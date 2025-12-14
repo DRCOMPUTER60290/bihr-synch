@@ -295,7 +295,12 @@ class BihrWI_Vehicle_Compatibility {
             set_transient( $transient_key, $total_lines, HOUR_IN_SECONDS );
         }
 
-        $batch_size = 2000; // Traiter 2000 lignes par batch (optimisé pour très gros fichiers)
+        // Optimisation MySQL : désactiver les vérifications de clés au début du premier batch
+        if ( $batch_start === 0 ) {
+            $wpdb->query( "ALTER TABLE {$this->compatibility_table} DISABLE KEYS" );
+        }
+
+        $batch_size = 5000; // Traiter 5000 lignes par batch (optimisé pour très gros fichiers)
         $h = fopen( $file_path, 'r' );
         
         if ( ! $h ) {
@@ -376,7 +381,7 @@ class BihrWI_Vehicle_Compatibility {
                 $values[] = $data['source_brand'];
             }
             
-            $sql = "INSERT INTO {$this->compatibility_table} 
+            $sql = "INSERT IGNORE INTO {$this->compatibility_table} 
                     (vehicle_code, part_number, barcode, manufacturer_part_number, 
                      position_id, position_value, attributes, source_brand) 
                     VALUES " . implode( ', ', $placeholders );
@@ -390,19 +395,17 @@ class BihrWI_Vehicle_Compatibility {
             }
         }
 
-        // Flush cache moins souvent (toutes les 5 batches au lieu de chaque batch)
-        if ( $batch_start % ( $batch_size * 5 ) === 0 ) {
-            wp_cache_flush();
-        }
-
         // Calculer la progression
         $processed = $batch_start + count( $batch );
         $progress = $total_lines > 0 ? round( ( $processed / $total_lines ) * 100 ) : 100;
         $is_complete = $processed >= $total_lines;
 
-        // Nettoyer le transient si terminé
+        // Nettoyer le transient et flush cache si terminé
         if ( $is_complete ) {
             delete_transient( $transient_key );
+            // Réactiver les index à la fin
+            $wpdb->query( "ALTER TABLE {$this->compatibility_table} ENABLE KEYS" );
+            wp_cache_flush();
         }
 
         return array(
