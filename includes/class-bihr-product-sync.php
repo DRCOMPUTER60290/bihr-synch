@@ -102,11 +102,8 @@ class BihrWI_Product_Sync {
                 break;
         }
 
-        $sql = $wpdb->prepare(
-            "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT %d OFFSET %d",
-            $per_page,
-            $offset
-        );
+        // Construction de la requête finale (les conditions WHERE sont déjà préparées)
+        $sql = "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT " . intval( $per_page ) . " OFFSET " . intval( $offset );
 
         return $wpdb->get_results( $sql );
     }
