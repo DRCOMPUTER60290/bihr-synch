@@ -43,11 +43,13 @@ Plugin WordPress pour la synchronisation automatique des produits BIHR avec WooC
 - 🤖 **Enrichissement IA** des descriptions via OpenAI GPT-4
 - 📊 **Filtrage avancé** (catégorie, prix, stock, recherche)
 - 📦 **Import multi-produits** avec barres de progression en temps réel
+- 🔢 **Prise en compte de `NewPartNumber`** (affichage + recherche + SKU WooCommerce)
 - 🖼️ **Gestion automatique des images**
 - 📈 **Gestion des stocks** en temps réel avec synchronisation programmable
 - 🔐 **Authentification OAuth** sécurisée
 - 📦 **Synchronisation automatique des commandes** vers l'API BIHR
 - 🏍️ **Filtre véhicule** pour les clients (compatibilité produits)
+- 🔁 **Outil admin “Synchro SKU”** depuis la compatibilité véhicules
 - ⚡ **Ultra-optimisé** : 10× plus rapide qu'initialement
 
 ## ✨ Fonctionnalités
@@ -64,7 +66,7 @@ Plugin WordPress pour la synchronisation automatique des produits BIHR avec WooC
 - Validation de la clé en temps réel
 - Test de connectivité API
 
-**Page:** `Menu WooCommerce > BIHR Synch > Authentification`
+**Page:** `Bihr Import > Authentification`
 
 ### 2. Téléchargement des catalogues
 
@@ -86,7 +88,7 @@ Le plugin télécharge automatiquement 6 types de catalogues :
 - ✅ Barre de progression en temps réel
 - ✅ Logs détaillés de chaque opération
 
-**Page:** `Menu WooCommerce > BIHR Synch > Authentification` (section Téléchargement)
+**Page:** `Bihr Import > Authentification` (section Téléchargement)
 
 ### 3. Gestion des catégories
 
@@ -109,12 +111,12 @@ G → OTHER PRODUCTS & SERVICES
 
 ### 4. Système de filtrage avancé
 
-**Page:** `Menu WooCommerce > BIHR Synch > Produits`
+**Page:** `Bihr Import > Produits Bihr`
 
 #### Filtres disponibles
 
 ##### 🔍 Recherche textuelle
-- Recherche dans : code produit, nom, description
+- Recherche dans : code produit, **NewPartNumber**, nom, description
 - Insensible à la casse
 - Correspondance partielle
 
@@ -146,7 +148,7 @@ G → OTHER PRODUCTS & SERVICES
 Affichage complet avec colonnes :
 - ☑️ **Sélection** : Case à cocher
 - 🔢 **ID** : ID interne
-- 📦 **Code** : Code produit BIHR
+- 📦 **Code** : `NewPartNumber` (si présent) sinon `ProductCode`
 - 📝 **Nom** : Nom du produit (priorité : `longdescription1`)
 - 💶 **Prix HT** : Prix revendeur
 - 📊 **Stock** : Niveau de stock
@@ -256,7 +258,7 @@ Texte de la description longue ici...
 
 ### 10. Logs et débogage
 
-**Page:** `Menu WooCommerce > BIHR Synch > Logs`
+**Page:** `Bihr Import > Logs`
 
 #### Fonctionnalités
 - 📝 Logs horodatés de toutes les opérations
@@ -299,6 +301,11 @@ Cette logique garantit que les noms les plus descriptifs sont utilisés.
 - 📦 Importer (unitaire ou multiple)
 - 📊 Voir l'état du stock et les prix
 
+#### Page Synchro SKU
+- 🔁 Synchroniser les SKU WooCommerce depuis la compatibilité véhicules
+- ✅ Utilise `part_number` (compatibilité) comme SKU
+- 🔍 Match automatique dans l'ordre : `NewPartNumber` → `_sku` actuel → `product_code`
+
 #### Page Logs
 - 📖 Consulter l'historique
 - 🗑️ Vider les logs
@@ -311,7 +318,7 @@ Cette logique garantit que les noms les plus descriptifs sont utilisés.
 
 ### 13. Synchronisation automatique des commandes
 
-**Page:** `Menu WooCommerce > BIHR Synch > Commandes`
+**Page:** `Bihr Import > Commandes`
 
 #### Fonctionnement automatique
 
@@ -416,7 +423,7 @@ Le plugin capture automatiquement :
 Ces informations sont visibles dans :
 - 📝 Les métadonnées de commande WooCommerce
 - 📋 Les notes de commande
-- 📊 Les logs du plugin (page BIHR Synch > Logs)
+- 📊 Les logs du plugin (page Bihr Import > Logs)
 
 #### Avantages
 
@@ -434,6 +441,22 @@ En cas d'échec :
 - 📝 Le message d'erreur est stocké
 - 📋 Une note est ajoutée à la commande
 - 📊 L'erreur est loguée pour analyse
+
+### 14. Synchronisation SKU depuis compatibilité véhicules
+
+**Page:** `Bihr Import > Synchro SKU`
+
+Cette fonctionnalité met à jour le SKU WooCommerce (`_sku`) pour qu'il corresponde au `part_number` de la table de compatibilité véhicules.
+
+**Pourquoi ?** Le filtre véhicule frontend recherche les produits par SKU (ex: `WHERE _sku = part_number`).
+
+**Correspondance automatique (anti-cas “CAR10206” / “1047882”) :**
+
+1. `_bihr_new_part_number` (NewPartNumber)
+2. `_sku` actuel
+3. `_bihr_product_code` (code BIHR)
+
+Si une correspondance est trouvée, le script met le SKU à jour avec `part_number`.
 
 ## 🚀 Installation
 
@@ -487,7 +510,7 @@ CREATE TABLE wp_bihr_products (
 
 ### 1. Configuration OAuth BIHR
 
-1. Rendez-vous dans `WooCommerce > BIHR Synch > Authentification`
+1. Rendez-vous dans `Bihr Import > Authentification`
 2. Renseignez vos identifiants BIHR :
    - **Client ID**
    - **Client Secret**
@@ -594,16 +617,22 @@ bihr-woocommerce-importer/
 │   │   └── bihr-progress.js         # JavaScript (AJAX, progression)
 │   └── views/
 │       ├── auth-page.php            # Page authentification
+│       ├── compatibility-page.php    # Import compatibilité véhicules
+│       ├── imported-products-page.php# Produits importés WooCommerce (suivi)
 │       ├── logs-page.php            # Page logs
+│       ├── margin-page.php           # Paramètres de marges
 │       ├── orders-settings-page.php # Page paramètres commandes
-│       └── products-page.php        # Page produits (filtres + import)
+│       ├── products-page.php         # Page produits (filtres + import)
+│       └── sku-sync-compatibility-page.php # Page admin : Synchro SKU
 │
 └── includes/                         # Classes métier
     ├── class-bihr-ai-enrichment.php # Enrichissement OpenAI
     ├── class-bihr-api-client.php    # Client API BIHR (OAuth)
     ├── class-bihr-logger.php        # Système de logs
     ├── class-bihr-order-sync.php    # Synchronisation des commandes
-    └── class-bihr-product-sync.php  # Synchronisation et import
+  ├── class-bihr-product-sync.php  # Parsing CSV, fusion, import WooCommerce
+  ├── class-bihr-vehicle-compatibility.php # Compatibilité véhicules
+  └── class-bihr-vehicle-filter.php # Filtre véhicule frontend
 ```
 
 ### Rôle de chaque classe
@@ -776,7 +805,7 @@ do_action('bihrwi_merge_catalogs');
 
 ### Comment désactiver la synchronisation automatique des commandes ?
 
-Rendez-vous dans `WooCommerce > BIHR Synch > Commandes` et décochez "Synchronisation automatique". Les commandes ne seront plus envoyées à BIHR automatiquement.
+Rendez-vous dans `Bihr Import > Commandes` et décochez "Synchronisation automatique". Les commandes ne seront plus envoyées à BIHR automatiquement.
 
 ### Que se passe-t-il si une commande contient des produits non-BIHR ?
 
@@ -798,7 +827,7 @@ define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 ```
 
-Les logs du plugin sont accessibles dans `WooCommerce > BIHR Synch > Logs`.
+Les logs du plugin sont accessibles dans `Bihr Import > Logs`.
 
 ### Rapporter un bug
 
@@ -906,7 +935,7 @@ France
 
 ---
 
-**🚀 Pour commencer, rendez-vous dans `WooCommerce > BIHR Synch > Authentification` !**
+**🚀 Pour commencer, rendez-vous dans `Bihr Import > Authentification` !**
 
 **📚 Documentation complète disponible dans les fichiers :**
 - `AUTO_STOCK_SYNC_GUIDE.md` : Guide synchronisation automatique
