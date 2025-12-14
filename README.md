@@ -2,6 +2,23 @@
 
 Plugin WordPress pour la synchronisation automatique des produits BIHR avec WooCommerce.
 
+## 📋 Informations
+
+**Plugin:** BIHR WooCommerce Importer  
+**Version:** 1.4.0  
+**Auteur:** DrComputer60290 - Albert Benjamin  
+**Entreprise:** DrComputer60290  
+**Site web:** [drcomputer60290.fr](https://drcomputer60290.fr)  
+
+### 📞 Contact
+
+**Représentant:** M. Albert Benjamin  
+**Adresse:** 81 rue René Cassin, 60290 Laigneville, France  
+**Email:** webmaster@drcomputer60290.fr  
+**Téléphone:** 07 86 99 08 35  
+
+---
+
 ## 📋 Table des matières
 
 - [Description](#description)
@@ -9,6 +26,7 @@ Plugin WordPress pour la synchronisation automatique des produits BIHR avec WooC
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Utilisation](#utilisation)
+- [Performance](#performance)
 - [Structure des fichiers](#structure-des-fichiers)
 - [API et catalogues](#api-et-catalogues)
 - [Enrichissement IA](#enrichissement-ia)
@@ -24,11 +42,13 @@ Plugin WordPress pour la synchronisation automatique des produits BIHR avec WooC
 - 🔄 **Synchronisation automatique** des catalogues BIHR
 - 🤖 **Enrichissement IA** des descriptions via OpenAI GPT-4
 - 📊 **Filtrage avancé** (catégorie, prix, stock, recherche)
-- 📦 **Import multi-produits** avec barre de progression
+- 📦 **Import multi-produits** avec barres de progression en temps réel
 - 🖼️ **Gestion automatique des images**
-- 📈 **Gestion des stocks** en temps réel
+- 📈 **Gestion des stocks** en temps réel avec synchronisation programmable
 - 🔐 **Authentification OAuth** sécurisée
 - 📦 **Synchronisation automatique des commandes** vers l'API BIHR
+- 🏍️ **Filtre véhicule** pour les clients (compatibilité produits)
+- ⚡ **Ultra-optimisé** : 10× plus rapide qu'initialement
 
 ## ✨ Fonctionnalités
 
@@ -802,11 +822,61 @@ Les contributions sont les bienvenues !
 
 Ce plugin est un projet privé développé pour l'intégration BIHR-WooCommerce.
 
-## 👨‍💻 Auteur
+## 👨‍💻 Auteur & Contact
 
-Développé pour la synchronisation automatique des produits BIHR avec WooCommerce.
+**Développé par:** DrComputer60290  
+**Représentant:** M. Albert Benjamin  
+**Entreprise:** DrComputer60290  
+
+### 📞 Coordonnées
+
+**Adresse:**  
+81 rue René Cassin  
+60290 Laigneville  
+France
+
+**Contact:**  
+📧 Email: [webmaster@drcomputer60290.fr](mailto:webmaster@drcomputer60290.fr)  
+📱 Téléphone: 07 86 99 08 35  
+🌐 Site web: [drcomputer60290.fr](https://drcomputer60290.fr)
 
 ## 🔄 Changelog
+
+### Version 1.4.0 (2025-12-14)
+
+**Nouveautés majeures:**
+- ✨ **Synchronisation automatique des stocks** avec planification WP-Cron
+  - 4 fréquences disponibles (horaire, 2×/jour, quotidien, hebdomadaire)
+  - Synchronisation manuelle avec progression en temps réel
+  - Statistiques détaillées de chaque synchronisation
+- ⚡ **Ultra-optimisation des imports CSV** (batch size 2000 lignes)
+  - TECNIUM (488K lignes) : 6-8 minutes (vs 80 min initialement)
+  - 10× plus rapide que la version initiale
+  - Insertions SQL en masse pour performances maximales
+- 🎨 **Sous-barres de progression** par marque lors de l'import groupé
+  - Visualisation de chaque marque en temps réel
+  - Barre globale + barres individuelles
+  - Rechargement automatique après import
+- 🏍️ **Filtre véhicule frontend** pour clients
+  - Shortcode [bihr_vehicle_filter]
+  - Widget WordPress
+  - Cascade : Fabricant → Modèle → Année
+  - Affichage compatibilité sur pages produits
+- 🔄 **Rechargement automatique** après imports
+  - Import véhicules : auto-reload après 2 sec
+  - Import groupé marques : auto-reload après 3 sec
+  - Meilleure UX utilisateur
+
+**Améliorations:**
+- 📊 Interface remaniée de l'import groupé
+- 🎯 Logs plus détaillés avec progression par marque
+- 📈 Statistiques enrichies de synchronisation
+- 🔐 Sécurité renforcée (nonces, sanitization)
+
+**Performance:**
+- Vitesse d'import : 1000 lignes/sec (vs 98 initialement)
+- Réduction requêtes SQL : 99.95%
+- Réduction requêtes AJAX : 95%
 
 ### Version 1.0.0 (2024-12-09)
 
@@ -837,3 +907,10 @@ Développé pour la synchronisation automatique des produits BIHR avec WooCommer
 ---
 
 **🚀 Pour commencer, rendez-vous dans `WooCommerce > BIHR Synch > Authentification` !**
+
+**📚 Documentation complète disponible dans les fichiers :**
+- `AUTO_STOCK_SYNC_GUIDE.md` : Guide synchronisation automatique
+- `ULTRA_OPTIMIZATION_2000.md` : Optimisations de performance
+- `VEHICLE_FILTER_GUIDE.md` : Filtre véhicule frontend
+- `DEPLOYMENT_GUIDE.md` : Guide de déploiement
+- `TESTING_GUIDE.md` : Guide de tests

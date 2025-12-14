@@ -2,9 +2,18 @@
 /**
  * Plugin Name: Bihr WooCommerce Importer
  * Description: Import des catalogues Bihr (Prices, Images, Attributes, Stocks) et création de produits WooCommerce.
- * Author: Benjamin / DrComputer60290
- * Version: 1.1.0
+ * Author: DrComputer60290 - Albert Benjamin
+ * Author URI: https://drcomputer60290.fr
+ * Version: 1.4.0
  * Text Domain: bihr-woocommerce-importer
+ * 
+ * Développé par: DrComputer60290
+ * Entreprise: DrComputer60290
+ * Représentant: M. Albert Benjamin
+ * Adresse: 81 rue René Cassin, 60290 Laigneville, France
+ * Email: webmaster@drcomputer60290.fr
+ * Téléphone: 07 86 99 08 35
+ * Site web: https://drcomputer60290.fr
  */
 
 // Sécurité de base
@@ -13,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Constantes
-define( 'BIHRWI_VERSION', '1.1.0' );
+define( 'BIHRWI_VERSION', '1.4.0' );
 define( 'BIHRWI_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BIHRWI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BIHRWI_LOG_FILE', WP_CONTENT_DIR . '/uploads/bihr-import/bihr-import.log' );

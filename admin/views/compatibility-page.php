@@ -174,19 +174,45 @@ $stats = $compatibility->get_statistics();
         <h2>3️⃣ Import groupé (toutes les marques)</h2>
         <p>
             Importez automatiquement les compatibilités de toutes les marques en une seule opération.
-            <br><strong>⚠️ Cette opération peut prendre plusieurs minutes.</strong>
+            <br><strong>⚠️ Cette opération peut prendre plusieurs minutes (estimé: 12-15 min pour toutes les marques).</strong>
         </p>
 
-        <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+        <div style="margin-bottom: 15px;">
             <button type="button" class="button button-primary button-large" id="btn-import-all-brands">🚀 Importer toutes les marques</button>
-            <div style="flex:1; min-width:250px;">
-                <div id="all-brands-progress" style="background:#eef2ff; height:16px; border-radius:8px; overflow:hidden; border:1px solid #cbd5e1;">
-                    <div id="all-brands-progress-bar" style="height:100%; width:0%; background:#16a34a;"></div>
-                </div>
-                <div id="all-brands-progress-text" style="font-size:12px; color:#555; margin-top:4px;"></div>
+        </div>
+
+        <!-- Barre de progression globale -->
+        <div style="background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #dee2e6; margin-bottom:15px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <strong>Progression globale</strong>
+                <span id="all-brands-global-text" style="font-weight:bold; color:#0073aa;">0%</span>
+            </div>
+            <div style="background:#fff; height:24px; border-radius:12px; overflow:hidden; border:1px solid #cbd5e1;">
+                <div id="all-brands-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg, #0073aa, #005a87); transition: width 0.3s;"></div>
             </div>
         </div>
-        <div id="all-brands-log" style="margin-top:10px; font-size:12px; color:#333; max-height:200px; overflow:auto; background:#f8fafc; border:1px solid #e2e8f0; padding:10px; border-radius:6px;"></div>
+
+        <!-- Sous-barres de progression par marque -->
+        <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #dee2e6;">
+            <h3 style="margin-top:0; font-size:14px; color:#555;">📊 Progression par marque</h3>
+            <div id="brands-progress-container" style="display:flex; flex-direction:column; gap:10px;">
+                <?php 
+                $brand_list = array( 'SHIN YO', 'TECNIUM', 'V BIKE', 'V PARTS', 'VECTOR', 'VICMA' );
+                foreach ( $brand_list as $brand ) : ?>
+                <div class="brand-progress-item" data-brand="<?php echo esc_attr( $brand ); ?>" style="opacity:0.5;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span style="font-weight:500; font-size:13px;"><?php echo esc_html( $brand ); ?></span>
+                        <span class="brand-progress-text" style="font-size:12px; color:#666;">En attente...</span>
+                    </div>
+                    <div style="background:#e9ecef; height:8px; border-radius:4px; overflow:hidden;">
+                        <div class="brand-progress-bar" style="height:100%; width:0%; background:#28a745; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <div id="all-brands-log" style="margin-top:15px; font-size:12px; color:#333; max-height:250px; overflow:auto; background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius:6px; display:none;"></div>
 
         <div style="margin-top:15px; display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
             <div>
@@ -291,11 +317,18 @@ jQuery(function($) {
         $.post(ajaxUrl, { action: 'bihrwi_import_vehicles', nonce }, function(resp) {
             if (resp.success) {
                 setProgress(bar, text, 100, resp.data.message || 'Import terminé');
+                // Rechargement automatique après 2 secondes
+                setTimeout(function() {
+                    location.reload();
+                }, 2000);
             } else {
                 setProgress(bar, text, 0, resp.data.message || 'Erreur');
+                btn.prop('disabled', false).text('📥 Importer les véhicules');
             }
-        }).fail(() => setProgress(bar, text, 0, 'Erreur de connexion'))
-        .always(() => btn.prop('disabled', false).text('📥 Importer les véhicules'));
+        }).fail(function() {
+            setProgress(bar, text, 0, 'Erreur de connexion');
+            btn.prop('disabled', false).text('📥 Importer les véhicules');
+        });
     });
 
     // Upload VehiclesList.zip
@@ -407,15 +440,17 @@ jQuery(function($) {
         importBatch();
     });
 
-    // Import groupé avec progression par marque et par batch (séquentiel)
+    // Import groupé avec sous-barres de progression par marque
     $('#btn-import-all-brands').on('click', function() {
         const btn = $(this);
-        const bar = $('#all-brands-progress-bar');
-        const text = $('#all-brands-progress-text');
+        const globalBar = $('#all-brands-progress-bar');
+        const globalText = $('#all-brands-global-text');
         const logBox = $('#all-brands-log');
+        
         btn.prop('disabled', true).text('⏳ Import en cours...');
-        logBox.empty();
-        setProgress(bar, text, 0, '0%');
+        logBox.show().empty();
+        globalBar.css('width', '0%');
+        globalText.text('0%');
 
         const total = brands.length;
         let currentBrandIndex = 0;
@@ -425,14 +460,26 @@ jQuery(function($) {
         function importBrandBatches(brandIndex) {
             if (brandIndex >= total) {
                 // Tous les marques sont importées
-                setProgress(bar, text, 100, 'Terminé');
-                logBox.append('<div style="color:#16a34a; font-weight: bold;">✅ Import de tous les marques terminé ! ' + totalImported + ' compatibilités importées</div>');
-                btn.prop('disabled', false).text('🚀 Importer toutes les marques');
+                globalBar.css('width', '100%');
+                globalText.text('100%');
+                logBox.append('<div style="color:#16a34a; font-weight: bold; padding:8px; background:#d4edda; border-radius:4px; margin-top:10px;">✅ Import terminé ! ' + totalImported + ' compatibilités importées au total</div>');
+                
+                // Rechargement automatique après 3 secondes
+                setTimeout(function() {
+                    location.reload();
+                }, 3000);
                 return;
             }
 
             const brand = brands[brandIndex];
-            logBox.append('<div>⏳ Démarrage de ' + brand + '...</div>');
+            const brandItem = $('.brand-progress-item[data-brand="' + brand + '"]');
+            const brandBar = brandItem.find('.brand-progress-bar');
+            const brandText = brandItem.find('.brand-progress-text');
+            
+            // Activer visuellement la marque en cours
+            brandItem.css('opacity', '1');
+            brandText.text('⏳ En cours...');
+            logBox.append('<div style="padding:4px 0;"><strong>' + brand + '</strong> : Démarrage...</div>');
             
             function importBrand(batchStart = 0) {
                 $.post(ajaxUrl, { 
@@ -446,29 +493,41 @@ jQuery(function($) {
                         totalImported += data.imported;
                         totalErrors += data.errors;
                         
-                        // Mise à jour de la progression globale (en tenant compte du nombre de marques)
-                        const brandProgress = (brandIndex / total) * 100;
-                        const brandBatchProgress = ((data.progress || 0) / 100) * (100 / total);
-                        const globalProgress = Math.round(brandProgress + brandBatchProgress);
+                        // Mise à jour barre de la marque
+                        const brandProgress = data.progress || 0;
+                        brandBar.css('width', brandProgress + '%');
+                        brandText.text(brandProgress + '% (' + data.processed + '/' + data.total_lines + ')');
                         
-                        logBox.append('<div style="color:#2563eb;">  ⏳ ' + brand + ' : ' + (data.progress || 0) + '% (' + data.processed + '/' + data.total_lines + ')</div>');
-                        setProgress(bar, text, globalProgress, globalProgress + '%');
+                        // Mise à jour de la progression globale
+                        const brandWeight = (brandIndex / total) * 100;
+                        const brandContribution = (brandProgress / 100) * (100 / total);
+                        const globalProgress = Math.round(brandWeight + brandContribution);
+                        globalBar.css('width', globalProgress + '%');
+                        globalText.text(globalProgress + '%');
                         
                         // Si ce batch n'est pas complet, continuer avec le marque courant
                         if (!data.is_complete && data.next_batch !== undefined) {
                             importBrand(data.next_batch);
                         } else {
-                            // Marque terminée, passer à la suivante
-                            logBox.append('<div style="color:#16a34a;">✅ ' + brand + ' : ' + totalImported + ' importés au total</div>');
+                            // Marque terminée
+                            brandBar.css('width', '100%').css('background', '#28a745');
+                            brandText.text('✅ Terminé').css('color', '#28a745');
+                            logBox.append('<div style="color:#16a34a; padding:4px 0;">✅ <strong>' + brand + '</strong> : ' + data.imported + ' compatibilités importées</div>');
+                            
+                            // Passer à la marque suivante
                             importBrandBatches(brandIndex + 1);
                         }
                     } else {
-                        logBox.append('<div style="color:#dc2626;">❌ ' + brand + ' : ' + (resp.data.message || 'Erreur') + '</div>');
-                        // Continuer avec la marque suivante même en cas d'erreur
+                        // Erreur
+                        brandBar.css('background', '#dc3545');
+                        brandText.text('❌ Erreur').css('color', '#dc3545');
+                        logBox.append('<div style="color:#dc2626; padding:4px 0;">❌ <strong>' + brand + '</strong> : ' + (resp.data.message || 'Erreur') + '</div>');
                         importBrandBatches(brandIndex + 1);
                     }
                 }).fail(function() {
-                    logBox.append('<div style="color:#dc2626;">❌ Erreur de connexion sur ' + brand + '</div>');
+                    brandBar.css('background', '#dc3545');
+                    brandText.text('❌ Connexion').css('color', '#dc3545');
+                    logBox.append('<div style="color:#dc2626; padding:4px 0;">❌ <strong>' + brand + '</strong> : Erreur de connexion</div>');
                     importBrandBatches(brandIndex + 1);
                 });
             }
