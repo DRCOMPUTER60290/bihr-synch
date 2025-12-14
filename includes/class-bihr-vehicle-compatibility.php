@@ -295,7 +295,7 @@ class BihrWI_Vehicle_Compatibility {
             set_transient( $transient_key, $total_lines, HOUR_IN_SECONDS );
         }
 
-        $batch_size = 100; // Traiter 100 lignes par batch
+        $batch_size = 500; // Traiter 500 lignes par batch (optimisé)
         $h = fopen( $file_path, 'r' );
         
         if ( ! $h ) {
@@ -359,16 +359,41 @@ class BihrWI_Vehicle_Compatibility {
 
         fclose( $h );
 
-        // Insérer le batch
-        foreach ( $batch as $data ) {
-            if ( $wpdb->insert( $this->compatibility_table, $data ) ) {
-                $count++;
+        // Insérer le batch en masse (optimisé)
+        if ( ! empty( $batch ) ) {
+            $values = array();
+            $placeholders = array();
+            
+            foreach ( $batch as $data ) {
+                $placeholders[] = "(%s, %s, %s, %s, %s, %s, %s, %s)";
+                $values[] = $data['vehicle_code'];
+                $values[] = $data['part_number'];
+                $values[] = $data['barcode'];
+                $values[] = $data['manufacturer_part_number'];
+                $values[] = $data['position_id'];
+                $values[] = $data['position_value'];
+                $values[] = $data['attributes'];
+                $values[] = $data['source_brand'];
+            }
+            
+            $sql = "INSERT INTO {$this->compatibility_table} 
+                    (vehicle_code, part_number, barcode, manufacturer_part_number, 
+                     position_id, position_value, attributes, source_brand) 
+                    VALUES " . implode( ', ', $placeholders );
+            
+            $result = $wpdb->query( $wpdb->prepare( $sql, $values ) );
+            
+            if ( $result ) {
+                $count = count( $batch );
             } else {
-                $errors++;
+                $errors = count( $batch );
             }
         }
 
-        wp_cache_flush();
+        // Flush cache moins souvent (toutes les 5 batches au lieu de chaque batch)
+        if ( $batch_start % ( $batch_size * 5 ) === 0 ) {
+            wp_cache_flush();
+        }
 
         // Calculer la progression
         $processed = $batch_start + count( $batch );
