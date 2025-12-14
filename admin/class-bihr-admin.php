@@ -364,6 +364,8 @@ class BihrWI_Admin {
     }
 
     public function render_products_page() {
+        global $wpdb;
+
         $current_page = isset( $_GET['paged'] ) ? max( 1, intval( $_GET['paged'] ) ) : 1;
         $per_page     = 20;
 
@@ -377,6 +379,8 @@ class BihrWI_Admin {
 
         // Calculer d'abord le total pour pouvoir borner la pagination (évite les pages vides)
         $total       = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category );
+        $debug_count_last_query = $wpdb->last_query;
+        $debug_count_last_error = $wpdb->last_error;
         $total_pages = max( 1, (int) ceil( $total / $per_page ) );
 
         // Si on demande une page au-delà du total, revenir à la dernière page valide
@@ -385,9 +389,14 @@ class BihrWI_Admin {
         }
 
         $products = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by );
+        $debug_products_last_query = $wpdb->last_query;
+        $debug_products_last_error = $wpdb->last_error;
         
         // Récupérer la liste des catégories disponibles pour le dropdown
         $available_categories = $this->product_sync->get_distinct_categories();
+
+        // Debug optionnel (affiché dans la vue uniquement si demandé)
+        $bihrwi_debug = isset( $_GET['bihrwi_debug'] ) ? (int) $_GET['bihrwi_debug'] : 0;
 
         include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
     }

@@ -45,6 +45,38 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
 <div class="wrap">
     <h1>Bihr Import – Produits Bihr</h1>
 
+    <?php if ( ! empty( $bihrwi_debug ) && current_user_can( 'manage_woocommerce' ) ) : ?>
+        <div class="notice notice-info" style="padding:10px;">
+            <p style="margin:0;"><strong>BIHR Debug</strong></p>
+            <p style="margin:6px 0 0;">
+                Page: <strong><?php echo intval( $current_page ); ?></strong> / <strong><?php echo intval( $total_pages ); ?></strong>
+                — Total: <strong><?php echo intval( $total ); ?></strong>
+                — Per page: <strong><?php echo intval( $per_page ); ?></strong>
+            </p>
+            <p style="margin:6px 0 0;">
+                Filtres: search=<code><?php echo esc_html( $filter_search ); ?></code>,
+                stock=<code><?php echo esc_html( $filter_stock ); ?></code>,
+                price_min=<code><?php echo esc_html( $filter_price_min ); ?></code>,
+                price_max=<code><?php echo esc_html( $filter_price_max ); ?></code>,
+                category=<code><?php echo esc_html( $filter_category ); ?></code>,
+                sort_by=<code><?php echo esc_html( $sort_by ); ?></code>
+            </p>
+            <?php if ( ! empty( $debug_count_last_error ) || ! empty( $debug_products_last_error ) ) : ?>
+                <p style="margin:6px 0 0; color:#b91c1c;"><strong>DB errors:</strong>
+                    <code><?php echo esc_html( trim( (string) $debug_count_last_error ) ); ?></code>
+                    <code><?php echo esc_html( trim( (string) $debug_products_last_error ) ); ?></code>
+                </p>
+            <?php endif; ?>
+            <details style="margin-top:8px;">
+                <summary>Requêtes SQL</summary>
+                <div style="margin-top:6px; font-family: monospace; font-size: 12px; white-space: pre-wrap;">
+                    <div><strong>COUNT</strong>: <?php echo esc_html( (string) $debug_count_last_query ); ?></div>
+                    <div style="margin-top:6px;"><strong>PRODUCTS</strong>: <?php echo esc_html( (string) $debug_products_last_query ); ?></div>
+                </div>
+            </details>
+        </div>
+    <?php endif; ?>
+
     <?php
     /* =======================
      *  NOTIFICATIONS (GET)
@@ -275,7 +307,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
 
     <p>
         <strong>Total :</strong> <?php echo intval( $total ); ?> produits
-        <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price ) || ! empty( $filter_category ) ) : ?>
+        <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || $filter_price_min !== '' || $filter_price_max !== '' || ! empty( $filter_category ) || ! empty( $sort_by ) ) : ?>
             (filtrés)
         <?php endif; ?>
     </p>
