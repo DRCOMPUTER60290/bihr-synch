@@ -11,7 +11,33 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @var int   $per_page
  * @var int   $total
  * @var int   $total_pages
+ * @var string $filter_search
+ * @var string $filter_stock
+ * @var string $filter_price_min
+ * @var string $filter_price_max
+ * @var string $filter_category
+ * @var string $sort_by
  */
+
+// Initialiser les variables de filtre si elles n'existent pas
+if ( ! isset( $filter_search ) ) {
+    $filter_search = '';
+}
+if ( ! isset( $filter_stock ) ) {
+    $filter_stock = '';
+}
+if ( ! isset( $filter_price_min ) ) {
+    $filter_price_min = '';
+}
+if ( ! isset( $filter_price_max ) ) {
+    $filter_price_max = '';
+}
+if ( ! isset( $filter_category ) ) {
+    $filter_category = '';
+}
+if ( ! isset( $sort_by ) ) {
+    $sort_by = '';
+}
 
 $status_data = get_option( 'bihrwi_prices_generation', array() );
 ?>
