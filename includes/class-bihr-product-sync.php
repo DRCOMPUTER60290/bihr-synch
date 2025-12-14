@@ -40,41 +40,43 @@ class BihrWI_Product_Sync {
 
         $offset = ( max( 1, (int) $page ) - 1 ) * max( 1, (int) $per_page );
 
-        // Construction de la requête avec filtres
-        $where = array( '1=1' );
+        // Construction de la requête avec filtres - utiliser une approche plus robuste
+        $where_conditions = array();
+        $where_values = array();
         
         // Filtre de recherche (code produit, nom, description)
         if ( ! empty( $search ) ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where[]     = $wpdb->prepare(
-                '(product_code LIKE %s OR name LIKE %s OR description LIKE %s)',
-                $search_like,
-                $search_like,
-                $search_like
-            );
+            $where_conditions[] = '(product_code LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $where_values[] = $search_like;
+            $where_values[] = $search_like;
+            $where_values[] = $search_like;
         }
 
         // Filtre de stock
         if ( $stock_filter === 'in_stock' ) {
-            $where[] = 'stock_level > 0';
+            $where_conditions[] = 'stock_level > 0';
         } elseif ( $stock_filter === 'out_of_stock' ) {
-            $where[] = '(stock_level = 0 OR stock_level IS NULL)';
+            $where_conditions[] = '(stock_level = 0 OR stock_level IS NULL)';
         }
 
         // Filtre de plage de prix
         if ( ! empty( $price_min ) && is_numeric( $price_min ) ) {
-            $where[] = $wpdb->prepare( 'dealer_price_ht >= %f', floatval( $price_min ) );
+            $where_conditions[] = 'dealer_price_ht >= %f';
+            $where_values[] = floatval( $price_min );
         }
         if ( ! empty( $price_max ) && is_numeric( $price_max ) ) {
-            $where[] = $wpdb->prepare( 'dealer_price_ht <= %f', floatval( $price_max ) );
+            $where_conditions[] = 'dealer_price_ht <= %f';
+            $where_values[] = floatval( $price_max );
         }
 
         // Filtre de catégorie
         if ( ! empty( $category_filter ) ) {
-            $where[] = $wpdb->prepare( 'category = %s', $category_filter );
+            $where_conditions[] = 'category = %s';
+            $where_values[] = $category_filter;
         }
 
-        $where_clause = implode( ' AND ', $where );
+        $where_clause = ! empty( $where_conditions ) ? implode( ' AND ', $where_conditions ) : '1=1';
 
         // Gestion du tri
         $order_clause = 'ORDER BY id ASC'; // Par défaut
@@ -102,10 +104,13 @@ class BihrWI_Product_Sync {
                 break;
         }
 
-        // Construction de la requête finale (les conditions WHERE sont déjà préparées)
-        $sql = "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT " . intval( $per_page ) . " OFFSET " . intval( $offset );
+        // Construction de la requête finale avec préparation correcte
+        $sql = "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT %d OFFSET %d";
+        $sql_values = array_merge( $where_values, array( $per_page, $offset ) );
+        
+        $query = $wpdb->prepare( $sql, $sql_values );
 
-        return $wpdb->get_results( $sql );
+        return $wpdb->get_results( $query );
     }
 
     /**
@@ -114,43 +119,49 @@ class BihrWI_Product_Sync {
     public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '' ) {
         global $wpdb;
 
-        // Construction de la requête avec filtres
-        $where = array( '1=1' );
+        // Construction de la requête avec filtres - utiliser une approche robuste
+        $where_conditions = array();
+        $where_values = array();
         
         // Filtre de recherche
         if ( ! empty( $search ) ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where[]     = $wpdb->prepare(
-                '(product_code LIKE %s OR name LIKE %s OR description LIKE %s)',
-                $search_like,
-                $search_like,
-                $search_like
-            );
+            $where_conditions[] = '(product_code LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $where_values[] = $search_like;
+            $where_values[] = $search_like;
+            $where_values[] = $search_like;
         }
 
         // Filtre de stock
         if ( $stock_filter === 'in_stock' ) {
-            $where[] = 'stock_level > 0';
+            $where_conditions[] = 'stock_level > 0';
         } elseif ( $stock_filter === 'out_of_stock' ) {
-            $where[] = '(stock_level = 0 OR stock_level IS NULL)';
+            $where_conditions[] = '(stock_level = 0 OR stock_level IS NULL)';
         }
 
         // Filtre de plage de prix
         if ( ! empty( $price_min ) && is_numeric( $price_min ) ) {
-            $where[] = $wpdb->prepare( 'dealer_price_ht >= %f', floatval( $price_min ) );
+            $where_conditions[] = 'dealer_price_ht >= %f';
+            $where_values[] = floatval( $price_min );
         }
         if ( ! empty( $price_max ) && is_numeric( $price_max ) ) {
-            $where[] = $wpdb->prepare( 'dealer_price_ht <= %f', floatval( $price_max ) );
+            $where_conditions[] = 'dealer_price_ht <= %f';
+            $where_values[] = floatval( $price_max );
         }
 
         // Filtre de catégorie
         if ( ! empty( $category_filter ) ) {
-            $where[] = $wpdb->prepare( 'category = %s', $category_filter );
+            $where_conditions[] = 'category = %s';
+            $where_values[] = $category_filter;
         }
 
-        $where_clause = implode( ' AND ', $where );
+        $where_clause = ! empty( $where_conditions ) ? implode( ' AND ', $where_conditions ) : '1=1';
 
-        return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_clause}" );
+        // Préparation correcte de la requête de comptage
+        $sql = "SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_clause}";
+        $query = ! empty( $where_values ) ? $wpdb->prepare( $sql, $where_values ) : $sql;
+
+        return (int) $wpdb->get_var( $query );
     }
 
     /* =========================================================
