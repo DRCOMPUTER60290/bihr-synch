@@ -552,15 +552,17 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
                     }
                 }
 
+                $base_admin_url = admin_url( 'admin.php' );
+
                 if ( $current_page > 1 ) {
                     $prev_params = array_merge( $params, array( 'paged' => $current_page - 1 ) );
-                    $prev_url = add_query_arg( $prev_params, admin_url( 'admin.php' ) );
+                    $prev_url = $base_admin_url . '?' . http_build_query( $prev_params, '', '&', PHP_QUERY_RFC3986 );
                     echo '<a class="button" href="' . esc_url( $prev_url ) . '">&laquo; Page précédente</a> ';
                 }
 
                 if ( $current_page < $total_pages ) {
                     $next_params = array_merge( $params, array( 'paged' => $current_page + 1 ) );
-                    $next_url = add_query_arg( $next_params, admin_url( 'admin.php' ) );
+                    $next_url = $base_admin_url . '?' . http_build_query( $next_params, '', '&', PHP_QUERY_RFC3986 );
                     echo '<a class="button" href="' . esc_url( $next_url ) . '">Page suivante &raquo;</a>';
                 }
                 ?>
