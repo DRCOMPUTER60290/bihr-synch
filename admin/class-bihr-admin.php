@@ -297,6 +297,15 @@ class BihrWI_Admin {
             'bihrwi_compatibility',
             array( $this, 'render_compatibility_page' )
         );
+
+        add_submenu_page(
+            'bihrwi_auth',
+            __( 'Synchronisation SKU (Compatibilité)', 'bihr-woocommerce-importer' ),
+            __( 'Synchro SKU', 'bihr-woocommerce-importer' ),
+            'manage_woocommerce',
+            'bihrwi_sku_sync_compat',
+            array( $this, 'render_sku_sync_compat_page' )
+        );
     }
 
     // === RENDER PAGES ===
@@ -356,6 +365,10 @@ class BihrWI_Admin {
         $last_token = get_transient( 'bihrwi_api_token' );
 
         include BIHRWI_PLUGIN_DIR . 'admin/views/auth-page.php';
+    }
+
+    public function render_sku_sync_compat_page() {
+        include BIHRWI_PLUGIN_DIR . 'admin/views/sku-sync-compatibility-page.php';
     }
 
     public function render_logs_page() {
