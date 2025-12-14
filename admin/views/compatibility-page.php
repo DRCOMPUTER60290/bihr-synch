@@ -144,11 +144,11 @@ $stats = $compatibility->get_statistics();
 
         <?php
         $brands = array(
-            'ARTI'          => '[ARTI].csv',
+            'ART'           => '[ART].csv',
             'BIHR'          => '[BIHR].csv',
-            'HIGHSIDEBIHR'  => '[HIGHSIDEBIHR].csv',
-            'IPEX'          => '[IPEX].csv',
-            'ITST'          => '[ITST].csv',
+            'HIGHSIDER'     => '[HIGHSIDER].csv',
+            'RFX'           => '[RFX].csv',
+            'RST'           => '[RST].csv',
             'SHIN YO'       => '[SHIN YO].csv',
             'TECNIUM'       => '[TECNIUM].csv',
             'V BIKE'        => '[V BIKE].csv',
