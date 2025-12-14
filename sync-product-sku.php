@@ -106,8 +106,8 @@ set_time_limit(0);
             foreach ($products as $product) {
                 $bihr_id = $product['bihr_id'];
                 $sku = $product['new_part_number'];
+                $product_code = $product['product_code'];
                 $current_product_id = $product['product_id'];
-                $product_name = $product['name'];
                 
                 // Étape 1: Trouver le produit WooCommerce
                 $wc_product_id = null;
@@ -115,14 +115,14 @@ set_time_limit(0);
                 if (!empty($current_product_id) && is_numeric($current_product_id)) {
                     $wc_product_id = intval($current_product_id);
                 } else {
-                    // Chercher par nom
+                    // Chercher par Code BIHR dans postmeta
                     $wc_product_id = $wpdb->get_var($wpdb->prepare("
-                        SELECT ID 
-                        FROM {$wpdb->posts} 
-                        WHERE post_type = 'product' 
-                        AND post_title = %s 
+                        SELECT post_id 
+                        FROM {$wpdb->postmeta} 
+                        WHERE meta_key = '_bihr_code' 
+                        AND meta_value = %s 
                         LIMIT 1
-                    ", $product_name));
+                    ", $product_code));
                     
                     if ($wc_product_id) {
                         // Mettre à jour le lien
