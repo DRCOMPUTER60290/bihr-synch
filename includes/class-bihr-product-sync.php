@@ -108,7 +108,8 @@ class BihrWI_Product_Sync {
         $sql = "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT %d OFFSET %d";
         $sql_values = array_merge( $where_values, array( $per_page, $offset ) );
         
-        $query = $wpdb->prepare( $sql, $sql_values );
+        // Utiliser ... pour dépacker l'array en arguments variables
+        $query = $wpdb->prepare( $sql, ...$sql_values );
 
         return $wpdb->get_results( $query );
     }
@@ -159,7 +160,7 @@ class BihrWI_Product_Sync {
 
         // Préparation correcte de la requête de comptage
         $sql = "SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_clause}";
-        $query = ! empty( $where_values ) ? $wpdb->prepare( $sql, $where_values ) : $sql;
+        $query = ! empty( $where_values ) ? $wpdb->prepare( $sql, ...$where_values ) : $sql;
 
         return (int) $wpdb->get_var( $query );
     }
