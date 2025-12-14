@@ -46,10 +46,11 @@ class BihrWI_Product_Sync {
         $where_conditions = array();
         $where_values = array();
         
-        // Filtre de recherche (code produit, nom, description)
+        // Filtre de recherche (code produit, NewPartNumber, nom, description)
         if ( ! empty( $search ) ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where_conditions[] = '(product_code LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $where_conditions[] = '(product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $where_values[] = $search_like;
             $where_values[] = $search_like;
             $where_values[] = $search_like;
             $where_values[] = $search_like;
@@ -140,7 +141,8 @@ class BihrWI_Product_Sync {
         // Filtre de recherche
         if ( ! empty( $search ) ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where_conditions[] = '(product_code LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $where_conditions[] = '(product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $where_values[] = $search_like;
             $where_values[] = $search_like;
             $where_values[] = $search_like;
             $where_values[] = $search_like;
@@ -221,6 +223,12 @@ class BihrWI_Product_Sync {
         $name = $row->name ?: $row->product_code;
         $product->set_name( $name );
 
+        // SKU : utiliser NewPartNumber si disponible, sinon ProductCode
+        $sku = ! empty( $row->new_part_number ) ? $row->new_part_number : $row->product_code;
+        if ( ! empty( $sku ) ) {
+            $product->set_sku( $sku );
+        }
+
         // Description de base
         $base_description = '';
         if ( ! empty( $row->description ) ) {
@@ -276,14 +284,11 @@ class BihrWI_Product_Sync {
 
         // Prix HT avec application de la marge
         if ( $row->dealer_price_ht !== null ) {
-            $price_with_margin = $this->calculate_price_with_margin( 
-                $row->dealer_price_ht, 
-                $row->category 
+            $price_with_margin = $this->calculate_price_with_margin(
+                $row->dealer_price_ht,
+                $row->category
             );
             $product->set_regular_price( wc_format_decimal( $price_with_margin ) );
-            
-            // Stocker le prix fournisseur dans les métadonnées
-            update_post_meta( $product_id_wc, '_bihr_supplier_price', $row->dealer_price_ht );
         }
 
         // Gestion du stock
@@ -295,6 +300,11 @@ class BihrWI_Product_Sync {
 
         // Sauvegarde du produit
         $product_id_wc = $product->save();
+
+        // Stocker le prix fournisseur dans les métadonnées
+        if ( $row->dealer_price_ht !== null ) {
+            update_post_meta( $product_id_wc, '_bihr_supplier_price', $row->dealer_price_ht );
+        }
 
         // Meta Bihr
         update_post_meta( $product_id_wc, '_bihr_product_code', $row->product_code );
@@ -1020,9 +1030,15 @@ class BihrWI_Product_Sync {
                 continue;
             }
 
+            $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
+
             $result[ $code ] = array(
                 'image_url' => $url_path, // chemin brut, sans préfixe
             );
+
+            if ( $new_part_number !== '' ) {
+                $result[ $code ]['new_part_number'] = $new_part_number;
+            }
         }
 
         $this->logger->log( 'Parsing Images: ' . count( $result ) . ' lignes.' );
@@ -1060,10 +1076,16 @@ class BihrWI_Product_Sync {
             $stock_level       = isset( $row['stocklevel'] ) ? (int) $row['stocklevel'] : null;
             $stock_description = isset( $row['stockleveldescription'] ) ? trim( $row['stockleveldescription'] ) : '';
 
+            $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
+
             $result[ $code ] = array(
                 'stock_level'       => $stock_level,
                 'stock_description' => $stock_description ?: null,
             );
+
+            if ( $new_part_number !== '' ) {
+                $result[ $code ]['new_part_number'] = $new_part_number;
+            }
         }
 
         $this->logger->log( 'Parsing Inventory: ' . count( $result ) . ' lignes.' );

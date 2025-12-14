@@ -320,7 +320,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
             
             <div style="flex: 1; min-width: 250px;">
                 <label for="search" style="display: block; margin-bottom: 5px; font-weight: 600;">
-                    Recherche (code, nom, description)
+                    Recherche (code, NewPartNumber, nom, description)
                 </label>
                 <input type="text" 
                        name="search" 
@@ -460,7 +460,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
                                data-name="<?php echo esc_attr( $row->name ?: $row->product_code ); ?>" />
                     </td>
                     <td><?php echo intval( $row->id ); ?></td>
-                    <td><?php echo esc_html( $row->product_code ); ?></td>
+                    <td><?php echo esc_html( ! empty( $row->new_part_number ) ? $row->new_part_number : $row->product_code ); ?></td>
                     <td><?php echo esc_html( $row->name ); ?></td>
                     <td>
                         <?php
