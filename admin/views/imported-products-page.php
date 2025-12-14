@@ -47,6 +47,158 @@ $total_pages = $results->max_num_pages;
 <div class="wrap">
     <h1><?php echo esc_html__( 'Produits Importés de BIHR', 'bihr-woocommerce-importer' ); ?></h1>
     
+    <!-- Section de configuration de synchronisation automatique des stocks -->
+    <div class="bihrwi-stock-sync-config" style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #0073aa; border-radius: 4px;">
+        <h2 style="margin-top: 0; display: flex; align-items: center; gap: 10px;">
+            <span class="dashicons dashicons-update-alt" style="color: #0073aa;"></span>
+            <?php esc_html_e( 'Synchronisation Automatique des Stocks', 'bihr-woocommerce-importer' ); ?>
+        </h2>
+        
+        <?php
+        $sync_settings = get_option( 'bihrwi_stock_sync_settings', array(
+            'enabled' => false,
+            'frequency' => 'daily',
+            'time' => '02:00',
+            'last_sync' => null,
+            'next_sync' => null
+        ) );
+        
+        $next_scheduled = wp_next_scheduled( 'bihrwi_auto_stock_sync' );
+        if ( $next_scheduled ) {
+            $sync_settings['next_sync'] = $next_scheduled;
+        }
+        ?>
+        
+        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="stock-sync-form">
+            <input type="hidden" name="action" value="bihrwi_save_stock_sync_settings">
+            <?php wp_nonce_field( 'bihrwi_stock_sync_settings', 'bihrwi_stock_sync_nonce' ); ?>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="sync_enabled"><?php esc_html_e( 'Activer la synchronisation automatique', 'bihr-woocommerce-importer' ); ?></label>
+                    </th>
+                    <td>
+                        <label for="sync_enabled">
+                            <input type="checkbox" 
+                                   id="sync_enabled" 
+                                   name="sync_enabled" 
+                                   value="1" 
+                                   <?php checked( $sync_settings['enabled'], true ); ?>>
+                            <?php esc_html_e( 'Mettre à jour automatiquement les stocks depuis l\'API BIHR', 'bihr-woocommerce-importer' ); ?>
+                        </label>
+                        <p class="description">
+                            <?php esc_html_e( 'Les stocks de tous les produits importés seront synchronisés selon la fréquence choisie.', 'bihr-woocommerce-importer' ); ?>
+                        </p>
+                    </td>
+                </tr>
+                
+                <tr id="frequency-row" style="<?php echo $sync_settings['enabled'] ? '' : 'display:none;'; ?>">
+                    <th scope="row">
+                        <label for="sync_frequency"><?php esc_html_e( 'Fréquence de synchronisation', 'bihr-woocommerce-importer' ); ?></label>
+                    </th>
+                    <td>
+                        <select id="sync_frequency" name="sync_frequency" style="min-width: 250px;">
+                            <option value="hourly" <?php selected( $sync_settings['frequency'], 'hourly' ); ?>>
+                                <?php esc_html_e( 'Toutes les heures', 'bihr-woocommerce-importer' ); ?>
+                            </option>
+                            <option value="twicedaily" <?php selected( $sync_settings['frequency'], 'twicedaily' ); ?>>
+                                <?php esc_html_e( 'Deux fois par jour (matin et soir)', 'bihr-woocommerce-importer' ); ?>
+                            </option>
+                            <option value="daily" <?php selected( $sync_settings['frequency'], 'daily' ); ?>>
+                                <?php esc_html_e( 'Une fois par jour', 'bihr-woocommerce-importer' ); ?>
+                            </option>
+                            <option value="weekly" <?php selected( $sync_settings['frequency'], 'weekly' ); ?>>
+                                <?php esc_html_e( 'Une fois par semaine', 'bihr-woocommerce-importer' ); ?>
+                            </option>
+                        </select>
+                        <p class="description">
+                            <?php esc_html_e( 'Choisissez la fréquence de mise à jour automatique des stocks.', 'bihr-woocommerce-importer' ); ?>
+                        </p>
+                    </td>
+                </tr>
+                
+                <tr id="time-row" style="<?php echo ( $sync_settings['enabled'] && in_array( $sync_settings['frequency'], array( 'daily', 'weekly' ) ) ) ? '' : 'display:none;'; ?>">
+                    <th scope="row">
+                        <label for="sync_time"><?php esc_html_e( 'Heure de synchronisation', 'bihr-woocommerce-importer' ); ?></label>
+                    </th>
+                    <td>
+                        <input type="time" 
+                               id="sync_time" 
+                               name="sync_time" 
+                               value="<?php echo esc_attr( $sync_settings['time'] ); ?>" 
+                               style="min-width: 150px;">
+                        <p class="description">
+                            <?php esc_html_e( 'Heure à laquelle la synchronisation quotidienne/hebdomadaire doit s\'exécuter (format 24h).', 'bihr-woocommerce-importer' ); ?>
+                        </p>
+                    </td>
+                </tr>
+                
+                <?php if ( ! empty( $sync_settings['last_sync'] ) ) : ?>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Dernière synchronisation', 'bihr-woocommerce-importer' ); ?></th>
+                    <td>
+                        <strong><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $sync_settings['last_sync'] ) ); ?></strong>
+                        <?php
+                        $last_sync_log = get_option( 'bihrwi_last_stock_sync_log' );
+                        if ( ! empty( $last_sync_log ) ) {
+                            echo '<p class="description">';
+                            printf(
+                                esc_html__( 'Produits synchronisés: %d | Réussis: %d | Échoués: %d | Durée: %s', 'bihr-woocommerce-importer' ),
+                                intval( $last_sync_log['total'] ?? 0 ),
+                                intval( $last_sync_log['success'] ?? 0 ),
+                                intval( $last_sync_log['failed'] ?? 0 ),
+                                esc_html( $last_sync_log['duration'] ?? 'N/A' )
+                            );
+                            echo '</p>';
+                        }
+                        ?>
+                    </td>
+                </tr>
+                <?php endif; ?>
+                
+                <?php if ( ! empty( $sync_settings['next_sync'] ) ) : ?>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Prochaine synchronisation', 'bihr-woocommerce-importer' ); ?></th>
+                    <td>
+                        <strong><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $sync_settings['next_sync'] ) ); ?></strong>
+                        <p class="description">
+                            <?php
+                            $time_until = human_time_diff( current_time( 'timestamp' ), $sync_settings['next_sync'] );
+                            /* translators: %s: temps restant */
+                            printf( esc_html__( 'Dans %s', 'bihr-woocommerce-importer' ), esc_html( $time_until ) );
+                            ?>
+                        </p>
+                    </td>
+                </tr>
+                <?php endif; ?>
+            </table>
+            
+            <p class="submit">
+                <button type="submit" class="button button-primary">
+                    <span class="dashicons dashicons-saved" style="margin-top: 3px;"></span>
+                    <?php esc_html_e( 'Enregistrer les paramètres', 'bihr-woocommerce-importer' ); ?>
+                </button>
+                
+                <button type="button" id="manual-sync-now" class="button button-secondary" style="margin-left: 10px;">
+                    <span class="dashicons dashicons-update" style="margin-top: 3px;"></span>
+                    <?php esc_html_e( 'Synchroniser maintenant', 'bihr-woocommerce-importer' ); ?>
+                </button>
+            </p>
+        </form>
+        
+        <!-- Zone de notification pour synchronisation manuelle -->
+        <div id="manual-sync-notification" style="display: none; background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 12px; margin-top: 15px; border-radius: 4px;">
+            <strong id="manual-sync-message"></strong>
+            <div id="manual-sync-progress" style="margin-top: 8px;">
+                <div style="background: #fff; height: 20px; border-radius: 3px; overflow: hidden;">
+                    <div id="manual-progress-bar" style="background: #28a745; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <small id="manual-progress-text" style="display: block; margin-top: 5px;"></small>
+            </div>
+        </div>
+    </div>
+    
     <div class="bihrwi-filters" style="background: #fff; padding: 15px; margin: 20px 0; border: 1px solid #ccc; border-radius: 4px;">
         <form method="get" action="">
             <input type="hidden" name="page" value="bihrwi_imported_products">
@@ -295,6 +447,108 @@ jQuery(document).ready(function($) {
     if (!nonce) {
         console.error('⚠️ ERREUR: Nonce manquant! Le script bihr-progress.js n\'est peut-être pas chargé.');
     }
+    
+    // === Gestion de la configuration de synchronisation automatique ===
+    
+    // Afficher/masquer les options selon l'activation
+    $('#sync_enabled').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#frequency-row').slideDown();
+            updateTimeRowVisibility();
+        } else {
+            $('#frequency-row').slideUp();
+            $('#time-row').slideUp();
+        }
+    });
+    
+    // Afficher/masquer l'heure selon la fréquence
+    $('#sync_frequency').on('change', function() {
+        updateTimeRowVisibility();
+    });
+    
+    function updateTimeRowVisibility() {
+        var frequency = $('#sync_frequency').val();
+        if (frequency === 'daily' || frequency === 'weekly') {
+            $('#time-row').slideDown();
+        } else {
+            $('#time-row').slideUp();
+        }
+    }
+    
+    // Synchronisation manuelle
+    $('#manual-sync-now').on('click', function() {
+        if (!confirm('Voulez-vous synchroniser les stocks de TOUS les produits maintenant ?\\n\\nCette opération peut prendre plusieurs minutes selon le nombre de produits.')) {
+            return;
+        }
+        
+        var $button = $(this);
+        var $notification = $('#manual-sync-notification');
+        var $message = $('#manual-sync-message');
+        var $progressBar = $('#manual-progress-bar');
+        var $progressText = $('#manual-progress-text');
+        
+        // Désactiver le bouton
+        $button.prop('disabled', true);
+        $button.find('.dashicons').addClass('spin');
+        
+        // Afficher la notification
+        $message.text('⏳ Synchronisation en cours...');
+        $progressText.text('Initialisation...');
+        $progressBar.css('width', '0%');
+        $notification.css('background', '#d4edda').show();
+        
+        console.log('Démarrage synchronisation manuelle...');
+        
+        $.ajax({
+            url: ajaxUrl,
+            method: 'POST',
+            data: {
+                action: 'bihrwi_manual_stock_sync',
+                nonce: nonce
+            },
+            beforeSend: function() {
+                console.log('Requête de synchronisation manuelle envoyée');
+            },
+            success: function(response) {
+                console.log('Réponse synchronisation:', response);
+                
+                if (response.success) {
+                    var data = response.data;
+                    $notification.css('background', '#d4edda');
+                    $message.html('✅ Synchronisation terminée !');
+                    $progressBar.css('width', '100%');
+                    $progressText.html(
+                        '<strong>Résultat:</strong> ' + data.total + ' produits | ' +
+                        '<span style="color: green;">' + data.success + ' réussis</span> | ' +
+                        '<span style="color: red;">' + data.failed + ' échoués</span> | ' +
+                        'Durée: ' + data.duration
+                    );
+                    
+                    // Recharger la page après 3 secondes
+                    setTimeout(function() {
+                        location.reload();
+                    }, 3000);
+                    
+                } else {
+                    $notification.css('background', '#f8d7da');
+                    $message.text('❌ Erreur: ' + (response.data.message || 'Erreur inconnue'));
+                    $progressBar.css('width', '100%').css('background', '#dc3545');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur AJAX synchronisation:', {xhr: xhr, status: status, error: error});
+                $notification.css('background', '#f8d7da');
+                $message.text('❌ Erreur de connexion: ' + error);
+                $progressBar.css('width', '100%').css('background', '#dc3545');
+            },
+            complete: function() {
+                $button.prop('disabled', false);
+                $button.find('.dashicons').removeClass('spin');
+            }
+        });
+    });
+    
+    // === Gestion des stocks individuels ===
     
     // Compteur de produits sélectionnés
     function updateSelectedCount() {

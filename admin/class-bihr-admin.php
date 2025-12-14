@@ -44,6 +44,16 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_upload_vehicles_zip', array( $this, 'ajax_upload_vehicles_zip' ) );
         add_action( 'wp_ajax_bihrwi_upload_links_zip', array( $this, 'ajax_upload_links_zip' ) );
 
+        // Handlers pour synchronisation automatique des stocks
+        add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
+        add_action( 'wp_ajax_bihrwi_manual_stock_sync', array( $this, 'ajax_manual_stock_sync' ) );
+        
+        // WP-Cron hooks pour synchronisation automatique
+        add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
+        
+        // Initialiser le WP-Cron si activé
+        add_action( 'init', array( $this, 'setup_stock_sync_cron' ) );
+
     }
 	
 	/**
@@ -1537,6 +1547,281 @@ class BihrWI_Admin {
         exit;
     }
 
+    /* =========================================================
+     *   SYNCHRONISATION AUTOMATIQUE DES STOCKS
+     * ======================================================= */
+
+    /**
+     * Initialise le WP-Cron pour la synchronisation automatique
+     */
+    public function setup_stock_sync_cron() {
+        $settings = get_option( 'bihrwi_stock_sync_settings', array( 'enabled' => false ) );
+
+        // Si désactivé, supprimer le cron
+        if ( empty( $settings['enabled'] ) ) {
+            $timestamp = wp_next_scheduled( 'bihrwi_auto_stock_sync' );
+            if ( $timestamp ) {
+                wp_unschedule_event( $timestamp, 'bihrwi_auto_stock_sync' );
+            }
+            return;
+        }
+
+        // Vérifier si le cron est déjà planifié
+        if ( ! wp_next_scheduled( 'bihrwi_auto_stock_sync' ) ) {
+            $frequency = $settings['frequency'] ?? 'daily';
+            $time = $settings['time'] ?? '02:00';
+
+            // Calculer le timestamp de la première exécution
+            $first_run = $this->calculate_next_sync_time( $frequency, $time );
+
+            wp_schedule_event( $first_run, $frequency, 'bihrwi_auto_stock_sync' );
+            
+            $this->logger->log( "WP-Cron planifié pour synchronisation automatique: " . date( 'Y-m-d H:i:s', $first_run ) );
+        }
+    }
+
+    /**
+     * Calcule le timestamp de la prochaine synchronisation
+     */
+    private function calculate_next_sync_time( $frequency, $time = '02:00' ) {
+        $current_time = current_time( 'timestamp' );
+
+        switch ( $frequency ) {
+            case 'hourly':
+                return strtotime( '+1 hour', $current_time );
+
+            case 'twicedaily':
+                // Deux fois par jour: 06:00 et 18:00
+                $today_morning = strtotime( 'today 06:00', $current_time );
+                $today_evening = strtotime( 'today 18:00', $current_time );
+                
+                if ( $current_time < $today_morning ) {
+                    return $today_morning;
+                } elseif ( $current_time < $today_evening ) {
+                    return $today_evening;
+                } else {
+                    return strtotime( 'tomorrow 06:00', $current_time );
+                }
+
+            case 'weekly':
+                // Une fois par semaine, le dimanche à l'heure spécifiée
+                list( $hour, $minute ) = explode( ':', $time );
+                $next_sunday = strtotime( 'next sunday ' . $hour . ':' . $minute, $current_time );
+                return $next_sunday;
+
+            case 'daily':
+            default:
+                // Une fois par jour à l'heure spécifiée
+                list( $hour, $minute ) = explode( ':', $time );
+                $today = strtotime( 'today ' . $hour . ':' . $minute, $current_time );
+                
+                if ( $current_time < $today ) {
+                    return $today;
+                } else {
+                    return strtotime( 'tomorrow ' . $hour . ':' . $minute, $current_time );
+                }
+        }
+    }
+
+    /**
+     * Handler POST: Sauvegarde des paramètres de synchronisation
+     */
+    public function handle_save_stock_sync_settings() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( 'Permission refusée' );
+        }
+
+        check_admin_referer( 'bihrwi_stock_sync_settings', 'bihrwi_stock_sync_nonce' );
+
+        $enabled = isset( $_POST['sync_enabled'] ) ? true : false;
+        $frequency = sanitize_text_field( $_POST['sync_frequency'] ?? 'daily' );
+        $time = sanitize_text_field( $_POST['sync_time'] ?? '02:00' );
+
+        $settings = array(
+            'enabled' => $enabled,
+            'frequency' => $frequency,
+            'time' => $time,
+            'last_sync' => get_option( 'bihrwi_stock_sync_settings' )['last_sync'] ?? null,
+        );
+
+        update_option( 'bihrwi_stock_sync_settings', $settings );
+
+        // Reconfigurer le WP-Cron
+        $timestamp = wp_next_scheduled( 'bihrwi_auto_stock_sync' );
+        if ( $timestamp ) {
+            wp_unschedule_event( $timestamp, 'bihrwi_auto_stock_sync' );
+        }
+
+        if ( $enabled ) {
+            $next_run = $this->calculate_next_sync_time( $frequency, $time );
+            wp_schedule_event( $next_run, $frequency, 'bihrwi_auto_stock_sync' );
+            
+            $this->logger->log( "Paramètres de synchronisation automatique sauvegardés. Prochaine exécution: " . date( 'Y-m-d H:i:s', $next_run ) );
+        } else {
+            $this->logger->log( "Synchronisation automatique désactivée." );
+        }
+
+        $redirect_url = add_query_arg( 
+            array( 
+                'page' => 'bihrwi_imported_products',
+                'sync_settings_saved' => '1'
+            ), 
+            admin_url( 'admin.php' ) 
+        );
+
+        wp_redirect( $redirect_url );
+        exit;
+    }
+
+    /**
+     * AJAX: Synchronisation manuelle immédiate
+     */
+    public function ajax_manual_stock_sync() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée' ) );
+        }
+
+        try {
+            $result = $this->sync_all_products_stock();
+            
+            // Mettre à jour la date de dernière synchronisation
+            $settings = get_option( 'bihrwi_stock_sync_settings', array() );
+            $settings['last_sync'] = current_time( 'timestamp' );
+            update_option( 'bihrwi_stock_sync_settings', $settings );
+
+            wp_send_json_success( $result );
+
+        } catch ( Exception $e ) {
+            $this->logger->log( 'AJAX: Erreur synchronisation manuelle - ' . $e->getMessage() );
+            wp_send_json_error( array( 'message' => $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * Exécute la synchronisation automatique (appelée par WP-Cron)
+     */
+    public function run_auto_stock_sync() {
+        $this->logger->log( '=== Début synchronisation automatique des stocks ===' );
+
+        try {
+            $result = $this->sync_all_products_stock();
+
+            // Mettre à jour la date de dernière synchronisation
+            $settings = get_option( 'bihrwi_stock_sync_settings', array() );
+            $settings['last_sync'] = current_time( 'timestamp' );
+            update_option( 'bihrwi_stock_sync_settings', $settings );
+
+            $this->logger->log( sprintf(
+                'Synchronisation automatique terminée: %d produits, %d réussis, %d échoués',
+                $result['total'],
+                $result['success'],
+                $result['failed']
+            ) );
+
+        } catch ( Exception $e ) {
+            $this->logger->log( 'ERREUR synchronisation automatique: ' . $e->getMessage() );
+        }
+
+        $this->logger->log( '=== Fin synchronisation automatique des stocks ===' );
+    }
+
+    /**
+     * Synchronise les stocks de tous les produits
+     */
+    private function sync_all_products_stock() {
+        $start_time = microtime( true );
+        $total = 0;
+        $success = 0;
+        $failed = 0;
+
+        // Récupérer tous les produits WooCommerce avec un code BIHR
+        $args = array(
+            'status' => 'publish',
+            'limit' => -1,
+            'return' => 'ids',
+        );
+
+        $product_ids = wc_get_products( $args );
+        $total = count( $product_ids );
+
+        $this->logger->log( "Début synchronisation de $total produits..." );
+
+        foreach ( $product_ids as $product_id ) {
+            $product = wc_get_product( $product_id );
+            if ( ! $product ) {
+                continue;
+            }
+
+            $product_code = $product->get_sku();
+            if ( empty( $product_code ) ) {
+                $product_code = get_post_meta( $product_id, '_bihr_product_code', true );
+            }
+
+            if ( empty( $product_code ) ) {
+                continue; // Pas de code BIHR, on skip
+            }
+
+            try {
+                // Récupérer le stock depuis l'API
+                $api_product = $this->api_client->get_product_by_code( $product_code );
+
+                if ( $api_product && isset( $api_product['stock_level'] ) ) {
+                    $stock_level = intval( $api_product['stock_level'] );
+
+                    // Mettre à jour le stock WooCommerce
+                    $product->set_stock_quantity( $stock_level );
+                    
+                    if ( $stock_level > 0 ) {
+                        $product->set_stock_status( 'instock' );
+                    } else {
+                        $product->set_stock_status( 'outofstock' );
+                    }
+
+                    $product->save();
+                    $success++;
+
+                    // Log tous les 100 produits
+                    if ( $success % 100 === 0 ) {
+                        $this->logger->log( "Progression: $success/$total produits synchronisés..." );
+                    }
+
+                    // Rate limit: 1 requête par seconde
+                    usleep( 1100000 ); // 1.1 seconde
+
+                } else {
+                    $failed++;
+                }
+
+            } catch ( Exception $e ) {
+                $failed++;
+                $this->logger->log( "Erreur sync produit $product_code: " . $e->getMessage() );
+            }
+        }
+
+        $end_time = microtime( true );
+        $duration = round( $end_time - $start_time, 2 );
+        $duration_formatted = gmdate( 'H:i:s', (int) $duration );
+
+        // Sauvegarder les statistiques de la dernière synchronisation
+        update_option( 'bihrwi_last_stock_sync_log', array(
+            'total' => $total,
+            'success' => $success,
+            'failed' => $failed,
+            'duration' => $duration_formatted,
+            'timestamp' => current_time( 'timestamp' )
+        ) );
+
+        return array(
+            'total' => $total,
+            'success' => $success,
+            'failed' => $failed,
+            'duration' => $duration_formatted
+        );
+    }
+
 	
 	
 }
+
