@@ -26,6 +26,7 @@ require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-ai-enrichment.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-sync.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-order-sync.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-compatibility.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-filter.php';
 require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
 
 // Activation : création table + dossier logs
@@ -194,5 +195,10 @@ add_action( 'plugins_loaded', function() {
         $logger     = new BihrWI_Logger();
         $api_client = new BihrWI_API_Client( $logger );
         new BihrWI_Order_Sync( $logger, $api_client );
+    }
+    
+    // Initialisation du filtre véhicule (frontend)
+    if ( class_exists( 'WooCommerce' ) ) {
+        new BihrWI_Vehicle_Filter();
     }
 } );

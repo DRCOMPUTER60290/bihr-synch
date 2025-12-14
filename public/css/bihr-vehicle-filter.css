@@ -1,0 +1,329 @@
+/* ===================================
+   BIHR Vehicle Filter Styles
+   =================================== */
+
+.bihr-vehicle-filter-wrapper {
+    background: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 20px 0;
+}
+
+.bihr-filter-title {
+    margin: 0 0 20px 0;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #0073aa;
+    color: #23282d;
+    font-size: 24px;
+}
+
+/* Form Layout */
+.bihr-vehicle-filter-form {
+    width: 100%;
+}
+
+.bihr-filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.bihr-filter-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.bihr-filter-field label {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 14px;
+}
+
+.bihr-filter-field select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: #fff;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.bihr-filter-field select:hover:not(:disabled) {
+    border-color: #0073aa;
+}
+
+.bihr-filter-field select:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Actions */
+.bihr-filter-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.bihr-filter-button,
+.bihr-reset-button {
+    padding: 12px 24px !important;
+    font-size: 15px !important;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: none;
+}
+
+.bihr-filter-button {
+    background-color: #0073aa;
+    color: #fff;
+}
+
+.bihr-filter-button:hover {
+    background-color: #005a87;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 115, 170, 0.3);
+}
+
+.bihr-reset-button {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.bihr-reset-button:hover {
+    background-color: #e0e0e0;
+}
+
+/* Results */
+.bihr-filter-results {
+    margin-top: 30px;
+    padding-top: 25px;
+    border-top: 2px solid #eee;
+}
+
+.bihr-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.bihr-results-header h4 {
+    margin: 0;
+    color: #0073aa;
+    font-size: 20px;
+}
+
+.bihr-results-count {
+    background: #0073aa;
+    color: #fff;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.bihr-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    font-size: 16px;
+}
+
+.bihr-no-results {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.bihr-no-results p {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+}
+
+.bihr-error {
+    padding: 15px;
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Products Grid */
+.bihr-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.bihr-product-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+}
+
+.bihr-product-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.bihr-product-image {
+    display: block;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bihr-product-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.3s;
+}
+
+.bihr-product-image:hover img {
+    transform: scale(1.05);
+}
+
+.bihr-product-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.bihr-product-details h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.bihr-product-details h4 a {
+    color: #333;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.bihr-product-details h4 a:hover {
+    color: #0073aa;
+}
+
+.bihr-product-sku {
+    font-size: 12px;
+    color: #777;
+    margin: 0 0 10px 0;
+}
+
+.bihr-product-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0073aa;
+    margin: auto 0 15px 0;
+}
+
+.bihr-view-product {
+    display: block;
+    text-align: center;
+    padding: 10px 15px;
+    background-color: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.bihr-view-product:hover {
+    background-color: #005a87;
+    color: #fff;
+}
+
+/* Product Compatibility (single product page) */
+.bihr-product-compatibility {
+    margin: 25px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-left: 4px solid #0073aa;
+    border-radius: 4px;
+}
+
+.bihr-product-compatibility h3 {
+    margin: 0 0 15px 0;
+    color: #0073aa;
+    font-size: 18px;
+}
+
+.bihr-compatibility-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+
+.bihr-compatibility-item {
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.bihr-compatibility-item strong {
+    display: block;
+    color: #0073aa;
+    margin-bottom: 3px;
+}
+
+.bihr-compatibility-item .year {
+    color: #666;
+    font-size: 12px;
+}
+
+.bihr-compatibility-item .version {
+    display: block;
+    color: #999;
+    font-size: 11px;
+    margin-top: 3px;
+}
+
+.bihr-more-vehicles {
+    margin: 15px 0 0 0;
+    text-align: center;
+    color: #666;
+    font-size: 13px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .bihr-filter-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .bihr-products-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .bihr-filter-actions {
+        flex-direction: column;
+    }
+    
+    .bihr-filter-button,
+    .bihr-reset-button {
+        width: 100%;
+    }
+    
+    .bihr-results-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
