@@ -1,6 +1,8 @@
 jQuery(document).ready(function($) {
     
-    console.log('BIHR Vehicle Filter loaded');
+    console.log('🚗 BIHR Vehicle Filter loaded');
+    console.log('AJAX URL:', bihrVehicleFilter.ajaxurl);
+    console.log('Nonce:', bihrVehicleFilter.nonce ? 'Present' : 'MISSING');
 
     const ajaxUrl = bihrVehicleFilter.ajaxurl;
     const nonce = bihrVehicleFilter.nonce;
@@ -19,6 +21,8 @@ jQuery(document).ready(function($) {
      * Charge les fabricants au chargement de la page
      */
     function loadManufacturers() {
+        console.log('📡 Chargement des fabricants...');
+        
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
@@ -26,8 +30,15 @@ jQuery(document).ready(function($) {
                 action: 'bihr_get_manufacturers',
                 nonce: nonce
             },
+            beforeSend: function() {
+                console.log('→ Envoi requête fabricants');
+            },
             success: function(response) {
+                console.log('← Réponse fabricants:', response);
+                
                 if (response.success && response.data.manufacturers) {
+                    console.log('✅ ' + response.data.manufacturers.length + ' fabricants trouvés');
+                    
                     $manufacturer.empty().append('<option value="">-- Sélectionnez un fabricant --</option>');
                     
                     response.data.manufacturers.forEach(function(manu) {
@@ -37,10 +48,18 @@ jQuery(document).ready(function($) {
                                 .text(manu.manufacturer_name)
                         );
                     });
+                } else {
+                    console.error('❌ Réponse invalide ou pas de fabricants');
+                    console.log('Response data:', response.data);
                 }
             },
-            error: function() {
-                console.error('Erreur lors du chargement des fabricants');
+            error: function(xhr, status, error) {
+                console.error('❌ Erreur AJAX fabricants:', {
+                    status: status,
+                    error: error,
+                    response: xhr.responseText
+                });
+                $manufacturer.empty().append('<option value="">❌ Erreur de chargement</option>');
             }
         });
     }
