@@ -295,7 +295,7 @@ class BihrWI_Vehicle_Compatibility {
             set_transient( $transient_key, $total_lines, HOUR_IN_SECONDS );
         }
 
-        $batch_size = 500; // Traiter 500 lignes par batch (optimisé)
+        $batch_size = 2000; // Traiter 2000 lignes par batch (optimisé pour très gros fichiers)
         $h = fopen( $file_path, 'r' );
         
         if ( ! $h ) {
