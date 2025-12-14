@@ -75,7 +75,7 @@ set_time_limit(0);
                 AND p.post_type = 'product'
                 AND EXISTS (
                     SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
-                    WHERE vc.barcode = pm.meta_value
+                    WHERE vc.part_number = pm.meta_value
                 )
             ");
             
@@ -99,7 +99,7 @@ set_time_limit(0);
                     p.post_title as name
                 FROM {$wpdb->postmeta} pm
                 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
-                INNER JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.barcode = pm.meta_value
+                INNER JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = pm.meta_value
                 WHERE pm.meta_key = '_bihr_product_code'
                 AND pm.meta_value IS NOT NULL
                 AND pm.meta_value != ''
@@ -211,7 +211,7 @@ set_time_limit(0);
                 AND p.post_type = 'product'
                 AND EXISTS (
                     SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
-                    WHERE vc.barcode = pm.meta_value
+                    WHERE vc.part_number = pm.meta_value
                 )
             ");
             
@@ -244,7 +244,7 @@ set_time_limit(0);
                 FROM {$wpdb->postmeta} pm_code
                 INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
                 LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                LEFT JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.barcode = pm_code.meta_value
+                LEFT JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = pm_code.meta_value
                 WHERE pm_code.meta_key = '_bihr_product_code'
                 AND pm_code.meta_value IS NOT NULL
                 AND pm_code.meta_value != ''
