@@ -375,9 +375,16 @@ class BihrWI_Admin {
         $filter_category = isset( $_GET['category_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['category_filter'] ) ) : '';
         $sort_by         = isset( $_GET['sort_by'] ) ? sanitize_text_field( wp_unslash( $_GET['sort_by'] ) ) : '';
 
-        $products     = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by );
-        $total        = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category );
-        $total_pages  = max( 1, ceil( $total / $per_page ) );
+        // Calculer d'abord le total pour pouvoir borner la pagination (évite les pages vides)
+        $total       = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category );
+        $total_pages = max( 1, (int) ceil( $total / $per_page ) );
+
+        // Si on demande une page au-delà du total, revenir à la dernière page valide
+        if ( $current_page > $total_pages ) {
+            $current_page = $total_pages;
+        }
+
+        $products = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by );
         
         // Récupérer la liste des catégories disponibles pour le dropdown
         $available_categories = $this->product_sync->get_distinct_categories();

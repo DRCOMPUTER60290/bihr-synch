@@ -509,29 +509,15 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
         <div class="tablenav">
             <div class="tablenav-pages">
                 <?php
-                // Construction de l'URL de base en préservant tous les paramètres de filtre
-                $params = array(
-                    'page' => 'bihrwi_products'
-                );
-                
-                // Ajouter les paramètres de filtre s'ils existent
-                if ( ! empty( $filter_search ) ) {
-                    $params['search'] = $filter_search;
-                }
-                if ( ! empty( $filter_stock ) ) {
-                    $params['stock_filter'] = $filter_stock;
-                }
-                if ( ! empty( $filter_price_min ) ) {
-                    $params['price_min'] = $filter_price_min;
-                }
-                if ( ! empty( $filter_price_max ) ) {
-                    $params['price_max'] = $filter_price_max;
-                }
-                if ( ! empty( $filter_category ) ) {
-                    $params['category_filter'] = $filter_category;
-                }
-                if ( ! empty( $sort_by ) ) {
-                    $params['sort_by'] = $sort_by;
+                // Préserver exactement les filtres actuellement dans l'URL.
+                // Important: ne pas utiliser empty() (ex: "0" serait perdu).
+                $allowed_keys = array( 'search', 'stock_filter', 'price_min', 'price_max', 'category_filter', 'sort_by' );
+                $params = array( 'page' => 'bihrwi_products' );
+
+                foreach ( $allowed_keys as $key ) {
+                    if ( isset( $_GET[ $key ] ) && wp_unslash( $_GET[ $key ] ) !== '' ) {
+                        $params[ $key ] = sanitize_text_field( wp_unslash( $_GET[ $key ] ) );
+                    }
                 }
 
                 if ( $current_page > 1 ) {
