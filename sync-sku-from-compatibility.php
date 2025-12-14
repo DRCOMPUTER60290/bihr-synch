@@ -22,6 +22,10 @@ if (!current_user_can('manage_options')) {
 global $wpdb;
 set_time_limit(0);
 
+// Expression SQL de la clé de correspondance vers la compatibilité
+// Priorité : NewPartNumber (meta) -> SKU actuel -> Code BIHR
+$compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)';
+
 ?>
 <!DOCTYPE html>
 <html>
@@ -66,16 +70,18 @@ set_time_limit(0);
             
             // Compter les produits WC avec compatibilité véhicule
             $total = $wpdb->get_var("
-                SELECT COUNT(DISTINCT pm.post_id)
-                FROM {$wpdb->postmeta} pm
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
-                WHERE pm.meta_key = '_bihr_product_code'
-                AND pm.meta_value IS NOT NULL
-                AND pm.meta_value != ''
+                SELECT COUNT(DISTINCT pm_code.post_id)
+                FROM {$wpdb->postmeta} pm_code
+                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
+                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
+                WHERE pm_code.meta_key = '_bihr_product_code'
+                AND pm_code.meta_value IS NOT NULL
+                AND pm_code.meta_value != ''
                 AND p.post_type = 'product'
                 AND EXISTS (
                     SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
-                    WHERE vc.part_number = pm.meta_value
+                    WHERE vc.part_number = {$compat_lookup_expr}
                 )
             ");
             
@@ -93,18 +99,22 @@ set_time_limit(0);
             // Récupérer un batch de produits avec leur part_number
             $products = $wpdb->get_results($wpdb->prepare("
                 SELECT DISTINCT
-                    pm.post_id as wc_product_id,
-                    pm.meta_value as product_code,
+                    pm_code.post_id as wc_product_id,
+                    pm_code.meta_value as product_code,
+                    pm_new.meta_value as new_part_number,
+                    pm_sku.meta_value as current_sku,
                     vc.part_number,
                     p.post_title as name
-                FROM {$wpdb->postmeta} pm
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
-                INNER JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = pm.meta_value
-                WHERE pm.meta_key = '_bihr_product_code'
-                AND pm.meta_value IS NOT NULL
-                AND pm.meta_value != ''
+                FROM {$wpdb->postmeta} pm_code
+                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
+                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
+                INNER JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = {$compat_lookup_expr}
+                WHERE pm_code.meta_key = '_bihr_product_code'
+                AND pm_code.meta_value IS NOT NULL
+                AND pm_code.meta_value != ''
                 AND p.post_type = 'product'
-                GROUP BY pm.post_id
+                GROUP BY pm_code.post_id
                 LIMIT %d OFFSET %d
             ", $batch_size, $offset), ARRAY_A);
             
@@ -117,6 +127,7 @@ set_time_limit(0);
                 $wc_product_id = $product['wc_product_id'];
                 $product_code = $product['product_code'];
                 $part_number = $product['part_number'];
+                $new_part_number = $product['new_part_number'];
                 $sku = $part_number; // Le SKU = part_number (pas product_code!)
                 
                 if (empty($sku)) {
@@ -142,7 +153,7 @@ set_time_limit(0);
                         array('%s'),
                         array('%d', '%s')
                     );
-                    echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' : SKU mis à jour → ' . $sku . ' (code: ' . $product_code . ')</div>';
+                    echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' : SKU mis à jour → ' . $sku . ' (code: ' . $product_code . ($new_part_number ? ', new: ' . $new_part_number : '') . ')</div>';
                     $sku_updated++;
                 } else {
                     // INSERT
@@ -157,7 +168,7 @@ set_time_limit(0);
                     );
                     
                     if ($result) {
-                        echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' : SKU créé → ' . $sku . ' (code: ' . $product_code . ')</div>';
+                        echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' : SKU créé → ' . $sku . ' (code: ' . $product_code . ($new_part_number ? ', new: ' . $new_part_number : '') . ')</div>';
                         $sku_inserted++;
                     } else {
                         echo '<div class="log-entry error">❌ WC #' . $wc_product_id . ' : Erreur INSERT</div>';
@@ -202,16 +213,18 @@ set_time_limit(0);
         } else {
             // PAGE D'ACCUEIL
             $wc_with_compatibility = $wpdb->get_var("
-                SELECT COUNT(DISTINCT pm.post_id)
-                FROM {$wpdb->postmeta} pm
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
-                WHERE pm.meta_key = '_bihr_product_code'
-                AND pm.meta_value IS NOT NULL
-                AND pm.meta_value != ''
+                SELECT COUNT(DISTINCT pm_code.post_id)
+                FROM {$wpdb->postmeta} pm_code
+                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
+                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
+                WHERE pm_code.meta_key = '_bihr_product_code'
+                AND pm_code.meta_value IS NOT NULL
+                AND pm_code.meta_value != ''
                 AND p.post_type = 'product'
                 AND EXISTS (
                     SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
-                    WHERE vc.part_number = pm.meta_value
+                    WHERE vc.part_number = {$compat_lookup_expr}
                 )
             ");
             
@@ -239,12 +252,14 @@ set_time_limit(0);
                     pm_code.post_id as wc_id,
                     p.post_title as name,
                     pm_code.meta_value as product_code,
-                    vc.part_number,
-                    pm_sku.meta_value as current_sku
+                    pm_new.meta_value as new_part_number,
+                    pm_sku.meta_value as current_sku,
+                    vc.part_number
                 FROM {$wpdb->postmeta} pm_code
                 INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
                 LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                LEFT JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = pm_code.meta_value
+                LEFT JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = {$compat_lookup_expr}
                 WHERE pm_code.meta_key = '_bihr_product_code'
                 AND pm_code.meta_value IS NOT NULL
                 AND pm_code.meta_value != ''
@@ -254,7 +269,7 @@ set_time_limit(0);
             ", ARRAY_A);
             
             echo '<table>';
-            echo '<tr><th>WC ID</th><th>Nom Produit</th><th>Code BIHR</th><th>Part Number</th><th>SKU Actuel</th><th>Statut</th></tr>';
+            echo '<tr><th>WC ID</th><th>Nom Produit</th><th>Code BIHR</th><th>NewPartNumber</th><th>Part Number</th><th>SKU Actuel</th><th>Statut</th></tr>';
             
             foreach ($samples as $row) {
                 $current_sku = $row['current_sku'];
@@ -272,6 +287,7 @@ set_time_limit(0);
                 echo '<td>' . $row['wc_id'] . '</td>';
                 echo '<td>' . substr($row['name'], 0, 40) . '...</td>';
                 echo '<td>' . $row['product_code'] . '</td>';
+                echo '<td>' . ($row['new_part_number'] ?: '-') . '</td>';
                 echo '<td><strong>' . ($part_number ?: '-') . '</strong></td>';
                 echo '<td>' . ($current_sku ?: '-') . '</td>';
                 echo '<td>' . $status . '</td>';
