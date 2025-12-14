@@ -24,11 +24,13 @@ class BihrWI_Product_Sync {
      */
     public function get_distinct_categories() {
         global $wpdb;
-        
-        $sql = "SELECT DISTINCT category 
-                FROM {$this->table_name} 
-                WHERE category IS NOT NULL AND category != '' 
-                ORDER BY category ASC";
+
+        // Normaliser les catégories (trim + remplacement des espaces insécables) pour éviter
+        // les valeurs qui semblent identiques visuellement mais ne matchent pas en filtre.
+        $sql = "SELECT DISTINCT REPLACE(TRIM(category), CHAR(160), ' ') AS category
+            FROM {$this->table_name}
+            WHERE category IS NOT NULL AND TRIM(REPLACE(category, CHAR(160), ' ')) != ''
+            ORDER BY category ASC";
         
         return $wpdb->get_col( $sql );
     }
@@ -72,8 +74,12 @@ class BihrWI_Product_Sync {
 
         // Filtre de catégorie
         if ( ! empty( $category_filter ) ) {
-            $where_conditions[] = 'category = %s';
-            $where_values[] = $category_filter;
+            // Normaliser côté PHP + SQL (trim + NBSP) pour matcher les valeurs en base
+            $normalized_category = str_replace( "\xc2\xa0", ' ', (string) $category_filter );
+            $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
+
+            $where_conditions[] = "REPLACE(TRIM(category), CHAR(160), ' ') = %s";
+            $where_values[] = $normalized_category;
         }
 
         $where_clause = ! empty( $where_conditions ) ? implode( ' AND ', $where_conditions ) : '1=1';
@@ -159,8 +165,12 @@ class BihrWI_Product_Sync {
 
         // Filtre de catégorie
         if ( ! empty( $category_filter ) ) {
-            $where_conditions[] = 'category = %s';
-            $where_values[] = $category_filter;
+            // Normaliser côté PHP + SQL (trim + NBSP) pour matcher les valeurs en base
+            $normalized_category = str_replace( "\xc2\xa0", ' ', (string) $category_filter );
+            $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
+
+            $where_conditions[] = "REPLACE(TRIM(category), CHAR(160), ' ') = %s";
+            $where_values[] = $normalized_category;
         }
 
         $where_clause = ! empty( $where_conditions ) ? implode( ' AND ', $where_conditions ) : '1=1';
