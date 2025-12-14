@@ -483,16 +483,40 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
         <div class="tablenav">
             <div class="tablenav-pages">
                 <?php
-                $base_url = remove_query_arg( array( 'paged' ), $_SERVER['REQUEST_URI'] );
-                $base_url = esc_url( $base_url );
+                // Construction de l'URL de base en préservant tous les paramètres de filtre
+                $params = array(
+                    'page' => 'bihrwi_products'
+                );
+                
+                // Ajouter les paramètres de filtre s'ils existent
+                if ( ! empty( $filter_search ) ) {
+                    $params['search'] = $filter_search;
+                }
+                if ( ! empty( $filter_stock ) ) {
+                    $params['stock_filter'] = $filter_stock;
+                }
+                if ( ! empty( $filter_price_min ) ) {
+                    $params['price_min'] = $filter_price_min;
+                }
+                if ( ! empty( $filter_price_max ) ) {
+                    $params['price_max'] = $filter_price_max;
+                }
+                if ( ! empty( $filter_category ) ) {
+                    $params['category_filter'] = $filter_category;
+                }
+                if ( ! empty( $sort_by ) ) {
+                    $params['sort_by'] = $sort_by;
+                }
 
                 if ( $current_page > 1 ) {
-                    $prev_url = add_query_arg( 'paged', $current_page - 1, $base_url );
+                    $prev_params = array_merge( $params, array( 'paged' => $current_page - 1 ) );
+                    $prev_url = add_query_arg( $prev_params, admin_url( 'admin.php' ) );
                     echo '<a class="button" href="' . esc_url( $prev_url ) . '">&laquo; Page précédente</a> ';
                 }
 
                 if ( $current_page < $total_pages ) {
-                    $next_url = add_query_arg( 'paged', $current_page + 1, $base_url );
+                    $next_params = array_merge( $params, array( 'paged' => $current_page + 1 ) );
+                    $next_url = add_query_arg( $next_params, admin_url( 'admin.php' ) );
                     echo '<a class="button" href="' . esc_url( $next_url ) . '">Page suivante &raquo;</a>';
                 }
                 ?>

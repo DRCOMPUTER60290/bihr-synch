@@ -144,12 +144,17 @@ $stats = $compatibility->get_statistics();
 
         <?php
         $brands = array(
-            'SHIN YO'   => '[SHIN YO].csv',
-            'TECNIUM'   => '[TECNIUM].csv',
-            'V BIKE'    => '[V BIKE].csv',
-            'V PARTS'   => '[V PARTS].csv',
-            'VECTOR'    => '[VECTOR].csv',
-            'VICMA'     => '[VICMA].csv',
+            'ARTI'          => '[ARTI].csv',
+            'BIHR'          => '[BIHR].csv',
+            'HIGHSIDEBIHR'  => '[HIGHSIDEBIHR].csv',
+            'IPEX'          => '[IPEX].csv',
+            'ITST'          => '[ITST].csv',
+            'SHIN YO'       => '[SHIN YO].csv',
+            'TECNIUM'       => '[TECNIUM].csv',
+            'V BIKE'        => '[V BIKE].csv',
+            'V PARTS'       => '[V PARTS].csv',
+            'VECTOR'        => '[VECTOR].csv',
+            'VICMA'         => '[VICMA].csv',
         );
         ?>
 
@@ -197,8 +202,8 @@ $stats = $compatibility->get_statistics();
             <h3 style="margin-top:0; font-size:14px; color:#555;">📊 Progression par marque</h3>
             <div id="brands-progress-container" style="display:flex; flex-direction:column; gap:10px;">
                 <?php 
-                $brand_list = array( 'SHIN YO', 'TECNIUM', 'V BIKE', 'V PARTS', 'VECTOR', 'VICMA' );
-                foreach ( $brand_list as $brand ) : ?>
+                // Utiliser la même liste que pour l'import individuel
+                foreach ( array_keys( $brands ) as $brand ) : ?>
                 <div class="brand-progress-item" data-brand="<?php echo esc_attr( $brand ); ?>" style="opacity:0.5;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                         <span style="font-weight:500; font-size:13px;"><?php echo esc_html( $brand ); ?></span>
