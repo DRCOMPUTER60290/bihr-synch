@@ -104,12 +104,19 @@ class BihrWI_Product_Sync {
                 break;
         }
 
-        // Construction de la requête finale avec préparation correcte
+        // Construction de la requête finale - appliquer prepare correctement
+        // L'ordre des placeholders dans le SQL doit correspondre à l'ordre des valeurs
         $sql = "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT %d OFFSET %d";
-        $sql_values = array_merge( $where_values, array( $per_page, $offset ) );
         
-        // Utiliser ... pour dépacker l'array en arguments variables
-        $query = $wpdb->prepare( $sql, ...$sql_values );
+        // Ajouter les limites aux valeurs
+        $all_values = array_merge( $where_values, array( $per_page, $offset ) );
+        
+        // Appliquer la préparation avec dépaquetage correct
+        if ( ! empty( $all_values ) ) {
+            $query = call_user_func_array( array( $wpdb, 'prepare' ), array_merge( array( $sql ), $all_values ) );
+        } else {
+            $query = $sql;
+        }
 
         return $wpdb->get_results( $query );
     }
@@ -160,7 +167,12 @@ class BihrWI_Product_Sync {
 
         // Préparation correcte de la requête de comptage
         $sql = "SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_clause}";
-        $query = ! empty( $where_values ) ? $wpdb->prepare( $sql, ...$where_values ) : $sql;
+        
+        if ( ! empty( $where_values ) ) {
+            $query = call_user_func_array( array( $wpdb, 'prepare' ), array_merge( array( $sql ), $where_values ) );
+        } else {
+            $query = $sql;
+        }
 
         return (int) $wpdb->get_var( $query );
     }
