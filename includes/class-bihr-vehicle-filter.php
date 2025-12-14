@@ -57,16 +57,16 @@ class BihrWI_Vehicle_Filter {
     public function enqueue_frontend_assets() {
         wp_enqueue_style(
             'bihr-vehicle-filter',
-            plugins_url( 'css/bihr-vehicle-filter.css', dirname( __FILE__ ) ),
+            plugins_url( 'public/css/bihr-vehicle-filter.css', dirname( dirname( __FILE__ ) ) ),
             array(),
-            '1.0.0'
+            '1.4.0'
         );
 
         wp_enqueue_script(
             'bihr-vehicle-filter',
-            plugins_url( 'js/bihr-vehicle-filter.js', dirname( __FILE__ ) ),
+            plugins_url( 'public/js/bihr-vehicle-filter.js', dirname( dirname( __FILE__ ) ) ),
             array( 'jquery' ),
-            '1.0.0',
+            '1.4.0',
             true
         );
 
