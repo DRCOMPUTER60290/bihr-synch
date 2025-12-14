@@ -68,12 +68,15 @@ set_time_limit(0);
             $batch_size = 500;
             $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
             
-            // Compter le total
+            // Compter le total de produits WC avec code BIHR
             $total = $wpdb->get_var("
-                SELECT COUNT(*) 
-                FROM {$wpdb->prefix}bihr_products 
-                WHERE product_code IS NOT NULL 
-                AND product_code != ''
+                SELECT COUNT(DISTINCT pm.post_id)
+                FROM {$wpdb->postmeta} pm
+                INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                WHERE pm.meta_key = '_bihr_product_code'
+                AND pm.meta_value IS NOT NULL
+                AND pm.meta_value != ''
+                AND p.post_type = 'product'
             ");
             
             echo '<div class="stats">';
@@ -87,12 +90,20 @@ set_time_limit(0);
             echo '<div class="progress-bar" style="width: ' . $progress_percent . '%">' . round($progress_percent, 1) . '%</div>';
             echo '</div>';
             
-            // Récupérer un batch avec product_code
+            // Récupérer un batch de produits WC avec leur code BIHR
             $products = $wpdb->get_results($wpdb->prepare("
-                SELECT id as bihr_id, product_id, product_code, name
-                FROM {$wpdb->prefix}bihr_products
-                WHERE product_code IS NOT NULL 
-                AND product_code != ''
+                SELECT 
+                    pm.post_id as wc_product_id,
+                    pm.meta_value as product_code,
+                    bp.id as bihr_id,
+                    p.post_title as name
+                FROM {$wpdb->postmeta} pm
+                INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                LEFT JOIN {$wpdb->prefix}bihr_products bp ON bp.product_code = pm.meta_value
+                WHERE pm.meta_key = '_bihr_product_code'
+                AND pm.meta_value IS NOT NULL
+                AND pm.meta_value != ''
+                AND p.post_type = 'product'
                 LIMIT %d OFFSET %d
             ", $batch_size, $offset), ARRAY_A);
             
@@ -104,43 +115,21 @@ set_time_limit(0);
             $errors = 0;
             
             foreach ($products as $product) {
+                $wc_product_id = $product['wc_product_id'];
                 $bihr_id = $product['bihr_id'];
                 $product_code = $product['product_code'];
                 $sku = $product_code; // Le SKU = product_code
-                $current_product_id = $product['product_id'];
                 
-                // Étape 1: Trouver le produit WooCommerce
-                $wc_product_id = null;
-                
-                if (!empty($current_product_id) && is_numeric($current_product_id)) {
-                    $wc_product_id = intval($current_product_id);
-                } else {
-                    // Chercher par _bihr_product_code dans postmeta
-                    $wc_product_id = $wpdb->get_var($wpdb->prepare("
-                        SELECT post_id 
-                        FROM {$wpdb->postmeta} 
-                        WHERE meta_key = '_bihr_product_code' 
-                        AND meta_value = %s 
-                        LIMIT 1
-                    ", $product_code));
-                    
-                    if ($wc_product_id) {
-                        // Mettre à jour le lien
-                        $wpdb->update(
-                            $wpdb->prefix . 'bihr_products',
-                            array('product_id' => $wc_product_id),
-                            array('id' => $bihr_id),
-                            array('%d'),
-                            array('%d')
-                        );
-                        $linked++;
-                    }
-                }
-                
-                if (!$wc_product_id) {
-                    echo '<div class="log-entry warning">⚠️ BIHR #' . $bihr_id . ' : Produit WC introuvable</div>';
-                    $not_found++;
-                    continue;
+                // Mettre à jour le lien BIHR si nécessaire
+                if ($bihr_id && $bihr_id > 0) {
+                    $wpdb->update(
+                        $wpdb->prefix . 'bihr_products',
+                        array('product_id' => $wc_product_id),
+                        array('id' => $bihr_id),
+                        array('%d'),
+                        array('%d')
+                    );
+                    $linked++;
                 }
                 
                 // Étape 2: Synchroniser le SKU
@@ -220,14 +209,14 @@ set_time_limit(0);
             
         } else {
             // PAGE D'ACCUEIL
-            $bihr_total = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}bihr_products WHERE product_code IS NOT NULL AND product_code != ''");
+            $wc_with_bihr = $wpdb->get_var("SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_product_code' AND meta_value IS NOT NULL AND meta_value != ''");
             $wc_products = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'");
             $wc_sku_count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value != ''");
-            $missing = $bihr_total - $wc_sku_count;
+            $missing = $wc_with_bihr - $wc_sku_count;
             
             echo '<div class="stats">';
-            echo '<div class="stat-box"><strong>' . number_format($bihr_total) . '</strong> Produits BIHR</div>';
-            echo '<div class="stat-box"><strong>' . number_format($wc_products) . '</strong> Produits WooCommerce</div>';
+            echo '<div class="stat-box"><strong>' . number_format($wc_with_bihr) . '</strong> Produits WC avec code BIHR</div>';
+            echo '<div class="stat-box"><strong>' . number_format($wc_products) . '</strong> Total produits WooCommerce</div>';
             echo '<div class="stat-box"><strong class="success">' . number_format($wc_sku_count) . '</strong> SKU actuels</div>';
             echo '<div class="stat-box"><strong class="error">' . number_format($missing) . '</strong> SKU manquants</div>';
             echo '</div>';
@@ -238,7 +227,7 @@ set_time_limit(0);
                 echo '<p>Ce script va lier les produits BIHR aux produits WooCommerce via leur nom, puis synchroniser les SKU.</p>';
                 echo '</div>';
                 
-                echo '<button onclick="if(confirm(\'Lancer la synchronisation de ' . number_format($bihr_total) . ' produits ?\')) window.location.href=\'?action=sync\'">🚀 LANCER LA SYNCHRONISATION</button>';
+                echo '<button onclick="if(confirm(\'Lancer la synchronisation de ' . number_format($wc_with_bihr) . ' produits WooCommerce ?\')) window.location.href=\'?action=sync\'">🚀 LANCER LA SYNCHRONISATION</button>';
             } else {
                 echo '<div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0;">';
                 echo '<h3 class="success">✅ Tous les SKU sont synchronisés !</h3>';
@@ -248,24 +237,32 @@ set_time_limit(0);
             // Exemples
             echo '<h3>📊 Aperçu (10 premiers produits)</h3>';
             $samples = $wpdb->get_results("
-                SELECT bp.id as bihr_id, bp.product_id, bp.product_code, bp.name,
-                       pm_code.meta_value as wc_code, pm_sku.meta_value as current_sku
-                FROM {$wpdb->prefix}bihr_products bp
-                LEFT JOIN {$wpdb->postmeta} pm_code ON pm_code.meta_value = bp.product_code AND pm_code.meta_key = '_bihr_product_code'
+                SELECT 
+                    pm_code.post_id as wc_id,
+                    p.post_title as name,
+                    pm_code.meta_value as product_code,
+                    pm_sku.meta_value as current_sku,
+                    bp.id as bihr_id
+                FROM {$wpdb->postmeta} pm_code
+                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
                 LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                WHERE bp.product_code IS NOT NULL AND bp.product_code != ''
+                LEFT JOIN {$wpdb->prefix}bihr_products bp ON bp.product_code = pm_code.meta_value
+                WHERE pm_code.meta_key = '_bihr_product_code'
+                AND pm_code.meta_value IS NOT NULL
+                AND pm_code.meta_value != ''
+                AND p.post_type = 'product'
                 LIMIT 10
             ", ARRAY_A);
             
             echo '<table>';
-            echo '<tr><th>BIHR ID</th><th>Nom Produit</th><th>SKU (new_part_number)</th><th>WC ID</th><th>SKU Actuel</th><th>Statut</th></tr>';
+            echo '<tr><th>WC ID</th><th>Nom Produit</th><th>Code BIHR</th><th>SKU Actuel</th><th>BIHR ID</th><th>Statut</th></tr>';
             
             foreach ($samples as $row) {
-                $has_wc = !empty($row['wc_code']);
                 $has_sku = !empty($row['current_sku']);
+                $has_bihr = !empty($row['bihr_id']);
                 
-                if (!$has_wc) {
-                    $status = '<span class="error">❌ Pas de produit WC</span>';
+                if (!$has_bihr) {
+                    $status = '<span class="warning">⚠️ Pas de lien BIHR</span>';
                 } elseif (!$has_sku) {
                     $status = '<span class="warning">⚠️ Manque SKU</span>';
                 } else {
@@ -273,11 +270,11 @@ set_time_limit(0);
                 }
                 
                 echo '<tr>';
-                echo '<td>' . $row['bihr_id'] . '</td>';
+                echo '<td>' . $row['wc_id'] . '</td>';
                 echo '<td>' . substr($row['name'], 0, 50) . '...</td>';
-                echo '<td><strong>' . $row['new_part_number'] . '</strong></td>';
-                echo '<td>' . ($row['wc_id'] ?: '-') . '</td>';
+                echo '<td><strong>' . $row['product_code'] . '</strong></td>';
                 echo '<td>' . ($row['current_sku'] ?: '-') . '</td>';
+                echo '<td>' . ($row['bihr_id'] ?: '-') . '</td>';
                 echo '<td>' . $status . '</td>';
                 echo '</tr>';
             }
