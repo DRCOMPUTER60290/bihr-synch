@@ -378,8 +378,16 @@ if ( ! defined( 'ABSPATH' ) ) {
             force: force ? 1 : 0
         }).done(function(resp){
             if (!resp || !resp.success) {
-                const msg = (resp && resp.data && resp.data.message) ? resp.data.message : 'Erreur inconnue.';
+                const payload = (resp && resp.data) ? resp.data : {};
+                const msg = payload.message ? payload.message : 'Erreur inconnue.';
+                let extra = '';
+                if (payload.request_status) extra += '\nrequest_status: ' + payload.request_status;
+                if (payload.order_url) extra += '\norder_url: ' + payload.order_url;
+                if (payload.ticket_id) extra += '\nticket_id: ' + payload.ticket_id;
                 $status.text('Erreur: ' + msg);
+                if (extra) {
+                    $pre.text(msg + extra);
+                }
                 return;
             }
 
@@ -413,8 +421,16 @@ if ( ! defined( 'ABSPATH' ) ) {
             force: 1
         }).done(function(resp){
             if (!resp || !resp.success) {
-                const msg = (resp && resp.data && resp.data.message) ? resp.data.message : 'Erreur inconnue.';
+                const payload = (resp && resp.data) ? resp.data : {};
+                const msg = payload.message ? payload.message : 'Erreur inconnue.';
+                let extra = '';
+                if (payload.request_status) extra += '\nrequest_status: ' + payload.request_status;
+                if (payload.order_url) extra += '\norder_url: ' + payload.order_url;
+                if (payload.ticket_id) extra += '\nticket_id: ' + payload.ticket_id;
                 $status.text('Erreur: ' + msg);
+                if (extra) {
+                    $pre.text(msg + extra);
+                }
                 return;
             }
 
