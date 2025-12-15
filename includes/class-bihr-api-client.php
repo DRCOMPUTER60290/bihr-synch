@@ -376,6 +376,130 @@ class BihrWI_API_Client {
     }
 
     /**
+     * Tente d'extraire un OrderId depuis une réponse GenerationStatus.
+     * L'API BIHR peut exposer l'identifiant dans le JSON ou via l'URL (OrderUrl).
+     *
+     * @param array $generation_status Résultat retourné par get_order_generation_status()
+     * @return string|false
+     */
+    public function extract_order_id_from_generation_status( $generation_status ) {
+        if ( ! is_array( $generation_status ) ) {
+            return false;
+        }
+
+        $data = $generation_status['data'] ?? array();
+        if ( is_array( $data ) ) {
+            foreach ( array( 'OrderId', 'orderId', 'orderID', 'OrderID' ) as $key ) {
+                if ( ! empty( $data[ $key ] ) && is_string( $data[ $key ] ) ) {
+                    return $data[ $key ];
+                }
+            }
+        }
+
+        $order_url = $generation_status['order_url'] ?? '';
+        if ( empty( $order_url ) || ! is_string( $order_url ) ) {
+            return false;
+        }
+
+        $parts = wp_parse_url( $order_url );
+        if ( ! empty( $parts['query'] ) ) {
+            parse_str( $parts['query'], $query );
+            foreach ( array( 'orderId', 'OrderId', 'orderID', 'OrderID', 'id', 'Id' ) as $key ) {
+                if ( ! empty( $query[ $key ] ) && is_string( $query[ $key ] ) ) {
+                    return $query[ $key ];
+                }
+            }
+        }
+
+        if ( ! empty( $parts['path'] ) && is_string( $parts['path'] ) ) {
+            $path = trim( $parts['path'], '/' );
+            if ( $path ) {
+                $segments = explode( '/', $path );
+                $last = end( $segments );
+                if ( is_string( $last ) && preg_match( '/^[a-f0-9]{32}$/i', $last ) ) {
+                    return $last;
+                }
+            }
+        }
+
+        if ( preg_match( '/orderId=([a-f0-9]{32})/i', $order_url, $m ) ) {
+            return $m[1];
+        }
+
+        return false;
+    }
+
+    /**
+     * Récupère les données détaillées d'une commande par identifiant de commande BIHR.
+     * Certaines instances de l’API BIHR exigent le paramètre orderId (et non TicketId).
+     * Endpoint: GET /api/v2.1/Order/Data?orderId={orderId}
+     *
+     * @param string $order_id Identifiant de commande BIHR
+     * @return array|false
+     */
+    public function get_order_data_by_order_id( $order_id ) {
+        try {
+            $token = $this->get_token();
+
+            $url = $this->base_url . '/Order/Data';
+            $url_with_param = add_query_arg( 'orderId', $order_id, $url );
+
+            $this->logger->log( "Order Data Request (orderId): {$url_with_param}" );
+
+            $response = wp_remote_get(
+                $url_with_param,
+                array(
+                    'timeout' => 15,
+                    'headers' => array(
+                        'Authorization' => 'Bearer ' . $token,
+                        'Accept'        => 'application/json',
+                    ),
+                )
+            );
+
+            if ( is_wp_error( $response ) ) {
+                $this->logger->log( 'Order Data Error: ' . $response->get_error_message() );
+                return false;
+            }
+
+            $code = wp_remote_retrieve_response_code( $response );
+            $body = wp_remote_retrieve_body( $response );
+
+            $this->logger->log( "Order Data HTTP: {$code}" );
+            $this->logger->log( "=== RÉPONSE Order/Data ===" );
+
+            if ( ! empty( $body ) ) {
+                $formatted_json = json_encode( json_decode( $body ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+                if ( $formatted_json ) {
+                    foreach ( explode( "\n", $formatted_json ) as $line ) {
+                        $this->logger->log( "  " . $line );
+                    }
+                } else {
+                    $this->logger->log( "  Body: {$body}" );
+                }
+            }
+            $this->logger->log( "==========================" );
+
+            if ( $code !== 200 ) {
+                $this->logger->log( "Order Data Request Failed: HTTP {$code}" );
+                return false;
+            }
+
+            $data = json_decode( $body, true );
+            if ( json_last_error() !== JSON_ERROR_NONE ) {
+                $this->logger->log( 'Order Data: Invalid JSON response' );
+                return false;
+            }
+
+            return $data;
+
+        } catch ( Exception $e ) {
+            $this->logger->log( 'Order Data Exception: ' . $e->getMessage() );
+            return false;
+        }
+    }
+
+    /**
      * Récupère les données détaillées d'une commande
      * Endpoint: GET /api/v2.1/Order/Data?TicketId={ticketId}
      * 
@@ -428,6 +552,11 @@ class BihrWI_API_Client {
             
             if ( $code !== 200 ) {
                 $this->logger->log( "Order Data Request Failed: HTTP {$code}" );
+
+				// Cas observé: l’API répond que orderId est requis.
+				if ( $code === 400 && stripos( $body, 'orderId' ) !== false ) {
+					$this->logger->log( 'Order Data: L\'API semble exiger le paramètre orderId (et non TicketId).' );
+				}
                 return false;
             }
 
