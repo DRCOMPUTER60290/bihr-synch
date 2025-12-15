@@ -232,6 +232,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                         <th><?php esc_html_e( 'ID BIHR', 'bihr-woocommerce-importer' ); ?></th>
                         <th><?php esc_html_e( 'Date Sync', 'bihr-woocommerce-importer' ); ?></th>
                         <th><?php esc_html_e( 'Statut', 'bihr-woocommerce-importer' ); ?></th>
+                        <th><?php esc_html_e( 'Order/Data', 'bihr-woocommerce-importer' ); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -242,6 +243,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                         $bihr_order_id    = get_post_meta( $post->ID, '_bihr_order_id', true );
                         $sync_date        = get_post_meta( $post->ID, '_bihr_sync_date', true );
                         $sync_failed      = get_post_meta( $post->ID, '_bihr_order_sync_failed', true );
+
+                        $cached_order_data_json = get_post_meta( $post->ID, '_bihr_order_data_json', true );
+                        $cached_order_data_at   = get_post_meta( $post->ID, '_bihr_order_data_fetched_at', true );
                     ?>
                         <tr>
                             <td><code style="font-size: 11px;"><?php echo esc_html( $ticket_id ?: 'N/A' ); ?></code></td>
@@ -267,6 +271,54 @@ if ( ! defined( 'ABSPATH' ) ) {
                                     <span style="color: green;">✅ <?php esc_html_e( 'Synchronisé', 'bihr-woocommerce-importer' ); ?></span>
                                 <?php endif; ?>
                             </td>
+                            <td>
+                                <?php if ( $bihr_ticket_id ) : ?>
+                                    <button
+                                        type="button"
+                                        class="button bihrwi-order-data-btn"
+                                        data-order-id="<?php echo esc_attr( $post->ID ); ?>"
+                                    >
+                                        <?php esc_html_e( 'Voir', 'bihr-woocommerce-importer' ); ?>
+                                    </button>
+
+                                    <?php if ( ! empty( $cached_order_data_at ) ) : ?>
+                                        <div style="margin-top: 6px; font-size: 11px; color: #666;">
+                                            <?php echo esc_html( sprintf( __( 'Cache: %s', 'bihr-woocommerce-importer' ), $cached_order_data_at ) ); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php else : ?>
+                                    <span style="color: #999;">N/A</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+
+                        <tr class="bihrwi-order-data-row" data-order-id="<?php echo esc_attr( $post->ID ); ?>" style="display:none;">
+                            <td colspan="8" style="background:#fff;">
+                                <div style="padding: 10px;">
+                                    <div class="bihrwi-order-data-status" style="margin-bottom: 8px; color:#666;"></div>
+                                    <pre class="bihrwi-order-data-pre" style="margin:0; max-height: 380px; overflow:auto; white-space: pre-wrap; word-break: break-word; background:#f6f7f7; padding:10px; border:1px solid #dcdcde; border-radius:4px;"><?php
+                                        if ( ! empty( $cached_order_data_json ) ) {
+                                            $decoded_cached = json_decode( $cached_order_data_json, true );
+                                            if ( json_last_error() === JSON_ERROR_NONE ) {
+                                                echo esc_html( wp_json_encode( $decoded_cached, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+                                            } else {
+                                                echo esc_html( $cached_order_data_json );
+                                            }
+                                        } else {
+                                            echo esc_html__( 'Cliquez sur “Voir” pour récupérer les données via l’API BIHR (Order/Data).', 'bihr-woocommerce-importer' );
+                                        }
+                                    ?></pre>
+                                    <div style="margin-top: 8px;">
+                                        <button
+                                            type="button"
+                                            class="button button-secondary bihrwi-order-data-refresh-btn"
+                                            data-order-id="<?php echo esc_attr( $post->ID ); ?>"
+                                        >
+                                            <?php esc_html_e( 'Actualiser', 'bihr-woocommerce-importer' ); ?>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -274,3 +326,66 @@ if ( ! defined( 'ABSPATH' ) ) {
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+(function($){
+    function prettyJson(value){
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch (e) {
+            return String(value);
+        }
+    }
+
+    function fetchOrderData(orderId, force){
+        const $row = $(".bihrwi-order-data-row[data-order-id='" + orderId + "']");
+        const $status = $row.find('.bihrwi-order-data-status');
+        const $pre = $row.find('.bihrwi-order-data-pre');
+
+        $status.text('Chargement depuis BIHR…');
+
+        return $.post(ajaxurl, {
+            action: 'bihrwi_get_order_data',
+            nonce: '<?php echo esc_js( wp_create_nonce( 'bihrwi_ajax_nonce' ) ); ?>',
+            order_id: orderId,
+            force: force ? 1 : 0
+        }).done(function(resp){
+            if (!resp || !resp.success) {
+                const msg = (resp && resp.data && resp.data.message) ? resp.data.message : 'Erreur inconnue.';
+                $status.text('Erreur: ' + msg);
+                return;
+            }
+
+            const payload = resp.data || {};
+            const fetchedAt = payload.fetched_at ? payload.fetched_at : '';
+            const cached = payload.cached ? ' (cache)' : '';
+
+            $status.text('OK' + cached + (fetchedAt ? ' - ' + fetchedAt : ''));
+            $pre.text(prettyJson(payload.data));
+        }).fail(function(){
+            $status.text('Erreur réseau ou serveur (AJAX).');
+        });
+    }
+
+    $(document).on('click', '.bihrwi-order-data-btn', function(){
+        const orderId = $(this).data('order-id');
+        const $row = $(".bihrwi-order-data-row[data-order-id='" + orderId + "']");
+        const isVisible = $row.is(':visible');
+
+        $('.bihrwi-order-data-row').hide();
+        if (isVisible) {
+            return;
+        }
+
+        $row.show();
+        fetchOrderData(orderId, false);
+    });
+
+    $(document).on('click', '.bihrwi-order-data-refresh-btn', function(){
+        const orderId = $(this).data('order-id');
+        const $row = $(".bihrwi-order-data-row[data-order-id='" + orderId + "']");
+        $row.show();
+        fetchOrderData(orderId, true);
+    });
+})(jQuery);
+</script>

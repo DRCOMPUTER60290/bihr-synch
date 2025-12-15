@@ -43,6 +43,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_clear_compatibility', array( $this, 'ajax_clear_compatibility' ) );
         add_action( 'wp_ajax_bihrwi_upload_vehicles_zip', array( $this, 'ajax_upload_vehicles_zip' ) );
         add_action( 'wp_ajax_bihrwi_upload_links_zip', array( $this, 'ajax_upload_links_zip' ) );
+        add_action( 'wp_ajax_bihrwi_get_order_data', array( $this, 'ajax_get_order_data' ) );
 
         // Handlers pour synchronisation automatique des stocks
         add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
@@ -89,6 +90,70 @@ class BihrWI_Admin {
 			)
 		);
 	}
+
+    /**
+     * Récupère les données détaillées d'une commande via BIHR (GET /api/v2.1/Order/Data)
+     * en utilisant le TicketId stocké dans les métadonnées WooCommerce.
+     */
+    public function ajax_get_order_data() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        $order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+        $force    = ! empty( $_POST['force'] );
+
+        if ( ! $order_id ) {
+            wp_send_json_error( array( 'message' => 'Missing order_id.' ) );
+        }
+
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) {
+            wp_send_json_error( array( 'message' => 'Order not found.' ) );
+        }
+
+        $bihr_ticket_id = get_post_meta( $order_id, '_bihr_api_ticket_id', true );
+        if ( empty( $bihr_ticket_id ) ) {
+            wp_send_json_error( array( 'message' => 'BIHR TicketId manquant pour cette commande.' ) );
+        }
+
+        // Cache simple via post_meta pour éviter de frapper l’API inutilement.
+        $cached_json = get_post_meta( $order_id, '_bihr_order_data_json', true );
+        $cached_at   = get_post_meta( $order_id, '_bihr_order_data_fetched_at', true );
+        if ( ! $force && ! empty( $cached_json ) ) {
+            $decoded = json_decode( $cached_json, true );
+            if ( json_last_error() === JSON_ERROR_NONE ) {
+                wp_send_json_success(
+                    array(
+                        'ticket_id'  => $bihr_ticket_id,
+                        'fetched_at' => $cached_at,
+                        'data'       => $decoded,
+                        'cached'     => true,
+                    )
+                );
+            }
+        }
+
+        $this->logger->log( "AJAX: Order/Data pour commande WC #{$order_id} (TicketId={$bihr_ticket_id})" );
+        $data = $this->api_client->get_order_data( $bihr_ticket_id );
+        if ( ! $data ) {
+            wp_send_json_error( array( 'message' => 'Impossible de récupérer Order/Data côté BIHR (voir logs).' ) );
+        }
+
+        update_post_meta( $order_id, '_bihr_order_data_json', wp_json_encode( $data ) );
+        update_post_meta( $order_id, '_bihr_order_data_fetched_at', current_time( 'mysql' ) );
+
+        wp_send_json_success(
+            array(
+                'ticket_id'  => $bihr_ticket_id,
+                'fetched_at' => current_time( 'mysql' ),
+                'data'       => $data,
+                'cached'     => false,
+            )
+        );
+    }
 	
 	public function handle_check_prices_now() {
     if ( ! current_user_can( 'manage_woocommerce' ) ) {
