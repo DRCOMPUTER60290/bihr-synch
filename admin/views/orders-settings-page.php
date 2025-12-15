@@ -120,6 +120,26 @@ if ( ! defined( 'ABSPATH' ) ) {
     </div>
 
     <div class="bihr-section">
+        <h2><?php esc_html_e( 'Order/Data (BIHR)', 'bihr-woocommerce-importer' ); ?></h2>
+        <p>
+            <?php esc_html_e( 'Saisissez un ID de commande WooCommerce pour récupérer les informations BIHR via GET /api/v2.1/Order/Data (TicketId provenant de la commande).', 'bihr-woocommerce-importer' ); ?>
+        </p>
+        <p style="margin: 0 0 10px;">
+            <label for="bihrwi_order_data_order_id" style="display:inline-block; min-width: 160px;">
+                <?php esc_html_e( 'ID commande WooCommerce', 'bihr-woocommerce-importer' ); ?>
+            </label>
+            <input type="number" id="bihrwi_order_data_order_id" min="1" style="width: 140px;" />
+            <button type="button" class="button" id="bihrwi_order_data_fetch_btn">
+                <?php esc_html_e( 'Récupérer', 'bihr-woocommerce-importer' ); ?>
+            </button>
+        </p>
+        <div id="bihrwi_order_data_manual_status" style="margin: 8px 0; color:#666;"></div>
+        <pre id="bihrwi_order_data_manual_pre" style="margin:0; max-height: 380px; overflow:auto; white-space: pre-wrap; word-break: break-word; background:#f6f7f7; padding:10px; border:1px solid #dcdcde; border-radius:4px;"><?php
+            echo esc_html__( 'Renseignez un ID de commande et cliquez sur “Récupérer”.', 'bihr-woocommerce-importer' );
+        ?></pre>
+    </div>
+
+    <div class="bihr-section">
         <h2><?php esc_html_e( 'Informations de Synchronisation', 'bihr-woocommerce-importer' ); ?></h2>
         
         <h3><?php esc_html_e( 'Comment ça fonctionne ?', 'bihr-woocommerce-importer' ); ?></h3>
@@ -324,6 +344,13 @@ if ( ! defined( 'ABSPATH' ) ) {
                 </tbody>
             </table>
         </div>
+    <?php else : ?>
+        <div class="bihr-section">
+            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'bihr-woocommerce-importer' ); ?></h2>
+            <p style="margin:0; color:#666;">
+                <?php esc_html_e( 'Aucune commande synchronisée BIHR n’a été trouvée pour le moment. La section Order/Data ci-dessus reste disponible si vous connaissez l’ID de commande WooCommerce.', 'bihr-woocommerce-importer' ); ?>
+            </p>
+        </div>
     <?php endif; ?>
 </div>
 
@@ -367,6 +394,39 @@ if ( ! defined( 'ABSPATH' ) ) {
         });
     }
 
+    function fetchOrderDataManual(orderId){
+        const $status = $('#bihrwi_order_data_manual_status');
+        const $pre = $('#bihrwi_order_data_manual_pre');
+
+        if (!orderId || parseInt(orderId, 10) <= 0) {
+            $status.text('Veuillez saisir un ID de commande valide.');
+            return;
+        }
+
+        $status.text('Chargement depuis BIHR…');
+        $pre.text('');
+
+        $.post(ajaxurl, {
+            action: 'bihrwi_get_order_data',
+            nonce: '<?php echo esc_js( wp_create_nonce( 'bihrwi_ajax_nonce' ) ); ?>',
+            order_id: orderId,
+            force: 1
+        }).done(function(resp){
+            if (!resp || !resp.success) {
+                const msg = (resp && resp.data && resp.data.message) ? resp.data.message : 'Erreur inconnue.';
+                $status.text('Erreur: ' + msg);
+                return;
+            }
+
+            const payload = resp.data || {};
+            const fetchedAt = payload.fetched_at ? payload.fetched_at : '';
+            $status.text('OK' + (fetchedAt ? ' - ' + fetchedAt : ''));
+            $pre.text(prettyJson(payload.data));
+        }).fail(function(){
+            $status.text('Erreur réseau ou serveur (AJAX).');
+        });
+    }
+
     $(document).on('click', '.bihrwi-order-data-btn', function(){
         const orderId = $(this).data('order-id');
         const $row = $(".bihrwi-order-data-row[data-order-id='" + orderId + "']");
@@ -386,6 +446,11 @@ if ( ! defined( 'ABSPATH' ) ) {
         const $row = $(".bihrwi-order-data-row[data-order-id='" + orderId + "']");
         $row.show();
         fetchOrderData(orderId, true);
+    });
+
+    $(document).on('click', '#bihrwi_order_data_fetch_btn', function(){
+        const orderId = $('#bihrwi_order_data_order_id').val();
+        fetchOrderDataManual(orderId);
     });
 })(jQuery);
 </script>
