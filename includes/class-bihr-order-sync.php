@@ -251,7 +251,9 @@ class BihrWI_Order_Sync {
             $lines[] = array(
                 'ProductId'         => $bihr_code,
                 'Quantity'          => $item->get_quantity(),
+                'ReferenceType'     => 'Not used anymore',
                 'CustomerReference' => $product->get_name(),
+                'ReservedQuantity'  => 0,
             );
         }
 
@@ -274,8 +276,12 @@ class BihrWI_Order_Sync {
 
         // Récupération de l'option de validation automatique
         $auto_checkout = get_option( 'bihrwi_auto_checkout', true );
+        $weekly_free_shipping = get_option( 'bihrwi_weekly_free_shipping', true );
+        $delivery_mode = get_option( 'bihrwi_delivery_mode', 'Default' );
         
         $this->logger->log( "[{$ticket_id}]    ⚙️ Option: Checkout automatique=" . ( $auto_checkout ? 'activé' : 'désactivé' ) );
+        $this->logger->log( "[{$ticket_id}]    ⚙️ Option: Livraison gratuite hebdomadaire=" . ( $weekly_free_shipping ? 'activée' : 'désactivée' ) );
+        $this->logger->log( "[{$ticket_id}]    ⚙️ Option: Mode de livraison={$delivery_mode}" );
 
         // Construction des données de commande selon nouvelle API doc
         $order_data = array(
@@ -283,6 +289,8 @@ class BihrWI_Order_Sync {
                 'CustomerReference'              => $customer_reference,
                 'Lines'                          => $lines,
                 'IsAutomaticCheckoutActivated'   => (bool) $auto_checkout,
+                'IsWeeklyFreeShippingActivated'  => (bool) $weekly_free_shipping,
+                'DeliveryMode'                   => $delivery_mode,
             ),
         );
 

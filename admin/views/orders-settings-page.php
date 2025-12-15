@@ -135,13 +135,13 @@ if ( ! defined( 'ABSPATH' ) ) {
         <pre style="background: #f0f0f1; padding: 15px; border: 1px solid #c3c4c7; border-radius: 4px; overflow-x: auto;">
 {
   "Order": {
-    "CustomerReference": "WC Order #123 - John Doe",
+    "CustomerReference": "Order for John Doe's motorbike",
     "Lines": [
       {
         "ProductId": "TPCI07495",
-        "Quantity": 2,
+        "Quantity": 14,
         "ReferenceType": "Not used anymore",
-        "CustomerReference": "Nom du produit",
+        "CustomerReference": "Brakes for John Doe's motorbike",
         "ReservedQuantity": 0
       }
     ],
@@ -150,12 +150,12 @@ if ( ! defined( 'ABSPATH' ) ) {
     "DeliveryMode": "Default"
   },
   "DropShippingAddress": {
-    "FirstName": "John",
-    "LastName": "Doe",
-    "Line1": "123 rue Example",
-    "Line2": "Appartement 4B",
-    "ZipCode": "75001",
-    "Town": "Paris",
+    "FirstName": "André",
+    "LastName": "Millet",
+    "Line1": "19, rue Blondel",
+    "Line2": "1er étage",
+    "ZipCode": "22106",
+    "Town": "Toussaint",
     "Country": "FR",
     "Phone": "+33123456789"
   }

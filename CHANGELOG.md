@@ -1,5 +1,39 @@
 # Résumé des changements
 
+## 📦 [15 décembre 2025] Mise à jour format Dropshipping BIHR
+
+### 🎯 Objectif
+Mettre à jour le format de payload pour être **100% conforme** aux spécifications BIHR pour les commandes dropshipping.
+
+### ✅ Changements apportés
+
+#### 1. Format de payload de commande
+- ✅ Ajout de `ReferenceType: "Not used anymore"` dans `Order.Lines[]`
+- ✅ Ajout de `ReservedQuantity: 0` dans `Order.Lines[]`
+- ✅ Ajout de `IsWeeklyFreeShippingActivated` dans `Order`
+- ✅ Ajout de `DeliveryMode` dans `Order` (configurable : Default/Express/Standard)
+
+#### 2. Options d'administration
+- ✅ Option "Livraison gratuite hebdomadaire" déjà disponible (`bihrwi_weekly_free_shipping`)
+- ✅ Option "Mode de livraison" déjà disponible (`bihrwi_delivery_mode`)
+
+#### 3. Documentation
+- 📄 Exemple JSON mis à jour dans l'interface admin
+- 📄 Fichier `DROPSHIPPING_UPDATE.md` créé
+- 📄 Fichier `DROPSHIPPING_SUMMARY.md` créé
+- 📄 Fichier `DROPSHIPPING_FINAL_REPORT.md` créé
+- 🧪 Script `verify-dropshipping-format.sh` créé
+
+#### 4. Fichiers modifiés
+- `/includes/class-bihr-order-sync.php` - Ajout des champs requis
+- `/admin/views/orders-settings-page.php` - Exemple JSON mis à jour
+
+### 🧪 Tests
+✅ 16/16 tests automatiques réussis  
+✅ Format 100% conforme à l'exemple BIHR
+
+---
+
 ## 🎯 Problème résolu
 L'import de fichiers CSV volumineux (27 MB+) causait des erreurs 502/504 et des timeouts car le fichier entier était traité en mémoire d'un seul coup.
 
