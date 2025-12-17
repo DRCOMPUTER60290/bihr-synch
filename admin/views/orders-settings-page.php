@@ -356,6 +356,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 <script>
 (function($){
+    // ============================================================
+    // UTILITAIRES DE FORMATAGE
+    // ============================================================
+    
+    /**
+     * Échappe le HTML pour prévenir les XSS
+     * @param {string} text Le texte à échapper
+     * @returns {string} Texte échappé
+     */
+    function escapeHtml(text) {
+        if (!text && text !== 0) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    }
+
     function prettyJson(value){
         try {
             return JSON.stringify(value, null, 2);
@@ -364,164 +385,445 @@ if ( ! defined( 'ABSPATH' ) ) {
         }
     }
 
+    /**
+     * Formate un prix en € français avec gestion d'erreurs
+     * @param {number|string} price Le prix à formater
+     * @param {string} defaultValue Valeur par défaut
+     * @returns {string} Format "XX,XX €"
+     */
+    function formatPrice(price, defaultValue = 'N/A') {
+        if (price === null || price === undefined || price === '') {
+            console.log('[BIHR] Prix vide:', price);
+            return defaultValue;
+        }
+        const p = parseFloat(price);
+        if (isNaN(p)) {
+            console.warn('[BIHR] Prix invalide:', price);
+            return defaultValue;
+        }
+        return p.toFixed(2).replace('.', ',') + ' €';
+    }
+
+    /**
+     * Formate une date ISO en français avec gestion d'erreurs
+     * @param {string} dateStr La date au format ISO
+     * @returns {string} Date formatée
+     */
+    function formatDate(dateStr) {
+        if (!dateStr || dateStr === '0001-01-01T00:00:00') {
+            return 'N/A';
+        }
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) {
+                console.warn('[BIHR] Date invalide:', dateStr);
+                return dateStr;
+            }
+            return d.toLocaleString('fr-FR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            console.error('[BIHR] Erreur formatDate:', e);
+            return dateStr;
+        }
+    }
+
+    /**
+     * Formate une adresse avec retours à la ligne HTML
+     * @param {Object} addr Objet adresse
+     * @returns {string} HTML formaté
+     */
+    function formatAddress(addr) {
+        if (!addr) {
+            console.warn('[BIHR] Adresse vide');
+            return '';
+        }
+        const parts = [];
+        if (addr.Line1) parts.push(escapeHtml(addr.Line1));
+        if (addr.Line2) parts.push(escapeHtml(addr.Line2));
+        
+        const zipCity = [];
+        if (addr.ZipCode) zipCity.push(escapeHtml(addr.ZipCode));
+        if (addr.City) zipCity.push(escapeHtml(addr.City));
+        if (zipCity.length) parts.push(zipCity.join(' '));
+        
+        if (addr.Country) parts.push('<strong>🌍 ' + escapeHtml(addr.Country) + '</strong>');
+        
+        if (parts.length === 0) {
+            console.warn('[BIHR] Adresse incomplète:', addr);
+            return '<em>Données incomplètes</em>';
+        }
+        return parts.join('<br>');
+    }
+
+    /**
+     * Valide les données Order/Data avec messages détaillés
+     * @param {Object} data Les données à valider
+     * @returns {Object} {valid: bool, errors: [], hasWarnings: bool, missingFields: []}
+     */
+    function validateData(data) {
+        const errors = [];
+        const missingFields = [];
+        
+        if (!data) {
+            errors.push('Données vides reçues de l\'API');
+            console.error('[BIHR] Validation: Data est null/undefined');
+            return { valid: false, errors, hasWarnings: true, missingFields: [] };
+        }
+
+        if (typeof data !== 'object') {
+            errors.push('Format de données invalide: attendu Object, reçu ' + typeof data);
+            console.error('[BIHR] Validation: Type invalide:', typeof data);
+            return { valid: false, errors, hasWarnings: true, missingFields: [] };
+        }
+
+        // Contrôles critiques
+        if (!data.ResultCode) {
+            missingFields.push('ResultCode');
+            console.warn('[BIHR] Validation: ResultCode manquant');
+        }
+
+        if (!data.OrderLines || !Array.isArray(data.OrderLines)) {
+            missingFields.push('OrderLines');
+            errors.push('⚠️ Pas d\'articles trouvés (OrderLines manquant ou invalide)');
+            console.warn('[BIHR] Validation: OrderLines manquant ou invalide');
+        } else if (data.OrderLines.length === 0) {
+            errors.push('⚠️ Panier vide (0 articles)');
+            console.warn('[BIHR] Validation: OrderLines vide');
+        }
+
+        if (!data.DeliveryOrders || !Array.isArray(data.DeliveryOrders)) {
+            missingFields.push('DeliveryOrders');
+            errors.push('⚠️ Pas de commande de livraison (DeliveryOrders manquant ou invalide)');
+            console.warn('[BIHR] Validation: DeliveryOrders manquant ou invalide');
+        } else if (data.DeliveryOrders.length === 0) {
+            errors.push('⚠️ Aucune commande de livraison créée');
+            console.warn('[BIHR] Validation: DeliveryOrders vide');
+        }
+
+        if (!data.ShippingAddress) {
+            missingFields.push('ShippingAddress');
+            console.warn('[BIHR] Validation: ShippingAddress manquant');
+        }
+
+        // Avertissements optionnels
+        const hasWarnings = !data.CustomerReference || 
+                           !data.Code || 
+                           (data.ShippingAddress && (!data.ShippingAddress.City || !data.ShippingAddress.Line1));
+
+        console.log('[BIHR] Validation complétée:', {
+            valid: errors.length === 0,
+            errorCount: errors.length,
+            hasWarnings,
+            missingFields
+        });
+
+        return { 
+            valid: errors.length === 0, 
+            errors,
+            hasWarnings,
+            missingFields
+        };
+    }
+
+    // ============================================================
+    // SECTIONS DE FORMATAGE
+    // ============================================================
+
+    function buildStatusSection(data) {
+        if (!data.ResultCode) return '';
+        
+        const statusClasses = {
+            'Cart': 'status-cart',
+            'Order': 'status-order',
+            'Delivered': 'status-delivered',
+            'Processing': 'status-processing'
+        };
+        const statusClass = statusClasses[data.ResultCode] || 'status-pending';
+        
+        return `
+            <div class="bihrwi-section section-status">
+                <h3>📦 Statut de la Commande</h3>
+                <p>
+                    <strong>Statut:</strong> 
+                    <span class="status-badge ${statusClass}">
+                        ${escapeHtml(data.ResultCode)}
+                    </span>
+                </p>
+            </div>
+        `;
+    }
+
+    function buildClientSection(data) {
+        const parts = [];
+        
+        if (data.CustomerId) parts.push(`<p><strong>🆔 Client:</strong> ${escapeHtml(data.CustomerId)}</p>`);
+        if (data.Code) parts.push(`<p><strong>📦 Code Commande:</strong> <code>${escapeHtml(data.Code)}</code></p>`);
+        if (data.CustomerReference) parts.push(`<p><strong>📝 Référence:</strong> ${escapeHtml(data.CustomerReference)}</p>`);
+        if (data.InternalCustomerId && data.InternalCustomerId !== data.CustomerId) {
+            parts.push(`<p><strong>🔗 ID Interne:</strong> ${escapeHtml(data.InternalCustomerId)}</p>`);
+        }
+
+        if (parts.length === 0) return '';
+
+        return `
+            <div class="bihrwi-section section-client">
+                <h3>👤 Informations Client</h3>
+                ${parts.join('')}
+            </div>
+        `;
+    }
+
+    function buildAddressSection(data) {
+        if (!data.DeliveryOrders || !Array.isArray(data.DeliveryOrders) || data.DeliveryOrders.length === 0) {
+            return `
+                <div class="bihrwi-section section-warning">
+                    <h3>🏠 Adresse de Livraison</h3>
+                    <p><em>❌ Pas d'adresse disponible</em></p>
+                </div>
+            `;
+        }
+
+        const firstOrder = data.DeliveryOrders[0];
+        const addr = firstOrder.ShippingAddress;
+
+        if (!addr) {
+            return `
+                <div class="bihrwi-section section-warning">
+                    <h3>🏠 Adresse de Livraison</h3>
+                    <p><em>⚠️ Adresse non disponible</em></p>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="bihrwi-section section-address">
+                <h3>🏠 Adresse de Livraison</h3>
+                <div class="address-box">
+                    ${formatAddress(addr)}
+                </div>
+            </div>
+        `;
+    }
+
+    function buildArticlesSection(data) {
+        if (!data.OrderLines || !Array.isArray(data.OrderLines) || data.OrderLines.length === 0) {
+            return `
+                <div class="bihrwi-section section-warning">
+                    <h3>📋 Articles de la Commande</h3>
+                    <p><em>❌ Aucun article trouvé</em></p>
+                </div>
+            `;
+        }
+
+        let tableHtml = '<table class="bihrwi-items-table"><thead><tr>';
+        tableHtml += '<th>#</th><th>Produit</th><th>Quantité</th><th>Référence</th>';
+        tableHtml += '</tr></thead><tbody>';
+
+        data.OrderLines.forEach((line, idx) => {
+            const productId = line.ProductId ? escapeHtml(line.ProductId) : '<em>N/A</em>';
+            const qty = line.Quantity || 0;
+            const ref = line.CustomerReference ? escapeHtml(line.CustomerReference) : '<em>Non fourni</em>';
+            
+            tableHtml += `<tr>
+                <td class="cell-number">${idx + 1}</td>
+                <td class="cell-product">${productId}</td>
+                <td class="cell-qty">${qty}</td>
+                <td class="cell-ref">${ref}</td>
+            </tr>`;
+        });
+
+        tableHtml += '</tbody></table>';
+
+        return `
+            <div class="bihrwi-section section-articles">
+                <h3>📋 Articles (${data.OrderLines.length})</h3>
+                ${tableHtml}
+            </div>
+        `;
+    }
+
+    function buildPricesSection(data) {
+        if (!data.DeliveryOrders || !Array.isArray(data.DeliveryOrders) || data.DeliveryOrders.length === 0) {
+            console.warn('[BIHR] buildPricesSection: DeliveryOrders manquant');
+            return '';
+        }
+
+        let totalExclVat = 0;
+        let totalInclVat = 0;
+        let priceCount = 0;
+
+        data.DeliveryOrders.forEach((order, idx) => {
+            if (order.ExclVatPrice !== undefined && order.ExclVatPrice !== null) {
+                const price = parseFloat(order.ExclVatPrice) || 0;
+                totalExclVat += price;
+                priceCount++;
+                console.log('[BIHR] Prix HT trouvé [' + idx + ']:', price);
+            }
+            if (order.InclVatPrice !== undefined && order.InclVatPrice !== null) {
+                const price = parseFloat(order.InclVatPrice) || 0;
+                totalInclVat += price;
+                console.log('[BIHR] Prix TTC trouvé [' + idx + ']:', price);
+            }
+        });
+
+        const tva = (totalInclVat - totalExclVat).toFixed(2);
+        const hasPrice = totalInclVat > 0 || totalExclVat > 0;
+
+        if (!hasPrice) {
+            console.warn('[BIHR] buildPricesSection: Aucun montant trouvé');
+            return `
+                <div class="bihrwi-section section-warning">
+                    <h3>💰 Montants</h3>
+                    <p><em>⚠️ Aucun montant disponible dans DeliveryOrders</em></p>
+                </div>
+            `;
+        }
+
+        console.log('[BIHR] Montants calculés: HT=' + totalExclVat.toFixed(2) + ', TTC=' + totalInclVat.toFixed(2) + ', TVA=' + tva);
+
+        return `
+            <div class="bihrwi-section section-prices">
+                <h3>💰 Montants</h3>
+                <div class="price-grid">
+                    <div class="price-item">
+                        <span class="price-label">🏷️ Prix HT:</span>
+                        <span class="price-value">${formatPrice(totalExclVat)}</span>
+                    </div>
+                    <div class="price-item">
+                        <span class="price-label">📊 TVA:</span>
+                        <span class="price-value">${parseFloat(tva).toFixed(2).replace('.', ',')} €</span>
+                    </div>
+                    <div class="price-item price-total">
+                        <span class="price-label">✅ Prix TTC:</span>
+                        <span class="price-value-highlight">${formatPrice(totalInclVat)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function buildShippingSection(data) {
+        if (!data.DeliveryOrders || !Array.isArray(data.DeliveryOrders) || data.DeliveryOrders.length === 0) {
+            return '';
+        }
+
+        const firstOrder = data.DeliveryOrders[0];
+        const parts = [];
+
+        if (firstOrder.CreationDate && firstOrder.CreationDate !== '0001-01-01T00:00:00') {
+            parts.push(`<p><strong>📅 Créé:</strong> ${formatDate(firstOrder.CreationDate)}</p>`);
+        }
+
+        if (firstOrder.DispatchDate) {
+            parts.push(`<p><strong>🚚 Expédié:</strong> ${formatDate(firstOrder.DispatchDate)}</p>`);
+        }
+
+        if (firstOrder.Weight) {
+            parts.push(`<p><strong>⚖️ Poids:</strong> ${escapeHtml(firstOrder.Weight.toString())} kg</p>`);
+        }
+
+        if (firstOrder.TransporterId) {
+            parts.push(`<p><strong>🚛 Transporteur:</strong> ${escapeHtml(firstOrder.TransporterId)}</p>`);
+        } else {
+            parts.push(`<p><em>🚛 Transporteur: Non assigné</em></p>`);
+        }
+
+        if (parts.length === 0) return '';
+
+        return `
+            <div class="bihrwi-section section-shipping">
+                <h3>📦 Informations de Livraison</h3>
+                ${parts.join('')}
+            </div>
+        `;
+    }
+
+    function buildWarningsSection(validation) {
+        if (!validation.errors || validation.errors.length === 0) return '';
+
+        return `
+            <div class="bihrwi-section section-warning">
+                <h3>⚠️ Avertissements</h3>
+                <ul class="warning-list">
+                    ${validation.errors.map(err => `<li>${escapeHtml(err)}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    function buildJsonSection(data) {
+        return `
+            <div class="bihrwi-section section-json">
+                <h3>📄 Données JSON Complètes</h3>
+                <pre class="bihrwi-json-raw">${escapeHtml(prettyJson(data))}</pre>
+            </div>
+        `;
+    }
+
+    // ============================================================
+    // FORMATAGE PRINCIPAL
+    // ============================================================
+
     function formatOrderDataForClient(data) {
-        if (!data || typeof data !== 'object') {
-            return prettyJson(data);
+        const validation = validateData(data);
+
+        if (!validation.valid && data === null) {
+            return `
+                <div class="bihrwi-order-data-formatted">
+                    <div class="bihrwi-section section-error">
+                        <h3>❌ Erreur de Données</h3>
+                        <ul class="error-list">
+                            ${validation.errors.map(err => `<li>${escapeHtml(err)}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
         }
 
         let html = '<div class="bihrwi-order-data-formatted">';
 
-        // 📦 ResultCode/Status
-        if (data.ResultCode) {
-            html += '<div class="bihrwi-section">';
-            html += '<h3>📦 Statut de la Commande</h3>';
-            html += '<p><strong>Résultat:</strong> <span class="status-badge status-' + data.ResultCode.toLowerCase() + '">' + escapeHtml(data.ResultCode) + '</span></p>';
-            html += '</div>';
+        // Section d'avertissements si données incohérentes
+        if (validation.hasWarnings) {
+            html += buildWarningsSection(validation);
         }
 
-        // 👤 Informations Client
-        if (data.CustomerId || data.CustomerReference || data.Code) {
-            html += '<div class="bihrwi-section">';
-            html += '<h3>👤 Informations Client</h3>';
-            if (data.CustomerId) html += '<p><strong>Client ID:</strong> ' + escapeHtml(data.CustomerId) + '</p>';
-            if (data.Code) html += '<p><strong>Code Commande:</strong> ' + escapeHtml(data.Code) + '</p>';
-            if (data.CustomerReference) html += '<p><strong>Référence:</strong> ' + escapeHtml(data.CustomerReference) + '</p>';
-            html += '</div>';
-        }
+        // Sections principales
+        html += buildStatusSection(data);
+        html += buildClientSection(data);
+        html += buildAddressSection(data);
+        html += buildArticlesSection(data);
+        html += buildPricesSection(data);
+        html += buildShippingSection(data);
 
-        // 🏠 Adresse de Livraison
-        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders) && data.DeliveryOrders.length > 0) {
-            const firstOrder = data.DeliveryOrders[0];
-            if (firstOrder.ShippingAddress) {
-                html += '<div class="bihrwi-section">';
-                html += '<h3>🏠 Adresse de Livraison</h3>';
-                const addr = firstOrder.ShippingAddress;
-                html += '<p>';
-                if (addr.Line1) html += escapeHtml(addr.Line1) + '<br>';
-                if (addr.Line2) html += escapeHtml(addr.Line2) + '<br>';
-                const zipCity = [];
-                if (addr.ZipCode) zipCity.push(escapeHtml(addr.ZipCode));
-                if (addr.City) zipCity.push(escapeHtml(addr.City));
-                if (zipCity.length) html += zipCity.join(' ') + '<br>';
-                if (addr.Country) html += '<strong>Pays:</strong> ' + escapeHtml(addr.Country);
-                html += '</p>';
-                html += '</div>';
-            }
-        }
-
-        // 📋 Articles/Lignes de Commande
-        let totalPrice = 0;
-        if (data.OrderLines && Array.isArray(data.OrderLines) && data.OrderLines.length > 0) {
-            html += '<div class="bihrwi-section">';
-            html += '<h3>📋 Articles de la Commande</h3>';
-            html += '<table class="bihrwi-items-table">';
-            html += '<tr><th>Produit</th><th>Quantité</th><th>Référence</th></tr>';
-            
-            data.OrderLines.forEach(line => {
-                html += '<tr>';
-                html += '<td>' + (line.ProductId ? escapeHtml(line.ProductId) : 'N/A') + '</td>';
-                html += '<td style="text-align:center;">' + (line.Quantity || 0) + '</td>';
-                html += '<td>' + (line.CustomerReference ? escapeHtml(line.CustomerReference) : 'N/A') + '</td>';
-                html += '</tr>';
-            });
-            html += '</table>';
-            html += '</div>';
-        } else {
-            html += '<div class="bihrwi-section">';
-            html += '<h3>📋 Articles de la Commande</h3>';
-            html += '<p><em>Aucun article dans cette commande.</em></p>';
-            html += '</div>';
-        }
-
-        // 💰 Montants et Livraison
-        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders) && data.DeliveryOrders.length > 0) {
-            html += '<div class="bihrwi-section">';
-            html += '<h3>💰 Montants</h3>';
-            
-            let totalInclVat = 0;
-            let totalExclVat = 0;
-            
-            data.DeliveryOrders.forEach(order => {
-                if (order.InclVatPrice !== undefined && order.InclVatPrice !== null) {
-                    totalInclVat += parseFloat(order.InclVatPrice) || 0;
-                }
-                if (order.ExclVatPrice !== undefined && order.ExclVatPrice !== null) {
-                    totalExclVat += parseFloat(order.ExclVatPrice) || 0;
-                }
-            });
-            
-            if (totalExclVat > 0) {
-                html += '<p><strong>Prix HT:</strong> ' + totalExclVat.toFixed(2) + ' €</p>';
-            }
-            if (totalInclVat > 0) {
-                html += '<p><strong>Prix TTC:</strong> <strong style="color:#2271b1; font-size:16px;">' + totalInclVat.toFixed(2) + ' €</strong></p>';
-            }
-            
-            const tva = (totalInclVat - totalExclVat).toFixed(2);
-            if (parseFloat(tva) > 0) {
-                html += '<p><strong>TVA:</strong> ' + tva + ' €</p>';
-            }
-            
-            html += '</div>';
-        }
-
-        // 📅 Informations de Statut
-        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders) && data.DeliveryOrders.length > 0) {
-            const firstOrder = data.DeliveryOrders[0];
-            html += '<div class="bihrwi-section">';
-            html += '<h3>📅 Statut de Livraison</h3>';
-            if (firstOrder.CreationDate && firstOrder.CreationDate !== '0001-01-01T00:00:00') {
-                html += '<p><strong>Date de Création:</strong> ' + new Date(firstOrder.CreationDate).toLocaleString('fr-FR') + '</p>';
-            }
-            if (firstOrder.DispatchDate) {
-                html += '<p><strong>Date d\'Envoi:</strong> ' + new Date(firstOrder.DispatchDate).toLocaleString('fr-FR') + '</p>';
-            }
-            if (firstOrder.Weight) {
-                html += '<p><strong>Poids:</strong> ' + firstOrder.Weight + ' kg</p>';
-            }
-            if (firstOrder.Volume) {
-                html += '<p><strong>Volume:</strong> ' + firstOrder.Volume + '</p>';
-            }
-            html += '</div>';
-        }
-
-        // 🏢 Informations Supplémentaires
-        html += '<div class="bihrwi-section">';
-        html += '<h3>🏢 Informations Supplémentaires</h3>';
-        if (data.InternalCustomerId) {
-            html += '<p><strong>ID Client Interne:</strong> ' + escapeHtml(data.InternalCustomerId) + '</p>';
-        }
-        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders)) {
-            html += '<p><strong>Nombre de Commandes Livraison:</strong> ' + data.DeliveryOrders.length + '</p>';
-        }
-        if (data.OrderLines && Array.isArray(data.OrderLines)) {
-            html += '<p><strong>Nombre d\'Articles:</strong> ' + data.OrderLines.length + '</p>';
-        }
-        html += '</div>';
-
-        // Afficher le JSON brut formaté
-        html += '<div class="bihrwi-section">';
-        html += '<h3>📄 Données JSON Complètes</h3>';
-        html += '<pre class="bihrwi-json-raw">' + escapeHtml(prettyJson(data)) + '</pre>';
-        html += '</div>';
+        // JSON brut
+        html += buildJsonSection(data);
 
         html += '</div>';
         return html;
     }
 
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    // ============================================================
+    // RÉCUPÉRATION ET AFFICHAGE
+    // ============================================================
 
+    /**
+     * Récupère et affiche les données Order/Data pour une commande WC
+     * @param {number} orderId ID de la commande WooCommerce
+     * @param {boolean} force Force la réactualisation (pas de cache)
+     */
     function fetchOrderData(orderId, force){
         const $row = $(".bihrwi-order-data-row[data-order-id='" + orderId + "']");
         const $status = $row.find('.bihrwi-order-data-status');
         const $pre = $row.find('.bihrwi-order-data-pre');
 
-        $status.text('Chargement depuis BIHR…');
+        $status.text('⏳ Chargement depuis BIHR…');
+        console.log('[BIHR] Récupération Order/Data pour ordre WC #' + orderId);
+        console.log('[BIHR] Force=' + (force ? 'OUI (pas de cache)' : 'NON (cache OK)'));
 
         return $.post(ajaxurl, {
             action: 'bihrwi_get_order_data',
@@ -529,14 +831,28 @@ if ( ! defined( 'ABSPATH' ) ) {
             order_id: orderId,
             force: force ? 1 : 0
         }).done(function(resp){
+            console.log('[BIHR] Réponse reçue:', resp);
+            
             if (!resp || !resp.success) {
                 const payload = (resp && resp.data) ? resp.data : {};
                 const msg = payload.message ? payload.message : 'Erreur inconnue.';
+                console.error('[BIHR] ❌ Erreur API:', msg);
+                
                 let extra = '';
-                if (payload.request_status) extra += '\nrequest_status: ' + payload.request_status;
-                if (payload.order_url) extra += '\norder_url: ' + payload.order_url;
-                if (payload.ticket_id) extra += '\nticket_id: ' + payload.ticket_id;
-                $status.text('Erreur: ' + msg);
+                if (payload.request_status) {
+                    extra += '\n📊 Statut: ' + payload.request_status;
+                    console.log('[BIHR] Statut API:', payload.request_status);
+                }
+                if (payload.order_url) {
+                    extra += '\n🔗 URL: ' + payload.order_url;
+                    console.log('[BIHR] URL:', payload.order_url);
+                }
+                if (payload.ticket_id) {
+                    extra += '\n🎫 Ticket: ' + payload.ticket_id;
+                    console.log('[BIHR] Ticket:', payload.ticket_id);
+                }
+                
+                $status.html('<span style="color:#d32f2f;">❌ Erreur:</span> ' + escapeHtml(msg));
                 if (extra) {
                     $pre.html('<div class="bihrwi-error-details">' + escapeHtml(msg + extra).replace(/\n/g, '<br>') + '</div>');
                 }
@@ -545,26 +861,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 
             const payload = resp.data || {};
             const fetchedAt = payload.fetched_at ? payload.fetched_at : '';
-            const cached = payload.cached ? ' (cache)' : '';
+            const cached = payload.cached ? ' <em style="color:#2196f3;">💾 cache</em>' : '';
 
-            $status.text('OK' + cached + (fetchedAt ? ' - ' + fetchedAt : ''));
+            console.log('[BIHR] ✅ Données reçues avec succès');
+            if (payload.data) {
+                console.log('[BIHR] Nombre articles:', (payload.data.OrderLines || []).length);
+                console.log('[BIHR] Nombre commandes:', (payload.data.DeliveryOrders || []).length);
+            }
+            
+            $status.html('✅ OK' + cached + (fetchedAt ? ' - ' + escapeHtml(fetchedAt) : ''));
             $pre.html(formatOrderDataForClient(payload.data));
-        }).fail(function(){
-            $status.text('Erreur réseau ou serveur (AJAX).');
+        }).fail(function(jqXHR, textStatus, errorThrown){
+            console.error('[BIHR] ❌ Erreur réseau/serveur:', textStatus, errorThrown);
+            console.log('[BIHR] Status HTTP:', jqXHR.status);
+            console.log('[BIHR] Response Text:', jqXHR.responseText);
+            $status.html('<span style="color:#d32f2f;">❌ Erreur réseau</span> (' + escapeHtml(textStatus) + ')');
         });
     }
 
+    /**
+     * Récupère les données Order/Data avec saisie manuelle
+     * @param {number} orderId ID de la commande WooCommerce à récupérer
+     */
     function fetchOrderDataManual(orderId){
         const $status = $('#bihrwi_order_data_manual_status');
         const $pre = $('#bihrwi_order_data_manual_pre');
 
         if (!orderId || parseInt(orderId, 10) <= 0) {
-            $status.text('Veuillez saisir un ID de commande valide.');
+            $status.text('⚠️ Veuillez saisir un ID de commande valide.');
+            console.warn('[BIHR] ID invalide:', orderId);
             return;
         }
 
-        $status.text('Chargement depuis BIHR…');
+        $status.text('⏳ Chargement depuis BIHR…');
         $pre.text('');
+        console.log('[BIHR] Récupération manuelle Order/Data pour ordre WC #' + orderId);
 
         $.post(ajaxurl, {
             action: 'bihrwi_get_order_data',
@@ -572,14 +903,19 @@ if ( ! defined( 'ABSPATH' ) ) {
             order_id: orderId,
             force: 1
         }).done(function(resp){
+            console.log('[BIHR] Réponse manuelle reçue:', resp);
+            
             if (!resp || !resp.success) {
                 const payload = (resp && resp.data) ? resp.data : {};
                 const msg = payload.message ? payload.message : 'Erreur inconnue.';
+                console.error('[BIHR] ❌ Erreur API (manuelle):', msg);
+                
                 let extra = '';
-                if (payload.request_status) extra += '\nrequest_status: ' + payload.request_status;
-                if (payload.order_url) extra += '\norder_url: ' + payload.order_url;
-                if (payload.ticket_id) extra += '\nticket_id: ' + payload.ticket_id;
-                $status.text('Erreur: ' + msg);
+                if (payload.request_status) extra += '\n📊 Statut: ' + payload.request_status;
+                if (payload.order_url) extra += '\n🔗 URL: ' + payload.order_url;
+                if (payload.ticket_id) extra += '\n🎫 Ticket: ' + payload.ticket_id;
+                
+                $status.html('<span style="color:#d32f2f;">❌ Erreur:</span> ' + escapeHtml(msg));
                 if (extra) {
                     $pre.html('<div class="bihrwi-error-details">' + escapeHtml(msg + extra).replace(/\n/g, '<br>') + '</div>');
                 }
@@ -588,12 +924,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 
             const payload = resp.data || {};
             const fetchedAt = payload.fetched_at ? payload.fetched_at : '';
-            $status.text('OK' + (fetchedAt ? ' - ' + fetchedAt : ''));
+
+            console.log('[BIHR] ✅ Données manuelle reçues avec succès');
+            if (payload.data) {
+                console.log('[BIHR] Contenu: Articles=' + (payload.data.OrderLines || []).length + ', Commandes=' + (payload.data.DeliveryOrders || []).length);
+            }
+            
+            $status.html('✅ OK' + (fetchedAt ? ' - ' + escapeHtml(fetchedAt) : ''));
             $pre.html(formatOrderDataForClient(payload.data));
-        }).fail(function(){
-            $status.text('Erreur réseau ou serveur (AJAX).');
+        }).fail(function(jqXHR, textStatus, errorThrown){
+            console.error('[BIHR] ❌ Erreur réseau/serveur (manuelle):', textStatus, errorThrown);
+            $status.html('<span style="color:#d32f2f;">❌ Erreur réseau</span> (' + escapeHtml(textStatus) + ')');
         });
     }
+
+    // ============================================================
+    // EVENT HANDLERS
+    // ============================================================
 
     $(document).on('click', '.bihrwi-order-data-btn', function(){
         const orderId = $(this).data('order-id');
@@ -620,5 +967,7 @@ if ( ! defined( 'ABSPATH' ) ) {
         const orderId = $('#bihrwi_order_data_order_id').val();
         fetchOrderDataManual(orderId);
     });
+
+    console.log('[BIHR] Plugin Order/Data initialisé');
 })(jQuery);
 </script>

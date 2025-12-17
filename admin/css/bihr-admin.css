@@ -179,60 +179,131 @@
 
 .bihrwi-order-data-formatted .bihrwi-section {
     margin-bottom: 25px;
-    padding: 15px;
-    background: #f9f9f9;
-    border-left: 4px solid #2271b1;
-    border-radius: 4px;
+    padding: 18px;
+    background: linear-gradient(135deg, #f9f9f9 0%, #ffffff 100%);
+    border-left: 5px solid #2271b1;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .bihrwi-order-data-formatted .bihrwi-section h3 {
-    margin: 0 0 15px 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #2271b1;
+    margin: 0 0 18px 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #1a4d8a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .bihrwi-order-data-formatted p {
-    margin: 8px 0;
+    margin: 10px 0;
     font-size: 14px;
+    line-height: 1.5;
+    color: #333;
 }
 
 .bihrwi-order-data-formatted p strong {
     color: #000;
+    font-weight: 600;
     display: inline-block;
-    min-width: 150px;
+    min-width: 160px;
 }
 
-.bihrwi-order-data-formatted p br + strong:first-of-type {
-    display: block;
-    margin-top: 8px;
-    min-width: 0;
+.bihrwi-order-data-formatted code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+}
+
+/* Sections spécifiques */
+.section-status {
+    border-left-color: #ff9800 !important;
+    background: linear-gradient(135deg, #fff8f0 0%, #fffcf7 100%) !important;
+}
+
+.section-client {
+    border-left-color: #9c27b0 !important;
+    background: linear-gradient(135deg, #f9f5fd 0%, #faf8fc 100%) !important;
+}
+
+.section-address {
+    border-left-color: #4caf50 !important;
+    background: linear-gradient(135deg, #f5fef5 0%, #fcfdfc 100%) !important;
+}
+
+.section-articles {
+    border-left-color: #2196f3 !important;
+    background: linear-gradient(135deg, #f5fbff 0%, #fcfeff 100%) !important;
+}
+
+.section-prices {
+    border-left-color: #f44336 !important;
+    background: linear-gradient(135deg, #fff5f5 0%, #fffcfc 100%) !important;
+}
+
+.section-shipping {
+    border-left-color: #00bcd4 !important;
+    background: linear-gradient(135deg, #f0feff 0%, #fcfdff 100%) !important;
+}
+
+.section-json {
+    border-left-color: #607d8b !important;
+    background: linear-gradient(135deg, #f5f7fa 0%, #fcfdfe 100%) !important;
+}
+
+.section-error {
+    border-left-color: #d32f2f !important;
+    background: linear-gradient(135deg, #ffebee 0%, #fffbfc 100%) !important;
+}
+
+.section-warning {
+    border-left-color: #fbc02d !important;
+    background: linear-gradient(135deg, #fffef0 0%, #fffef8 100%) !important;
+}
+
+/* Adresse */
+.address-box {
+    background: white;
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    font-style: italic;
+    line-height: 1.8;
 }
 
 /* Status Badge */
 .status-badge {
     display: inline-block;
-    padding: 4px 12px;
+    padding: 6px 14px;
     border-radius: 20px;
-    font-weight: 600;
-    font-size: 13px;
+    font-weight: 700;
+    font-size: 12px;
     color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 .status-badge.status-cart {
-    background: #ff9800;
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
 }
 
 .status-badge.status-order {
-    background: #4caf50;
+    background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
 }
 
 .status-badge.status-delivered {
-    background: #2196f3;
+    background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+}
+
+.status-badge.status-processing {
+    background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
 }
 
 .status-badge.status-pending {
-    background: #9c27b0;
+    background: linear-gradient(135deg, #607d8b 0%, #455a64 100%);
 }
 
 /* Tableau des articles */
@@ -240,84 +311,172 @@
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 10px;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
-.bihrwi-items-table th,
-.bihrwi-items-table td {
-    padding: 10px;
-    border: 1px solid #ddd;
-    text-align: left;
-    font-size: 13px;
+.bihrwi-items-table thead {
+    background: linear-gradient(135deg, #1a4d8a 0%, #2271b1 100%);
 }
 
 .bihrwi-items-table th {
-    background: #2271b1;
+    padding: 12px 15px;
     color: white;
+    font-weight: 700;
+    text-align: left;
+    border: none;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.bihrwi-items-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #e8e8e8;
+    font-size: 13px;
+}
+
+.bihrwi-items-table tbody tr:hover {
+    background: #f5f9ff;
+    transition: background 0.15s ease;
+}
+
+.bihrwi-items-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.cell-number {
+    font-weight: 700;
+    color: #2271b1;
+    width: 40px;
+}
+
+.cell-product {
+    font-family: 'Monaco', 'Courier New', monospace;
     font-weight: 600;
+    color: #d32f2f;
 }
 
-.bihrwi-items-table tr:nth-child(even) {
-    background: #f5f5f5;
+.cell-qty {
+    text-align: center;
+    font-weight: 600;
+    background: rgba(33, 113, 177, 0.05);
+    border-radius: 3px;
 }
 
-.bihrwi-items-table tr:hover {
-    background: #fffacd;
+.cell-ref {
+    color: #666;
+    font-size: 12px;
+}
+
+/* Grille de prix */
+.price-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.price-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.price-item.price-total {
+    background: linear-gradient(135deg, #fff3e0 0%, #fffdf7 100%);
+    border: 2px solid #ff9800;
+}
+
+.price-label {
+    font-weight: 600;
+    color: #666;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.price-value {
+    font-weight: 700;
+    color: #2271b1;
+    font-size: 16px;
+}
+
+.price-value-highlight {
+    font-weight: 700;
+    color: #d32f2f;
+    font-size: 18px;
 }
 
 /* JSON Brut */
 .bihrwi-json-raw {
     margin: 0 !important;
     padding: 15px !important;
-    background: white !important;
-    border: 1px solid #ddd;
+    background: #f5f7fa !important;
+    border: 1px solid #dcdcde;
     border-radius: 4px;
     overflow-x: auto;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.5;
     color: #333;
     max-height: 600px;
     overflow-y: auto;
+    font-family: 'Courier New', monospace;
 }
 
-details.bihrwi-raw-json {
-    margin-top: 20px;
-    padding: 10px;
-    background: #f0f0f0;
-    border: 1px solid #ccc;
+.bihrwi-json-raw::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.bihrwi-json-raw::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.bihrwi-json-raw::-webkit-scrollbar-thumb {
+    background: #888;
     border-radius: 4px;
 }
 
-details.bihrwi-raw-json summary {
-    cursor: pointer;
-    font-weight: 600;
-    color: #2271b1;
-    user-select: none;
-    padding: 10px;
-    margin: -10px -10px 0 -10px;
-}
-
-details.bihrwi-raw-json summary:hover {
-    background: #e0e0e0;
-}
-
-details.bihrwi-raw-json pre {
-    margin: 15px 0 0 0 !important;
-    padding: 12px !important;
-    background: white !important;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    overflow-x: auto;
-    font-size: 12px;
-    line-height: 1.4;
+.bihrwi-json-raw::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 /* Détails d'erreur */
 .bihrwi-error-details {
     padding: 15px;
-    background: #fff3cd;
-    border-left: 4px solid #ff9800;
+    background: linear-gradient(135deg, #ffebee 0%, #fff5f5 100%);
+    border-left: 4px solid #d32f2f;
     border-radius: 4px;
-    color: #333;
+    color: #c62828;
     font-size: 13px;
+    line-height: 1.7;
+    font-family: 'Courier New', monospace;
+}
+
+/* Listes d'erreurs/avertissements */
+.error-list,
+.warning-list {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.error-list li,
+.warning-list li {
+    margin: 8px 0;
     line-height: 1.6;
+}
+
+.error-list li:before {
+    content: '❌ ';
+    margin-right: 8px;
+}
+
+.warning-list li:before {
+    content: '⚠️ ';
+    margin-right: 8px;
 }
