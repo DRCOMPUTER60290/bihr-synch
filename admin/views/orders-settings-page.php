@@ -364,6 +364,131 @@ if ( ! defined( 'ABSPATH' ) ) {
         }
     }
 
+    function formatOrderDataForClient(data) {
+        if (!data || typeof data !== 'object') {
+            return prettyJson(data);
+        }
+
+        let html = '<div class="bihrwi-order-data-formatted">';
+
+        // 📦 ResultCode/Status
+        if (data.ResultCode) {
+            html += '<div class="bihrwi-section">';
+            html += '<h3>📦 Statut de la Commande</h3>';
+            html += '<p><strong>Résultat:</strong> <span class="status-badge status-' + data.ResultCode.toLowerCase() + '">' + escapeHtml(data.ResultCode) + '</span></p>';
+            html += '</div>';
+        }
+
+        // 🏠 Adresse de Livraison
+        if (data.ShippingAddress) {
+            html += '<div class="bihrwi-section">';
+            html += '<h3>🏠 Adresse de Livraison</h3>';
+            const addr = data.ShippingAddress;
+            html += '<p>';
+            if (addr.Line1) html += escapeHtml(addr.Line1) + '<br>';
+            if (addr.Line2) html += escapeHtml(addr.Line2) + '<br>';
+            const zipCity = [];
+            if (addr.ZipCode) zipCity.push(escapeHtml(addr.ZipCode));
+            if (addr.City) zipCity.push(escapeHtml(addr.City));
+            if (zipCity.length) html += zipCity.join(' ') + '<br>';
+            if (addr.Country) html += '<strong>Pays:</strong> ' + escapeHtml(addr.Country);
+            html += '</p>';
+            html += '</div>';
+        }
+
+        // 📋 Articles/Lignes de Commande
+        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders) && data.DeliveryOrders.length > 0) {
+            html += '<div class="bihrwi-section">';
+            html += '<h3>📋 Articles de la Commande</h3>';
+            html += '<table class="bihrwi-items-table">';
+            html += '<tr><th>Produit</th><th>Quantité</th><th>Prix Unitaire</th><th>Prix Total</th></tr>';
+            
+            let totalAmount = 0;
+            data.DeliveryOrders.forEach(order => {
+                if (order.DeliveryOrderLines) {
+                    order.DeliveryOrderLines.forEach(line => {
+                        const quantity = line.Quantity || 0;
+                        const unitPrice = parseFloat(line.UnitPrice) || 0;
+                        const total = quantity * unitPrice;
+                        totalAmount += total;
+                        
+                        html += '<tr>';
+                        html += '<td>' + (line.ProductId ? escapeHtml(line.ProductId) : 'N/A') + '</td>';
+                        html += '<td style="text-align:center;">' + quantity + '</td>';
+                        html += '<td style="text-align:right;">' + unitPrice.toFixed(2) + ' €</td>';
+                        html += '<td style="text-align:right;"><strong>' + total.toFixed(2) + ' €</strong></td>';
+                        html += '</tr>';
+                    });
+                }
+            });
+            html += '<tr style="background:#f0f0f0; font-weight:bold;">';
+            html += '<td colspan="3" style="text-align:right;">TOTAL ARTICLES:</td>';
+            html += '<td style="text-align:right;">' + totalAmount.toFixed(2) + ' €</td>';
+            html += '</tr>';
+            html += '</table>';
+            html += '</div>';
+        } else {
+            html += '<div class="bihrwi-section">';
+            html += '<h3>📋 Articles de la Commande</h3>';
+            html += '<p><em>Aucun article dans cette commande.</em></p>';
+            html += '</div>';
+        }
+
+        // 💰 Montants
+        if (data.TotalPrice !== undefined || data.ShippingPrice !== undefined) {
+            html += '<div class="bihrwi-section">';
+            html += '<h3>💰 Montants</h3>';
+            if (data.TotalPrice !== undefined) {
+                html += '<p><strong>Prix Total:</strong> ' + parseFloat(data.TotalPrice).toFixed(2) + ' €</p>';
+            }
+            if (data.ShippingPrice !== undefined) {
+                html += '<p><strong>Frais de Livraison:</strong> ' + parseFloat(data.ShippingPrice).toFixed(2) + ' €</p>';
+            }
+            html += '</div>';
+        }
+
+        // 📅 Dates
+        if (data.OrderDate || data.CreationDate) {
+            html += '<div class="bihrwi-section">';
+            html += '<h3>📅 Dates</h3>';
+            if (data.OrderDate) {
+                html += '<p><strong>Date de Commande:</strong> ' + new Date(data.OrderDate).toLocaleString('fr-FR') + '</p>';
+            }
+            if (data.CreationDate) {
+                html += '<p><strong>Date de Création:</strong> ' + new Date(data.CreationDate).toLocaleString('fr-FR') + '</p>';
+            }
+            html += '</div>';
+        }
+
+        // 🏢 Informations Supplémentaires
+        if (data.OrderNumber || data.OrderId || data.Packages !== undefined) {
+            html += '<div class="bihrwi-section">';
+            html += '<h3>🏢 Informations Supplémentaires</h3>';
+            if (data.OrderNumber) html += '<p><strong>Numéro de Commande:</strong> ' + escapeHtml(data.OrderNumber) + '</p>';
+            if (data.OrderId) html += '<p><strong>ID Commande:</strong> ' + escapeHtml(data.OrderId) + '</p>';
+            if (data.Packages === null || data.Packages === undefined) {
+                html += '<p><strong>Packages:</strong> <em>Pas encore préparés</em></p>';
+            }
+            html += '</div>';
+        }
+
+        // Afficher le JSON brut si besoin
+        html += '<details class="bihrwi-raw-json">';
+        html += '<summary>📋 Afficher le JSON brut</summary>';
+        html += '<pre>' + escapeHtml(prettyJson(data)) + '</pre>';
+        html += '</details>';
+
+        html += '</div>';
+        return html;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     function fetchOrderData(orderId, force){
         const $row = $(".bihrwi-order-data-row[data-order-id='" + orderId + "']");
         const $status = $row.find('.bihrwi-order-data-status');
@@ -386,7 +511,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                 if (payload.ticket_id) extra += '\nticket_id: ' + payload.ticket_id;
                 $status.text('Erreur: ' + msg);
                 if (extra) {
-                    $pre.text(msg + extra);
+                    $pre.html('<div class="bihrwi-error-details">' + escapeHtml(msg + extra).replace(/\n/g, '<br>') + '</div>');
                 }
                 return;
             }
@@ -396,7 +521,7 @@ if ( ! defined( 'ABSPATH' ) ) {
             const cached = payload.cached ? ' (cache)' : '';
 
             $status.text('OK' + cached + (fetchedAt ? ' - ' + fetchedAt : ''));
-            $pre.text(prettyJson(payload.data));
+            $pre.html(formatOrderDataForClient(payload.data));
         }).fail(function(){
             $status.text('Erreur réseau ou serveur (AJAX).');
         });
@@ -429,7 +554,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                 if (payload.ticket_id) extra += '\nticket_id: ' + payload.ticket_id;
                 $status.text('Erreur: ' + msg);
                 if (extra) {
-                    $pre.text(msg + extra);
+                    $pre.html('<div class="bihrwi-error-details">' + escapeHtml(msg + extra).replace(/\n/g, '<br>') + '</div>');
                 }
                 return;
             }
@@ -437,7 +562,7 @@ if ( ! defined( 'ABSPATH' ) ) {
             const payload = resp.data || {};
             const fetchedAt = payload.fetched_at ? payload.fetched_at : '';
             $status.text('OK' + (fetchedAt ? ' - ' + fetchedAt : ''));
-            $pre.text(prettyJson(payload.data));
+            $pre.html(formatOrderDataForClient(payload.data));
         }).fail(function(){
             $status.text('Erreur réseau ou serveur (AJAX).');
         });

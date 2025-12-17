@@ -167,3 +167,143 @@
     height: auto !important;
     line-height: 1 !important;
 }
+/* ========================================
+   Styles pour l'affichage Order/Data
+   ======================================== */
+
+.bihrwi-order-data-formatted {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    line-height: 1.6;
+    color: #333;
+}
+
+.bihrwi-order-data-formatted .bihrwi-section {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-left: 4px solid #2271b1;
+    border-radius: 4px;
+}
+
+.bihrwi-order-data-formatted .bihrwi-section h3 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.bihrwi-order-data-formatted p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.bihrwi-order-data-formatted p strong {
+    color: #000;
+    display: inline-block;
+    min-width: 150px;
+}
+
+.bihrwi-order-data-formatted p br + strong:first-of-type {
+    display: block;
+    margin-top: 8px;
+    min-width: 0;
+}
+
+/* Status Badge */
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 13px;
+    color: white;
+}
+
+.status-badge.status-cart {
+    background: #ff9800;
+}
+
+.status-badge.status-order {
+    background: #4caf50;
+}
+
+.status-badge.status-delivered {
+    background: #2196f3;
+}
+
+.status-badge.status-pending {
+    background: #9c27b0;
+}
+
+/* Tableau des articles */
+.bihrwi-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+}
+
+.bihrwi-items-table th,
+.bihrwi-items-table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.bihrwi-items-table th {
+    background: #2271b1;
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.bihrwi-items-table tr:nth-child(even) {
+    background: #f5f5f5;
+}
+
+.bihrwi-items-table tr:hover {
+    background: #fffacd;
+}
+
+/* JSON Brut */
+details.bihrwi-raw-json {
+    margin-top: 20px;
+    padding: 10px;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+details.bihrwi-raw-json summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #2271b1;
+    user-select: none;
+    padding: 10px;
+    margin: -10px -10px 0 -10px;
+}
+
+details.bihrwi-raw-json summary:hover {
+    background: #e0e0e0;
+}
+
+details.bihrwi-raw-json pre {
+    margin: 15px 0 0 0 !important;
+    padding: 12px !important;
+    background: white !important;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Détails d'erreur */
+.bihrwi-error-details {
+    padding: 15px;
+    background: #fff3cd;
+    border-left: 4px solid #ff9800;
+    border-radius: 4px;
+    color: #333;
+    font-size: 13px;
+    line-height: 1.6;
+}
