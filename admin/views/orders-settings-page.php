@@ -379,52 +379,51 @@ if ( ! defined( 'ABSPATH' ) ) {
             html += '</div>';
         }
 
-        // 🏠 Adresse de Livraison
-        if (data.ShippingAddress) {
+        // 👤 Informations Client
+        if (data.CustomerId || data.CustomerReference || data.Code) {
             html += '<div class="bihrwi-section">';
-            html += '<h3>🏠 Adresse de Livraison</h3>';
-            const addr = data.ShippingAddress;
-            html += '<p>';
-            if (addr.Line1) html += escapeHtml(addr.Line1) + '<br>';
-            if (addr.Line2) html += escapeHtml(addr.Line2) + '<br>';
-            const zipCity = [];
-            if (addr.ZipCode) zipCity.push(escapeHtml(addr.ZipCode));
-            if (addr.City) zipCity.push(escapeHtml(addr.City));
-            if (zipCity.length) html += zipCity.join(' ') + '<br>';
-            if (addr.Country) html += '<strong>Pays:</strong> ' + escapeHtml(addr.Country);
-            html += '</p>';
+            html += '<h3>👤 Informations Client</h3>';
+            if (data.CustomerId) html += '<p><strong>Client ID:</strong> ' + escapeHtml(data.CustomerId) + '</p>';
+            if (data.Code) html += '<p><strong>Code Commande:</strong> ' + escapeHtml(data.Code) + '</p>';
+            if (data.CustomerReference) html += '<p><strong>Référence:</strong> ' + escapeHtml(data.CustomerReference) + '</p>';
             html += '</div>';
         }
 
-        // 📋 Articles/Lignes de Commande
+        // 🏠 Adresse de Livraison
         if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders) && data.DeliveryOrders.length > 0) {
+            const firstOrder = data.DeliveryOrders[0];
+            if (firstOrder.ShippingAddress) {
+                html += '<div class="bihrwi-section">';
+                html += '<h3>🏠 Adresse de Livraison</h3>';
+                const addr = firstOrder.ShippingAddress;
+                html += '<p>';
+                if (addr.Line1) html += escapeHtml(addr.Line1) + '<br>';
+                if (addr.Line2) html += escapeHtml(addr.Line2) + '<br>';
+                const zipCity = [];
+                if (addr.ZipCode) zipCity.push(escapeHtml(addr.ZipCode));
+                if (addr.City) zipCity.push(escapeHtml(addr.City));
+                if (zipCity.length) html += zipCity.join(' ') + '<br>';
+                if (addr.Country) html += '<strong>Pays:</strong> ' + escapeHtml(addr.Country);
+                html += '</p>';
+                html += '</div>';
+            }
+        }
+
+        // 📋 Articles/Lignes de Commande
+        let totalPrice = 0;
+        if (data.OrderLines && Array.isArray(data.OrderLines) && data.OrderLines.length > 0) {
             html += '<div class="bihrwi-section">';
             html += '<h3>📋 Articles de la Commande</h3>';
             html += '<table class="bihrwi-items-table">';
-            html += '<tr><th>Produit</th><th>Quantité</th><th>Prix Unitaire</th><th>Prix Total</th></tr>';
+            html += '<tr><th>Produit</th><th>Quantité</th><th>Référence</th></tr>';
             
-            let totalAmount = 0;
-            data.DeliveryOrders.forEach(order => {
-                if (order.DeliveryOrderLines) {
-                    order.DeliveryOrderLines.forEach(line => {
-                        const quantity = line.Quantity || 0;
-                        const unitPrice = parseFloat(line.UnitPrice) || 0;
-                        const total = quantity * unitPrice;
-                        totalAmount += total;
-                        
-                        html += '<tr>';
-                        html += '<td>' + (line.ProductId ? escapeHtml(line.ProductId) : 'N/A') + '</td>';
-                        html += '<td style="text-align:center;">' + quantity + '</td>';
-                        html += '<td style="text-align:right;">' + unitPrice.toFixed(2) + ' €</td>';
-                        html += '<td style="text-align:right;"><strong>' + total.toFixed(2) + ' €</strong></td>';
-                        html += '</tr>';
-                    });
-                }
+            data.OrderLines.forEach(line => {
+                html += '<tr>';
+                html += '<td>' + (line.ProductId ? escapeHtml(line.ProductId) : 'N/A') + '</td>';
+                html += '<td style="text-align:center;">' + (line.Quantity || 0) + '</td>';
+                html += '<td>' + (line.CustomerReference ? escapeHtml(line.CustomerReference) : 'N/A') + '</td>';
+                html += '</tr>';
             });
-            html += '<tr style="background:#f0f0f0; font-weight:bold;">';
-            html += '<td colspan="3" style="text-align:right;">TOTAL ARTICLES:</td>';
-            html += '<td style="text-align:right;">' + totalAmount.toFixed(2) + ' €</td>';
-            html += '</tr>';
             html += '</table>';
             html += '</div>';
         } else {
@@ -434,49 +433,77 @@ if ( ! defined( 'ABSPATH' ) ) {
             html += '</div>';
         }
 
-        // 💰 Montants
-        if (data.TotalPrice !== undefined || data.ShippingPrice !== undefined) {
+        // 💰 Montants et Livraison
+        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders) && data.DeliveryOrders.length > 0) {
             html += '<div class="bihrwi-section">';
             html += '<h3>💰 Montants</h3>';
-            if (data.TotalPrice !== undefined) {
-                html += '<p><strong>Prix Total:</strong> ' + parseFloat(data.TotalPrice).toFixed(2) + ' €</p>';
+            
+            let totalInclVat = 0;
+            let totalExclVat = 0;
+            
+            data.DeliveryOrders.forEach(order => {
+                if (order.InclVatPrice !== undefined && order.InclVatPrice !== null) {
+                    totalInclVat += parseFloat(order.InclVatPrice) || 0;
+                }
+                if (order.ExclVatPrice !== undefined && order.ExclVatPrice !== null) {
+                    totalExclVat += parseFloat(order.ExclVatPrice) || 0;
+                }
+            });
+            
+            if (totalExclVat > 0) {
+                html += '<p><strong>Prix HT:</strong> ' + totalExclVat.toFixed(2) + ' €</p>';
             }
-            if (data.ShippingPrice !== undefined) {
-                html += '<p><strong>Frais de Livraison:</strong> ' + parseFloat(data.ShippingPrice).toFixed(2) + ' €</p>';
+            if (totalInclVat > 0) {
+                html += '<p><strong>Prix TTC:</strong> <strong style="color:#2271b1; font-size:16px;">' + totalInclVat.toFixed(2) + ' €</strong></p>';
             }
+            
+            const tva = (totalInclVat - totalExclVat).toFixed(2);
+            if (parseFloat(tva) > 0) {
+                html += '<p><strong>TVA:</strong> ' + tva + ' €</p>';
+            }
+            
             html += '</div>';
         }
 
-        // 📅 Dates
-        if (data.OrderDate || data.CreationDate) {
+        // 📅 Informations de Statut
+        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders) && data.DeliveryOrders.length > 0) {
+            const firstOrder = data.DeliveryOrders[0];
             html += '<div class="bihrwi-section">';
-            html += '<h3>📅 Dates</h3>';
-            if (data.OrderDate) {
-                html += '<p><strong>Date de Commande:</strong> ' + new Date(data.OrderDate).toLocaleString('fr-FR') + '</p>';
+            html += '<h3>📅 Statut de Livraison</h3>';
+            if (firstOrder.CreationDate && firstOrder.CreationDate !== '0001-01-01T00:00:00') {
+                html += '<p><strong>Date de Création:</strong> ' + new Date(firstOrder.CreationDate).toLocaleString('fr-FR') + '</p>';
             }
-            if (data.CreationDate) {
-                html += '<p><strong>Date de Création:</strong> ' + new Date(data.CreationDate).toLocaleString('fr-FR') + '</p>';
+            if (firstOrder.DispatchDate) {
+                html += '<p><strong>Date d\'Envoi:</strong> ' + new Date(firstOrder.DispatchDate).toLocaleString('fr-FR') + '</p>';
+            }
+            if (firstOrder.Weight) {
+                html += '<p><strong>Poids:</strong> ' + firstOrder.Weight + ' kg</p>';
+            }
+            if (firstOrder.Volume) {
+                html += '<p><strong>Volume:</strong> ' + firstOrder.Volume + '</p>';
             }
             html += '</div>';
         }
 
         // 🏢 Informations Supplémentaires
-        if (data.OrderNumber || data.OrderId || data.Packages !== undefined) {
-            html += '<div class="bihrwi-section">';
-            html += '<h3>🏢 Informations Supplémentaires</h3>';
-            if (data.OrderNumber) html += '<p><strong>Numéro de Commande:</strong> ' + escapeHtml(data.OrderNumber) + '</p>';
-            if (data.OrderId) html += '<p><strong>ID Commande:</strong> ' + escapeHtml(data.OrderId) + '</p>';
-            if (data.Packages === null || data.Packages === undefined) {
-                html += '<p><strong>Packages:</strong> <em>Pas encore préparés</em></p>';
-            }
-            html += '</div>';
+        html += '<div class="bihrwi-section">';
+        html += '<h3>🏢 Informations Supplémentaires</h3>';
+        if (data.InternalCustomerId) {
+            html += '<p><strong>ID Client Interne:</strong> ' + escapeHtml(data.InternalCustomerId) + '</p>';
         }
+        if (data.DeliveryOrders && Array.isArray(data.DeliveryOrders)) {
+            html += '<p><strong>Nombre de Commandes Livraison:</strong> ' + data.DeliveryOrders.length + '</p>';
+        }
+        if (data.OrderLines && Array.isArray(data.OrderLines)) {
+            html += '<p><strong>Nombre d\'Articles:</strong> ' + data.OrderLines.length + '</p>';
+        }
+        html += '</div>';
 
-        // Afficher le JSON brut si besoin
-        html += '<details class="bihrwi-raw-json">';
-        html += '<summary>📋 Afficher le JSON brut</summary>';
-        html += '<pre>' + escapeHtml(prettyJson(data)) + '</pre>';
-        html += '</details>';
+        // Afficher le JSON brut formaté
+        html += '<div class="bihrwi-section">';
+        html += '<h3>📄 Données JSON Complètes</h3>';
+        html += '<pre class="bihrwi-json-raw">' + escapeHtml(prettyJson(data)) + '</pre>';
+        html += '</div>';
 
         html += '</div>';
         return html;
