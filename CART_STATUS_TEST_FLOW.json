@@ -1,0 +1,125 @@
+{
+  "scenario": "Récupération de Order/Data avec statut Cart",
+  "context": {
+    "woocommerce_order_id": 2942,
+    "bihr_ticket_id": "a172b4ecb99b42208a62501a38be56b7",
+    "request_url": "GET https://api.bihr.net/api/v2.1/Order/Data?orderId=a172b4ecb99b42208a62501a38be56b7"
+  },
+  "step_1_generation_status": {
+    "description": "L'API BIHR retourne le statut de génération",
+    "http_code": 200,
+    "response": {
+      "OrderUrl": "https://www.mybihr.com/fr/fr/my-account/saved-carts/000013872145",
+      "OrderQueuePosition": 0,
+      "RequestStatus": "Cart"
+    }
+  },
+  "step_2_order_data_attempt": {
+    "description": "Tentative de récupération des données complètes",
+    "http_code": 400,
+    "error_response": "L'API refuse car la commande n'est pas finalisée (statut=Cart)"
+  },
+  "step_3_plugin_response_before_fix": {
+    "description": "Ancienne gestion d'erreur (avant la correction)",
+    "success": false,
+    "data": {
+      "message": "Impossible de récupérer Order/Data côté BIHR (voir logs)."
+    },
+    "problem": "Message générique sans détail sur la raison réelle"
+  },
+  "step_3_plugin_response_after_fix": {
+    "description": "Nouvelle gestion d'erreur (après la correction)",
+    "success": false,
+    "data": {
+      "message": "Order/Data indisponible tant que BIHR n'a pas généré une commande (statut=Cart).",
+      "request_status": "Cart",
+      "order_url": "https://www.mybihr.com/fr/fr/my-account/saved-carts/000013872145",
+      "ticket_id": "a172b4ecb99b42208a62501a38be56b7"
+    },
+    "benefit": "Message explicite avec diagnostic complet"
+  },
+  "step_4_frontend_display": {
+    "description": "Affichage dans l'interface WooCommerce",
+    "status": "Erreur: Order/Data indisponible tant que BIHR n'a pas généré une commande (statut=Cart).",
+    "details": [
+      "request_status: Cart",
+      "order_url: https://www.mybihr.com/fr/fr/my-account/saved-carts/000013872145",
+      "ticket_id: a172b4ecb99b42208a62501a38be56b7"
+    ]
+  },
+  "step_5_when_ready": {
+    "description": "Quand BIHR finalise le traitement (RequestStatus = Order)",
+    "http_code": 200,
+    "response_example": {
+      "OrderNumber": "ORD-2025-000123",
+      "TotalAmount": 159.99,
+      "Currency": "EUR",
+      "OrderDate": "2025-12-17T09:58:24Z",
+      "Lines": [
+        {
+          "ProductId": "TPCI07495",
+          "Quantity": 2,
+          "UnitPrice": 79.99,
+          "TotalPrice": 159.98
+        }
+      ],
+      "ShippingAddress": {
+        "FirstName": "André",
+        "LastName": "Millet",
+        "Line1": "19, rue Blondel",
+        "ZipCode": "22106",
+        "Town": "Toussaint",
+        "Country": "FR"
+      },
+      "ShippingPrice": 0,
+      "Status": "Order"
+    }
+  },
+  "code_changes": {
+    "file_1": {
+      "path": "includes/class-bihr-api-client.php",
+      "method": "get_order_data()",
+      "changes": [
+        "Ajout: Vérification du statut via GenerationStatus si erreur HTTP",
+        "Ajout: Détection du statut 'Cart'",
+        "Ajout: Retour d'un objet d'erreur structuré avec flag 'error: true'",
+        "Amélioration: Message explicite et informations détaillées"
+      ]
+    },
+    "file_2": {
+      "path": "admin/class-bihr-admin.php",
+      "method": "ajax_get_order_data()",
+      "changes": [
+        "Ajout: Vérification du flag 'error' dans la réponse",
+        "Amélioration: Retour d'une réponse JSON structurée avec les détails"
+      ]
+    },
+    "file_3": {
+      "path": "admin/views/orders-settings-page.php",
+      "description": "JavaScript frontend",
+      "status": "✅ Déjà compatible",
+      "affiche": "request_status, order_url, ticket_id dans le pre"
+    }
+  },
+  "testing": {
+    "test_1": {
+      "name": "Test avec statut Cart",
+      "steps": [
+        "1. Créer une commande WooCommerce avec produits BIHR",
+        "2. Attendre la synchronisation vers BIHR",
+        "3. Cliquer sur 'Voir' dans la section Order/Data",
+        "4. Vérifier le message d'erreur explicite avec statut 'Cart'"
+      ],
+      "expected_result": "Message clair: 'Order/Data indisponible tant que BIHR n'a pas généré une commande (statut=Cart).'"
+    },
+    "test_2": {
+      "name": "Test avec statut Order (après finalisation)",
+      "steps": [
+        "1. Attendre que BIHR finalise la commande (RequestStatus = Order)",
+        "2. Cliquer sur 'Actualiser' dans Order/Data",
+        "3. Vérifier que les données complètes s'affichent"
+      ],
+      "expected_result": "Données JSON complètes de la commande"
+    }
+  }
+}

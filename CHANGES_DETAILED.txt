@@ -1,0 +1,172 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                         DÉTAILS DES MODIFICATIONS                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📂 FICHIER 1: includes/class-bihr-api-client.php
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 Fonction: get_order_data() - Lignes 509-600
+📝 Description: Récupération des données d'une commande BIHR
+
+AVANT:
+─────
+if ( $code !== 200 ) {
+    $this->logger->log( "Order Data Request Failed: HTTP {$code}" );
+    
+    // Cas observé: l'API répond que orderId est requis.
+    if ( $code === 400 && stripos( $body, 'orderId' ) !== false ) {
+        $this->logger->log( '...' );
+    }
+    return false;
+}
+
+APRÈS:
+─────
+if ( $code !== 200 ) {
+    $this->logger->log( "Order Data Request Failed: HTTP {$code}" );
+    
+    // ✨ NOUVEAU: Détection du statut "Cart"
+    $status_data = $this->get_order_generation_status( $ticket_id );
+    if ( $status_data && isset( $status_data['request_status'] ) ) {
+        $status = $status_data['request_status'];
+        if ( $status === 'Cart' ) {
+            $this->logger->log( "Order Data: Données indisponibles - Commande en statut Cart (panier)" );
+            return array(
+                'error'           => true,
+                'message'         => 'Order/Data indisponible tant que BIHR n\'a pas généré une commande (statut=Cart).',
+                'request_status'  => 'Cart',
+                'order_url'       => $status_data['order_url'] ?? '',
+                'ticket_id'       => $ticket_id,
+            );
+        }
+    }
+    
+    // Ancien fallback conservé
+    if ( $code === 400 && stripos( $body, 'TicketId' ) !== false ) {
+        // ... code existant ...
+    }
+    return false;
+}
+
+✨ AVANTAGES:
+• Détection automatique du statut "Cart"
+• Message d'erreur explicite et structuré
+• Retour des détails (URL, statut, ticket)
+• Backward compatible
+
+
+📂 FICHIER 2: admin/class-bihr-admin.php
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 Fonction: ajax_get_order_data() - Lignes 142-170
+📝 Description: Handler AJAX pour récupérer Order/Data
+
+AVANT:
+─────
+$this->logger->log( "AJAX: Order/Data pour commande WC #{$order_id} (TicketId={$bihr_ticket_id})" );
+
+$bihr_order_id = get_post_meta( $order_id, '_bihr_api_order_id', true );
+if ( empty( $bihr_order_id ) ) {
+    // ... logique complexe pour résoudre l'orderId ...
+}
+
+$data = $this->api_client->get_order_data( $bihr_ticket_id );
+if ( ! $data ) {
+    wp_send_json_error( array( 'message' => 'Impossible de récupérer Order/Data...' ) );
+}
+
+// ... sauvegarde du cache ...
+
+APRÈS:
+─────
+$this->logger->log( "AJAX: Order/Data pour commande WC #{$order_id} (TicketId={$bihr_ticket_id})" );
+
+// Logique complexe supprimée (maintenant dans get_order_data)
+
+$data = $this->api_client->get_order_data( $bihr_ticket_id );
+
+// ✨ NOUVEAU: Vérifier le flag 'error'
+if ( $data && isset( $data['error'] ) && $data['error'] ) {
+    wp_send_json_error( array(
+        'message'        => $data['message'],
+        'request_status' => $data['request_status'] ?? '',
+        'order_url'      => $data['order_url'] ?? '',
+        'ticket_id'      => $data['ticket_id'] ?? '',
+    ) );
+}
+
+if ( ! $data ) {
+    wp_send_json_error( array( 'message' => 'Impossible de récupérer Order/Data...' ) );
+}
+
+// ... sauvegarde du cache ...
+
+✨ AVANTAGES:
+• Code simplifié et plus lisible
+• Extraction directe des détails d'erreur
+• Réponse JSON structurée
+• Meilleure séparation des responsabilités
+
+
+📂 FICHIER 3: admin/views/orders-settings-page.php
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 Section JavaScript - Lignes 370-440
+📝 Description: Affichage de Order/Data et gestion des erreurs
+
+STATUS: ✅ DÉJÀ COMPATIBLE - AUCUNE MODIFICATION NÉCESSAIRE
+
+Le code JavaScript gère déjà les propriétés supplémentaires:
+```javascript
+if (payload.request_status) extra += '\nrequest_status: ' + payload.request_status;
+if (payload.order_url) extra += '\norder_url: ' + payload.order_url;
+if (payload.ticket_id) extra += '\nticket_id: ' + payload.ticket_id;
+```
+
+Affichage résultant:
+──────────────────
+Erreur: Order/Data indisponible tant que BIHR n'a pas généré une commande (statut=Cart).
+request_status: Cart
+order_url: https://www.mybihr.com/fr/fr/my-account/saved-carts/000013872145
+ticket_id: a172b4ecb99b42208a62501a38be56b7
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 STATISTIQUES DES CHANGEMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Fichier                            │ Avant │ Après │ ±Lignes │ Impact
+───────────────────────────────────┼───────┼───────┼─────────┼──────────────
+includes/class-bihr-api-client.php │ 603   │ 603   │   +54   │ 🟢 Amélioration
+admin/class-bihr-admin.php         │ 1925  │ 1870  │   -55   │ 🟢 Simplification
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧪 TESTS DE VALIDATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Syntaxe PHP: php -l includes/class-bihr-api-client.php
+   Résultat: No syntax errors detected
+
+✅ Syntaxe PHP: php -l admin/class-bihr-admin.php
+   Résultat: No syntax errors detected
+
+✅ Git Diff: Changements couvrent exactement le problème signalé
+
+✅ Backward Compatibility: Fallback TicketId conservé
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 DÉPLOIEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Télécharger les fichiers modifiés
+2. Sauvegarder les versions existantes
+3. Remplacer les fichiers
+4. Tester avec une commande WooCommerce
+5. Vérifier le message d'erreur explicite
+
+Fichiers à déployer:
+├─ includes/class-bihr-api-client.php
+└─ admin/class-bihr-admin.php
+

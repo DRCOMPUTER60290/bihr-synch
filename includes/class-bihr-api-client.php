@@ -501,7 +501,7 @@ class BihrWI_API_Client {
 
     /**
      * Récupère les données détaillées d'une commande
-     * Endpoint: GET /api/v2.1/Order/Data?TicketId={ticketId}
+     * Endpoint (Swagger BIHR): GET /api/v2.1/Order/Data?orderId={orderGenerationTicketId}
      * 
      * @param string $ticket_id Le TicketId retourné par Order/Creation
      * @return array|false Données de la commande ou false
@@ -511,7 +511,8 @@ class BihrWI_API_Client {
             $token = $this->get_token();
             
             $url = $this->base_url . '/Order/Data';
-            $url_with_param = add_query_arg( 'TicketId', $ticket_id, $url );
+            // D'après le Swagger BIHR, le paramètre requis est `orderId` (qui correspond au ticket de génération).
+            $url_with_param = add_query_arg( 'orderId', $ticket_id, $url );
             
             $this->logger->log( "Order Data Request: {$url_with_param}" );
             
@@ -550,24 +551,53 @@ class BihrWI_API_Client {
             }
             $this->logger->log( "==========================" );
             
+            // Traiter la réponse même si le code HTTP n'est pas 200
+            if ( ! empty( $body ) ) {
+                $data = json_decode( $body, true );
+                
+                if ( json_last_error() === JSON_ERROR_NONE && is_array( $data ) ) {
+                    // Retourner les données même si le ResultCode est "Cart"
+                    // L'interface affichera les données reçues
+                    return $data;
+                }
+            }
+            
+            // Si pas de données valides et code HTTP n'est pas 200
             if ( $code !== 200 ) {
                 $this->logger->log( "Order Data Request Failed: HTTP {$code}" );
 
-				// Cas observé: l’API répond que orderId est requis.
-				if ( $code === 400 && stripos( $body, 'orderId' ) !== false ) {
-					$this->logger->log( 'Order Data: L\'API semble exiger le paramètre orderId (et non TicketId).' );
-				}
+                // Fallback rare: certaines instances pourraient accepter TicketId (ancien comportement).
+                if ( $code === 400 && stripos( $body, 'TicketId' ) !== false ) {
+                    $fallback_url = add_query_arg( 'TicketId', $ticket_id, $url );
+                    $this->logger->log( "Order Data Fallback (TicketId): {$fallback_url}" );
+
+                    $fallback_response = wp_remote_get(
+                        $fallback_url,
+                        array(
+                            'timeout' => 15,
+                            'headers' => array(
+                                'Authorization' => 'Bearer ' . $token,
+                                'Accept'        => 'application/json',
+                            ),
+                        )
+                    );
+
+                    if ( ! is_wp_error( $fallback_response ) ) {
+                        $fallback_code = wp_remote_retrieve_response_code( $fallback_response );
+                        $fallback_body = wp_remote_retrieve_body( $fallback_response );
+                        $this->logger->log( "Order Data Fallback HTTP: {$fallback_code}" );
+                        if ( $fallback_code === 200 ) {
+                            $fallback_data = json_decode( $fallback_body, true );
+                            if ( json_last_error() === JSON_ERROR_NONE ) {
+                                return $fallback_data;
+                            }
+                        }
+                    }
+                }
                 return false;
             }
 
-            $data = json_decode( $body, true );
-            
-            if ( json_last_error() !== JSON_ERROR_NONE ) {
-                $this->logger->log( 'Order Data: Invalid JSON response' );
-                return false;
-            }
-            
-            return $data;
+            return false;
 
         } catch ( Exception $e ) {
             $this->logger->log( 'Order Data Exception: ' . $e->getMessage() );

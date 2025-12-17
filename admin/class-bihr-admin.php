@@ -119,28 +119,8 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'BIHR TicketId manquant pour cette commande.' ) );
         }
 
-        $bihr_order_id = get_post_meta( $order_id, '_bihr_api_order_id', true );
-        if ( empty( $bihr_order_id ) ) {
-            $existing_bihr_order_id = get_post_meta( $order_id, '_bihr_order_id', true );
-            if ( ! empty( $existing_bihr_order_id ) && $existing_bihr_order_id !== 'N/A' ) {
-                $bihr_order_id = $existing_bihr_order_id;
-            }
-        }
-
-        // 0) Tentative via l'URL de commande BIHR déjà stockée (si disponible)
-        $stored_order_url = get_post_meta( $order_id, '_bihr_order_url', true );
-        if ( empty( $bihr_order_id ) && ! empty( $stored_order_url ) ) {
-            $maybe_id = $this->api_client->extract_order_id_from_generation_status(
-                array(
-                    'order_url' => $stored_order_url,
-                    'data'      => array(),
-                )
-            );
-            if ( ! empty( $maybe_id ) ) {
-                $bihr_order_id = $maybe_id;
-                update_post_meta( $order_id, '_bihr_api_order_id', $bihr_order_id );
-            }
-        }
+        // NB: Le Swagger BIHR indique que /Order/Data attend `orderId` = order generation ticket ID.
+        // On utilise donc directement le TicketId BIHR stocké sur la commande.
 
         // Cache simple via post_meta pour éviter de frapper l’API inutilement.
         $cached_json = get_post_meta( $order_id, '_bihr_order_data_json', true );
@@ -160,65 +140,10 @@ class BihrWI_Admin {
         }
 
         $this->logger->log( "AJAX: Order/Data pour commande WC #{$order_id} (TicketId={$bihr_ticket_id})" );
-
-        // 1) Si on a un orderId BIHR, tenter la voie orderId en priorité.
-        $data = false;
-        if ( ! empty( $bihr_order_id ) ) {
-            $data = $this->api_client->get_order_data_by_order_id( $bihr_order_id );
-        }
-
-        // 2) Sinon, résoudre TicketId -> orderId via GenerationStatus.
+        $data = $this->api_client->get_order_data( $bihr_ticket_id );
+        
         if ( ! $data ) {
-            $status = $this->api_client->get_order_generation_status( $bihr_ticket_id );
-            $request_status = '';
-            $order_url = '';
-            if ( is_array( $status ) ) {
-                $request_status = $status['request_status'] ?? '';
-                $order_url = $status['order_url'] ?? '';
-                if ( ! empty( $order_url ) ) {
-                    update_post_meta( $order_id, '_bihr_order_url', $order_url );
-                }
-                if ( ! empty( $request_status ) ) {
-                    update_post_meta( $order_id, '_bihr_order_request_status', $request_status );
-                }
-            }
-
-            $resolved_order_id = $this->api_client->extract_order_id_from_generation_status( $status );
-            if ( ! empty( $resolved_order_id ) ) {
-                $bihr_order_id = $resolved_order_id;
-                update_post_meta( $order_id, '_bihr_api_order_id', $bihr_order_id );
-                $data = $this->api_client->get_order_data_by_order_id( $bihr_order_id );
-            } else {
-                // Si l'API exige orderId, ne pas appeler Order/Data avec TicketId.
-                // On renvoie plutôt un diagnostic clair (statut + URL).
-                if ( ! empty( $request_status ) && $request_status !== 'Order' ) {
-                    wp_send_json_error(
-                        array(
-                            'message'        => 'Order/Data indisponible tant que BIHR n\'a pas généré une commande (statut=' . $request_status . ').',
-                            'request_status' => $request_status,
-                            'order_url'      => $order_url,
-                            'ticket_id'      => $bihr_ticket_id,
-                        )
-                    );
-                }
-                wp_send_json_error(
-                    array(
-                        'message'        => 'Impossible de déterminer un orderId BIHR à partir du TicketId (Order/Data exige un orderId).',
-                        'request_status' => $request_status,
-                        'order_url'      => $order_url,
-                        'ticket_id'      => $bihr_ticket_id,
-                    )
-                );
-            }
-        }
-
-        // 3) Fallback: anciennes instances qui acceptent TicketId (rare)
-        // Conserver uniquement si on n'a pas de statut exploitable.
-        if ( ! $data ) {
-            $data = $this->api_client->get_order_data( $bihr_ticket_id );
-        }
-        if ( ! $data ) {
-            wp_send_json_error( array( 'message' => 'Impossible de récupérer Order/Data côté BIHR. L\'API peut exiger un orderId (voir logs).', ) );
+            wp_send_json_error( array( 'message' => 'Impossible de récupérer Order/Data côté BIHR (voir logs).', ) );
         }
 
         update_post_meta( $order_id, '_bihr_order_data_json', wp_json_encode( $data ) );
@@ -227,7 +152,6 @@ class BihrWI_Admin {
         wp_send_json_success(
             array(
                 'ticket_id'  => $bihr_ticket_id,
-                'order_id'   => $bihr_order_id,
                 'fetched_at' => current_time( 'mysql' ),
                 'data'       => $data,
                 'cached'     => false,
