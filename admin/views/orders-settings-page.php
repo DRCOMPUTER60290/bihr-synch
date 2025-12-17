@@ -655,54 +655,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 
         let totalExclVat = 0;
         let totalInclVat = 0;
-        let priceCount = 0;
 
         data.DeliveryOrders.forEach((order, idx) => {
             if (order.ExclVatPrice !== undefined && order.ExclVatPrice !== null) {
                 const price = parseFloat(order.ExclVatPrice) || 0;
                 totalExclVat += price;
-                priceCount++;
-                console.log('[BIHR] Prix HT trouvé [' + idx + ']:', price);
+                console.log('[BIHR] Prix HT [' + idx + ']:', price);
             }
             if (order.InclVatPrice !== undefined && order.InclVatPrice !== null) {
                 const price = parseFloat(order.InclVatPrice) || 0;
                 totalInclVat += price;
-                console.log('[BIHR] Prix TTC trouvé [' + idx + ']:', price);
+                console.log('[BIHR] Prix TTC [' + idx + ']:', price);
             }
         });
 
-        const tva = (totalInclVat - totalExclVat).toFixed(2);
+        const tva = (totalInclVat - totalExclVat);
         const hasPrice = totalInclVat > 0 || totalExclVat > 0;
 
         if (!hasPrice) {
             console.warn('[BIHR] buildPricesSection: Aucun montant trouvé');
             return `
-                <div class="bihrwi-section section-warning">
+                <div class="bihrwi-section section-prices">
                     <h3>💰 Montants</h3>
-                    <p><em>⚠️ Aucun montant disponible dans DeliveryOrders</em></p>
+                    <p><em>⚠️ Aucun montant disponible</em></p>
                 </div>
             `;
         }
 
-        console.log('[BIHR] Montants calculés: HT=' + totalExclVat.toFixed(2) + ', TTC=' + totalInclVat.toFixed(2) + ', TVA=' + tva);
+        console.log('[BIHR] Montants: HT=' + totalExclVat.toFixed(2) + ' € | TVA=' + tva.toFixed(2) + ' € | TTC=' + totalInclVat.toFixed(2) + ' €');
 
         return `
             <div class="bihrwi-section section-prices">
                 <h3>💰 Montants</h3>
-                <div class="price-grid">
-                    <div class="price-item">
-                        <span class="price-label">🏷️ Prix HT:</span>
-                        <span class="price-value">${formatPrice(totalExclVat)}</span>
-                    </div>
-                    <div class="price-item">
-                        <span class="price-label">📊 TVA:</span>
-                        <span class="price-value">${parseFloat(tva).toFixed(2).replace('.', ',')} €</span>
-                    </div>
-                    <div class="price-item price-total">
-                        <span class="price-label">✅ Prix TTC:</span>
-                        <span class="price-value-highlight">${formatPrice(totalInclVat)}</span>
-                    </div>
-                </div>
+                ${totalExclVat > 0 ? `<p><strong>🏷️ HT:</strong> ${formatPrice(totalExclVat)}</p>` : ''}
+                ${tva > 0 ? `<p><strong>📊 TVA:</strong> ${formatPrice(tva)}</p>` : ''}
+                <p><strong>✅ TTC:</strong> <span style="color: #d32f2f; font-weight: 700; font-size: 14px;">${formatPrice(totalInclVat)}</span></p>
             </div>
         `;
     }
