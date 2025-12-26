@@ -60,8 +60,10 @@ class BihrWI_AI_Enrichment {
                 ),
             );
 
-            // Si une image est disponible et que c'est une URL valide, on utilise GPT-4 Vision
+            // Essayer d'abord avec vision si image disponible
+            $model = 'gpt-4o-mini'; // Par défaut sans vision
             if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
+                // Essayer avec vision en premier
                 $messages[1]['content'] = array(
                     array(
                         'type' => 'text',
@@ -75,11 +77,21 @@ class BihrWI_AI_Enrichment {
                     ),
                 );
                 $model = 'gpt-4o'; // Modèle avec vision
+                $this->log( "IA - Tentative avec vision (gpt-4o) et image: {$image_url}" );
+                
+                $response = $this->call_openai_api( $messages, $model );
+                
+                // Si l'image cause une erreur, réessayer sans image
+                if ( $response === false || $response === 'IMAGE_ERROR' ) {
+                    $this->log( 'IA - Échec avec image, tentative sans image (gpt-4o-mini)' );
+                    $messages[1]['content'] = $prompt;
+                    $model = 'gpt-4o-mini';
+                    $response = $this->call_openai_api( $messages, $model );
+                }
             } else {
-                $model = 'gpt-4o-mini'; // Modèle standard sans vision
+                $this->log( "IA - Pas d'image valide, utilisation de gpt-4o-mini" );
+                $response = $this->call_openai_api( $messages, $model );
             }
-
-            $response = $this->call_openai_api( $messages, $model );
 
             if ( $response === false ) {
                 return false;
@@ -159,6 +171,11 @@ class BihrWI_AI_Enrichment {
         $body        = wp_remote_retrieve_body( $response );
 
         if ( $status_code !== 200 ) {
+            // Déterminer si c'est une erreur d'image
+            if ( strpos( $body, 'invalid_image_url' ) !== false || strpos( $body, 'Error while downloading' ) !== false ) {
+                $this->log( "IA - Erreur d'image détectée (HTTP {$status_code})" );
+                return 'IMAGE_ERROR'; // Signal spécial pour erreur d'image
+            }
             $this->log( "OpenAI API erreur HTTP {$status_code}: {$body}" );
             return false;
         }
