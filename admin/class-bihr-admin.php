@@ -462,6 +462,18 @@ class BihrWI_Admin {
     }
 
     public function render_products_page() {
+        // Vérifier les permissions
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( esc_html__( 'Vous n\'avez pas les permissions nécessaires pour accéder à cette page.', 'bihr-woocommerce-importer' ) );
+        }
+
+        // Vérifier le nonce si présent (filtres appliqués)
+        if ( isset( $_GET['bihrwi_filter_nonce_field'] ) ) {
+            if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['bihrwi_filter_nonce_field'] ) ), 'bihrwi_filter_nonce' ) ) {
+                wp_die( esc_html__( 'Erreur de sécurité. Veuillez réessayer.', 'bihr-woocommerce-importer' ) );
+            }
+        }
+
         global $wpdb;
 
         $current_page = isset( $_GET['paged'] ) ? max( 1, intval( $_GET['paged'] ) ) : 1;

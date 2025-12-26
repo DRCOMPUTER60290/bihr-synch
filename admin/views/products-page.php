@@ -317,6 +317,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
         <h3>🔍 Filtres de recherche</h3>
         <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="bihr-filters-form">
             <input type="hidden" name="page" value="bihrwi_products" />
+            <?php wp_nonce_field( 'bihrwi_filter_nonce', 'bihrwi_filter_nonce_field' ); ?>
             
             <!-- Recherche (largeur complète) -->
             <div class="bihr-filter-field bihr-filter-search">
