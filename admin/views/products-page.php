@@ -316,7 +316,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
     <div class="bihr-section">
         <h3>🔍 Filtres de recherche</h3>
         <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="bihr-filters-form">
-            <input type="hidden" name="page" value="bihrwi_products" />
+            <input type="hidden" name="page" value="bihr-products" />
             <?php wp_nonce_field( 'bihrwi_filter_nonce', 'bihrwi_filter_nonce_field' ); ?>
             
             <!-- Recherche (largeur complète) -->
@@ -406,7 +406,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
             <div class="bihr-filters-actions">
                 <?php submit_button( 'Filtrer', 'secondary', 'submit', false ); ?>
                 <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price_min ) || ! empty( $filter_price_max ) || ! empty( $filter_category ) || ! empty( $sort_by ) ) : ?>
-                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihrwi_products' ) ); ?>" class="button">
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-products' ) ); ?>" class="button">
                         Réinitialiser
                     </a>
                 <?php endif; ?>
