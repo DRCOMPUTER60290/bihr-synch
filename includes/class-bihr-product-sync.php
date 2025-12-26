@@ -250,14 +250,19 @@ class BihrWI_Product_Sync {
                 }
             }
             
+            $this->logger->log( 'IA - Appel generate_descriptions pour: ' . $name . ' | Image URL: ' . $full_image_url . ' | Code: ' . $row->product_code );
+            
             // Génération des descriptions enrichies
             $ai_descriptions = $ai_enrichment->generate_descriptions( $name, $full_image_url, $row->product_code );
+            
+            $this->logger->log( 'IA - Résultat generate_descriptions: ' . wp_json_encode( $ai_descriptions ) );
             
             if ( $ai_descriptions && is_array( $ai_descriptions ) ) {
                 // Description courte (excerpt WooCommerce)
                 if ( ! empty( $ai_descriptions['short_description'] ) ) {
                     $product->set_short_description( $ai_descriptions['short_description'] );
-                    $this->logger->log( 'Import WooCommerce: description courte IA ajoutée' );
+                    $this->logger->log( 'Import WooCommerce: description courte IA ajoutée - ' . $ai_descriptions['short_description'] );
+
                 }
                 
                 // Description longue

@@ -180,32 +180,42 @@ class BihrWI_AI_Enrichment {
         $short_description = '';
         $long_description  = '';
 
+        $this->log( 'IA - Réponse brute à parser: ' . substr( $response, 0, 200 ) . '...' );
+
         // Extraction de la description courte
         if ( preg_match( '/\[SHORT\](.*?)\[\/SHORT\]/s', $response, $short_matches ) ) {
             $short_description = trim( $short_matches[1] );
+            $this->log( 'IA - Description courte trouvée via balises' );
         }
 
         // Extraction de la description longue
         if ( preg_match( '/\[LONG\](.*?)\[\/LONG\]/s', $response, $long_matches ) ) {
             $long_description = trim( $long_matches[1] );
+            $this->log( 'IA - Description longue trouvée via balises' );
         }
 
         // Si les balises ne sont pas trouvées, on essaie de splitter par ligne vide
         if ( empty( $short_description ) || empty( $long_description ) ) {
+            $this->log( 'IA - Tentative de parsing sans balises (fallback)' );
             $parts = preg_split( '/\n\s*\n/', trim( $response ), 2 );
             if ( count( $parts ) === 2 ) {
                 $short_description = trim( $parts[0] );
                 $long_description  = trim( $parts[1] );
+                $this->log( 'IA - Descriptions splitées en 2 parties' );
             } else {
                 // Fallback: tout dans la description longue
                 $long_description = trim( $response );
                 $short_description = wp_trim_words( $long_description, 25, '...' );
+                $this->log( 'IA - Tout mis en description longue (pas de split possible)' );
             }
         }
 
         if ( empty( $short_description ) && empty( $long_description ) ) {
+            $this->log( 'IA - ERREUR: Aucune description extraite!' );
             return false;
         }
+
+        $this->log( 'IA - Parse réussi | Short: ' . substr( $short_description, 0, 50 ) . '... | Long: ' . substr( $long_description, 0, 50 ) . '...' );
 
         return array(
             'short_description' => $short_description,
