@@ -167,7 +167,7 @@ class BihrWI_Admin {
 
     check_admin_referer( 'bihrwi_check_prices_now_action', 'bihrwi_check_prices_now_nonce' );
 
-    $redirect_url = add_query_arg( array( 'page' => 'bihrwi_products' ), admin_url( 'admin.php' ) );
+    $redirect_url = add_query_arg( array( 'page' => 'bihr-products' ), admin_url( 'admin.php' ) );
 
     $status_data = get_option( 'bihrwi_prices_generation', array() );
 
@@ -546,7 +546,7 @@ class BihrWI_Admin {
         update_option( 'bihrwi_password', $password );
         update_option( 'bihrwi_openai_key', $openai_key );
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihrwi_auth' ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-auth' ), admin_url( 'admin.php' ) );
 
         // Test de l'authentification Bihr
         try {
@@ -633,7 +633,7 @@ class BihrWI_Admin {
 
         $redirect_url = add_query_arg(
             array(
-                'page'            => 'bihrwi_logs',
+                'page'            => 'bihr-logs',
                 'bihrwi_cleared'  => 1,
             ),
             admin_url( 'admin.php' )
@@ -650,7 +650,7 @@ class BihrWI_Admin {
 
         check_admin_referer( 'bihrwi_start_prices_action', 'bihrwi_start_prices_nonce' );
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihrwi_products' ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-products' ), admin_url( 'admin.php' ) );
 
         try {
             // Démarre la génération du catalog Prices (l'API ajoutera /Full automatiquement)
@@ -694,7 +694,7 @@ class BihrWI_Admin {
 
         $product_id = isset( $_POST['bihrwi_product_id'] ) ? intval( $_POST['bihrwi_product_id'] ) : 0;
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihrwi_products' ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-products' ), admin_url( 'admin.php' ) );
 
         if ( ! $product_id ) {
             $redirect_url = add_query_arg(
@@ -742,7 +742,7 @@ class BihrWI_Admin {
 
         check_admin_referer( 'bihrwi_merge_catalogs_action', 'bihrwi_merge_catalogs_nonce' );
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihrwi_products' ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-products' ), admin_url( 'admin.php' ) );
 
         try {
             $count = $this->product_sync->merge_catalogs_from_directory();
@@ -797,7 +797,7 @@ class BihrWI_Admin {
     // Redirection avec notification
     $redirect = add_query_arg(
         array(
-            'page'                => 'bihrwi_products',
+            'page'                => 'bihr-products',
             'bihrwi_reset_success' => 1,
         ),
         admin_url( 'admin.php' )
@@ -817,7 +817,7 @@ class BihrWI_Admin {
 
 		check_admin_referer( 'bihrwi_download_all_action', 'bihrwi_download_all_nonce' );
 
-		$redirect_url = add_query_arg( array( 'page' => 'bihrwi_products' ), admin_url( 'admin.php' ) );
+		$redirect_url = add_query_arg( array( 'page' => 'bihr-products' ), admin_url( 'admin.php' ) );
 
 		try {
 			$this->logger->log( 'Téléchargement de tous les catalogues: démarrage' );
@@ -1529,7 +1529,7 @@ class BihrWI_Admin {
 
         check_admin_referer( 'bihrwi_import_vehicles_action', 'bihrwi_import_vehicles_nonce' );
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihrwi_compatibility' ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-compatibility' ), admin_url( 'admin.php' ) );
 
         try {
             // Construire le chemin du fichier
@@ -1572,7 +1572,7 @@ class BihrWI_Admin {
 
         check_admin_referer( 'bihrwi_import_compatibility_action', 'bihrwi_import_compatibility_nonce' );
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihrwi_compatibility' ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-compatibility' ), admin_url( 'admin.php' ) );
         $brand = isset( $_POST['brand'] ) ? sanitize_text_field( $_POST['brand'] ) : '';
 
         if ( empty( $brand ) ) {
@@ -1623,7 +1623,7 @@ class BihrWI_Admin {
 
         check_admin_referer( 'bihrwi_import_all_compatibility_action', 'bihrwi_import_all_compatibility_nonce' );
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihrwi_compatibility' ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-compatibility' ), admin_url( 'admin.php' ) );
 
         try {
             $upload_dir = wp_upload_dir();
@@ -1777,7 +1777,7 @@ class BihrWI_Admin {
 
         $redirect_url = add_query_arg( 
             array( 
-                'page' => 'bihrwi_imported_products',
+                'page' => 'bihr-imported-products',
                 'sync_settings_saved' => '1'
             ), 
             admin_url( 'admin.php' ) 

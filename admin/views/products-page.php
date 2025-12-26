@@ -544,7 +544,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
                 // Préserver exactement les filtres actuellement dans l'URL.
                 // Important: ne pas utiliser empty() (ex: "0" serait perdu).
                 $allowed_keys = array( 'search', 'stock_filter', 'price_min', 'price_max', 'category_filter', 'sort_by' );
-                $params = array( 'page' => 'bihrwi_products' );
+                $params = array( 'page' => 'bihr-products' );
 
                 foreach ( $allowed_keys as $key ) {
                     if ( isset( $_GET[ $key ] ) && wp_unslash( $_GET[ $key ] ) !== '' ) {
