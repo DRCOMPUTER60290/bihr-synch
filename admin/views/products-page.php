@@ -315,102 +315,101 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
     <!-- Filtres -->
     <div class="bihr-section">
         <h3>🔍 Filtres de recherche</h3>
-        <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+        <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="bihr-filters-form">
             <input type="hidden" name="page" value="bihrwi_products" />
             
-            <div style="flex: 1; min-width: 250px;">
-                <label for="search" style="display: block; margin-bottom: 5px; font-weight: 600;">
+            <!-- Recherche (largeur complète) -->
+            <div class="bihr-filter-field bihr-filter-search">
+                <label for="search">
                     Recherche (code, NewPartNumber, nom, description)
                 </label>
                 <input type="text" 
                        name="search" 
                        id="search" 
                        value="<?php echo esc_attr( $filter_search ); ?>" 
-                       placeholder="Saisir un mot-clé..."
-                       style="width: 100%;" />
+                       placeholder="Saisir un mot-clé..." />
             </div>
 
-            <div>
-                <label for="stock_filter" style="display: block; margin-bottom: 5px; font-weight: 600;">
-                    Stock
-                </label>
-                <select name="stock_filter" id="stock_filter">
-                    <option value="">Tous</option>
-                    <option value="in_stock" <?php selected( $filter_stock, 'in_stock' ); ?>>En stock</option>
-                    <option value="out_of_stock" <?php selected( $filter_stock, 'out_of_stock' ); ?>>Hors stock</option>
-                </select>
+            <!-- Grille des filtres 2-3 colonnes -->
+            <div class="bihr-filters-grid">
+                <div class="bihr-filter-field">
+                    <label for="stock_filter">
+                        Stock
+                    </label>
+                    <select name="stock_filter" id="stock_filter">
+                        <option value="">Tous</option>
+                        <option value="in_stock" <?php selected( $filter_stock, 'in_stock' ); ?>>En stock</option>
+                        <option value="out_of_stock" <?php selected( $filter_stock, 'out_of_stock' ); ?>>Hors stock</option>
+                    </select>
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="price_min">
+                        Prix minimum (€)
+                    </label>
+                    <input type="number" 
+                           name="price_min" 
+                           id="price_min" 
+                           value="<?php echo esc_attr( $filter_price_min ); ?>" 
+                           placeholder="0.00"
+                           step="0.01"
+                           min="0" />
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="price_max">
+                        Prix maximum (€)
+                    </label>
+                    <input type="number" 
+                           name="price_max" 
+                           id="price_max" 
+                           value="<?php echo esc_attr( $filter_price_max ); ?>" 
+                           placeholder="9999.99"
+                           step="0.01"
+                           min="0" />
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="category_filter">
+                        Catégorie
+                    </label>
+                    <select name="category_filter" id="category_filter">
+                        <option value="">Toutes</option>
+                        <?php if ( ! empty( $available_categories ) ) : ?>
+                            <?php foreach ( $available_categories as $cat ) : ?>
+                                <option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $filter_category, $cat ); ?>>
+                                    <?php echo esc_html( $cat ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="sort_by">
+                        Trier par
+                    </label>
+                    <select name="sort_by" id="sort_by">
+                        <option value="">Par défaut (ID)</option>
+                        <option value="name_asc" <?php selected( $sort_by, 'name_asc' ); ?>>Nom (A → Z)</option>
+                        <option value="name_desc" <?php selected( $sort_by, 'name_desc' ); ?>>Nom (Z → A)</option>
+                        <option value="price_asc" <?php selected( $sort_by, 'price_asc' ); ?>>Prix croissant</option>
+                        <option value="price_desc" <?php selected( $sort_by, 'price_desc' ); ?>>Prix décroissant</option>
+                        <option value="stock_asc" <?php selected( $sort_by, 'stock_asc' ); ?>>Stock croissant</option>
+                        <option value="stock_desc" <?php selected( $sort_by, 'stock_desc' ); ?>>Stock décroissant</option>
+                    </select>
+                </div>
             </div>
 
-            <div>
-                <label for="price_min" style="display: block; margin-bottom: 5px; font-weight: 600;">
-                    Prix minimum (€)
-                </label>
-                <input type="number" 
-                       name="price_min" 
-                       id="price_min" 
-                       value="<?php echo esc_attr( $filter_price_min ); ?>" 
-                       placeholder="0.00"
-                       step="0.01"
-                       min="0"
-                       style="width: 100%;" />
-            </div>
-
-            <div>
-                <label for="price_max" style="display: block; margin-bottom: 5px; font-weight: 600;">
-                    Prix maximum (€)
-                </label>
-                <input type="number" 
-                       name="price_max" 
-                       id="price_max" 
-                       value="<?php echo esc_attr( $filter_price_max ); ?>" 
-                       placeholder="9999.99"
-                       step="0.01"
-                       min="0"
-                       style="width: 100%;" />
-            </div>
-
-            <div>
-                <label for="category_filter" style="display: block; margin-bottom: 5px; font-weight: 600;">
-                    Catégorie
-                </label>
-                <select name="category_filter" id="category_filter">
-                    <option value="">Toutes</option>
-                    <?php if ( ! empty( $available_categories ) ) : ?>
-                        <?php foreach ( $available_categories as $cat ) : ?>
-                            <option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $filter_category, $cat ); ?>>
-                                <?php echo esc_html( $cat ); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </select>
-            </div>
-
-            <div>
-                <label for="sort_by" style="display: block; margin-bottom: 5px; font-weight: 600;">
-                    Trier par
-                </label>
-                <select name="sort_by" id="sort_by">
-                    <option value="">Par défaut (ID)</option>
-                    <option value="name_asc" <?php selected( $sort_by, 'name_asc' ); ?>>Nom (A → Z)</option>
-                    <option value="name_desc" <?php selected( $sort_by, 'name_desc' ); ?>>Nom (Z → A)</option>
-                    <option value="price_asc" <?php selected( $sort_by, 'price_asc' ); ?>>Prix croissant</option>
-                    <option value="price_desc" <?php selected( $sort_by, 'price_desc' ); ?>>Prix décroissant</option>
-                    <option value="stock_asc" <?php selected( $sort_by, 'stock_asc' ); ?>>Stock croissant</option>
-                    <option value="stock_desc" <?php selected( $sort_by, 'stock_desc' ); ?>>Stock décroissant</option>
-                </select>
-            </div>
-
-            <div>
+            <!-- Boutons d'action -->
+            <div class="bihr-filters-actions">
                 <?php submit_button( 'Filtrer', 'secondary', 'submit', false ); ?>
-            </div>
-
-            <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price_min ) || ! empty( $filter_price_max ) || ! empty( $filter_category ) || ! empty( $sort_by ) ) : ?>
-                <div>
+                <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price_min ) || ! empty( $filter_price_max ) || ! empty( $filter_category ) || ! empty( $sort_by ) ) : ?>
                     <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihrwi_products' ) ); ?>" class="button">
                         Réinitialiser
                     </a>
-                </div>
-            <?php endif; ?>
+                <?php endif; ?>
+            </div>
         </form>
     </div>
 
