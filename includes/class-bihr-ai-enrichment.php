@@ -8,7 +8,7 @@ class BihrWI_AI_Enrichment {
     protected $logger;
     protected $api_key;
 
-    public function __construct( BihrWI_Logger $logger ) {
+    public function __construct( $logger = null ) {
         $this->logger  = $logger;
         $this->api_key = get_option( 'bihrwi_openai_key', '' );
     }
@@ -21,6 +21,15 @@ class BihrWI_AI_Enrichment {
     }
 
     /**
+     * Helper pour loguer en toute sécurité
+     */
+    protected function log( $message ) {
+        if ( $this->logger && method_exists( $this->logger, 'log' ) ) {
+            $this->logger->log( $message );
+        }
+    }
+
+    /**
      * Génère les descriptions courte et longue via OpenAI GPT-4 Vision
      * @param string $product_name Nom du produit
      * @param string $image_url URL de l'image du produit
@@ -29,11 +38,11 @@ class BihrWI_AI_Enrichment {
      */
     public function generate_descriptions( $product_name, $image_url = '', $product_code = '' ) {
         if ( ! $this->is_enabled() ) {
-            $this->logger->log( 'AI Enrichment: désactivé (pas de clé OpenAI)' );
+            $this->log( 'AI Enrichment: désactivé (pas de clé OpenAI)' );
             return false;
         }
 
-        $this->logger->log( "AI Enrichment: génération pour {$product_code} - {$product_name}" );
+        $this->log( "AI Enrichment: génération pour {$product_code} - {$product_name}" );
 
         try {
             // Construction du prompt
@@ -80,14 +89,14 @@ class BihrWI_AI_Enrichment {
             $parsed = $this->parse_response( $response );
 
             if ( $parsed ) {
-                $this->logger->log( "AI Enrichment: succès pour {$product_code}" );
+                $this->log( "AI Enrichment: succès pour {$product_code}" );
                 return $parsed;
             }
 
             return false;
 
         } catch ( Exception $e ) {
-            $this->logger->log( 'AI Enrichment erreur: ' . $e->getMessage() );
+            $this->log( 'AI Enrichment erreur: ' . $e->getMessage() );
             return false;
         }
     }
@@ -142,7 +151,7 @@ class BihrWI_AI_Enrichment {
         $response = wp_remote_post( $endpoint, $args );
 
         if ( is_wp_error( $response ) ) {
-            $this->logger->log( 'OpenAI API erreur: ' . $response->get_error_message() );
+            $this->log( 'OpenAI API erreur: ' . $response->get_error_message() );
             return false;
         }
 
@@ -150,14 +159,14 @@ class BihrWI_AI_Enrichment {
         $body        = wp_remote_retrieve_body( $response );
 
         if ( $status_code !== 200 ) {
-            $this->logger->log( "OpenAI API erreur HTTP {$status_code}: {$body}" );
+            $this->log( "OpenAI API erreur HTTP {$status_code}: {$body}" );
             return false;
         }
 
         $data = json_decode( $body, true );
 
         if ( ! isset( $data['choices'][0]['message']['content'] ) ) {
-            $this->logger->log( 'OpenAI API réponse invalide: ' . $body );
+            $this->log( 'OpenAI API réponse invalide: ' . $body );
             return false;
         }
 

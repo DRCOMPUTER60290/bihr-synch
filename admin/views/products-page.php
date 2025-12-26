@@ -312,6 +312,19 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
         <?php endif; ?>
     </p>
 
+    <!-- Information sur l'enrichissement IA -->
+    <?php
+    $ai_enrichment = new BihrWI_AI_Enrichment( null );
+    if ( ! $ai_enrichment->is_enabled() ) :
+    ?>
+        <div class="notice notice-info" style="margin: 20px 0;">
+            <p>
+                <strong>💡 Astuce :</strong> Vous pouvez activer l'enrichissement IA pour générer automatiquement des descriptions courtes et longues lors de l'importation des produits. 
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-auth' ) ); ?>">Configurez votre clé OpenAI ici</a>.
+            </p>
+        </div>
+    <?php endif; ?>
+
     <!-- Filtres -->
     <div class="bihr-section">
         <h3>🔍 Filtres de recherche</h3>
