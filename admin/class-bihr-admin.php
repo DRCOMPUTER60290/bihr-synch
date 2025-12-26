@@ -44,6 +44,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_upload_vehicles_zip', array( $this, 'ajax_upload_vehicles_zip' ) );
         add_action( 'wp_ajax_bihrwi_upload_links_zip', array( $this, 'ajax_upload_links_zip' ) );
         add_action( 'wp_ajax_bihrwi_get_order_data', array( $this, 'ajax_get_order_data' ) );
+        add_action( 'wp_ajax_bihr_toggle_beginner_mode', array( $this, 'ajax_toggle_beginner_mode' ) );
 
         // Handlers pour synchronisation automatique des stocks
         add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
@@ -294,85 +295,96 @@ class BihrWI_Admin {
 	
 
     public function register_menus() {
+        // Menu principal avec dashboard
         add_menu_page(
-            __( 'Bihr Import', 'bihr-woocommerce-importer' ),
-            __( 'Bihr Import', 'bihr-woocommerce-importer' ),
+            __( 'BIHR WooCommerce', 'bihr-woocommerce-importer' ),
+            __( 'BIHR', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_auth',
-            array( $this, 'render_auth_page' ),
+            'bihr-dashboard',
+            array( $this, 'render_dashboard_page' ),
             'dashicons-cart',
             56
         );
 
+        // Dashboard (page d'accueil)
         add_submenu_page(
-            'bihrwi_auth',
-            __( 'Authentification Bihr', 'bihr-woocommerce-importer' ),
-            __( 'Authentification', 'bihr-woocommerce-importer' ),
+            'bihr-dashboard',
+            __( 'Dashboard BIHR', 'bihr-woocommerce-importer' ),
+            __( '🏠 Accueil', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_auth',
+            'bihr-dashboard',
+            array( $this, 'render_dashboard_page' )
+        );
+
+        add_submenu_page(
+            'bihr-dashboard',
+            __( 'Authentification Bihr', 'bihr-woocommerce-importer' ),
+            __( '🔐 Authentification', 'bihr-woocommerce-importer' ),
+            'manage_woocommerce',
+            'bihr-auth',
             array( $this, 'render_auth_page' )
         );
 
         add_submenu_page(
-            'bihrwi_auth',
+            'bihr-dashboard',
             __( 'Logs Bihr', 'bihr-woocommerce-importer' ),
-            __( 'Logs', 'bihr-woocommerce-importer' ),
+            __( '📊 Logs', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_logs',
+            'bihr-logs',
             array( $this, 'render_logs_page' )
         );
 
         add_submenu_page(
-            'bihrwi_auth',
+            'bihr-dashboard',
             __( 'Produits Bihr', 'bihr-woocommerce-importer' ),
-            __( 'Produits Bihr', 'bihr-woocommerce-importer' ),
+            __( '📦 Produits BIHR', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_products',
+            'bihr-products',
             array( $this, 'render_products_page' )
         );
 
         add_submenu_page(
-            'bihrwi_auth',
+            'bihr-dashboard',
             __( 'Paramètres Commandes', 'bihr-woocommerce-importer' ),
-            __( 'Commandes', 'bihr-woocommerce-importer' ),
+            __( '🛒 Commandes', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_orders',
+            'bihr-orders',
             array( $this, 'render_orders_settings_page' )
         );
 
         add_submenu_page(
-            'bihrwi_auth',
+            'bihr-dashboard',
             __( 'Gestion des marges', 'bihr-woocommerce-importer' ),
-            __( 'Marges', 'bihr-woocommerce-importer' ),
+            __( '💰 Marges', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_margins',
+            'bihr-margins',
             array( $this, 'render_margins_page' )
         );
 
         add_submenu_page(
-            'bihrwi_auth',
+            'bihr-dashboard',
             __( 'Produits Importés', 'bihr-woocommerce-importer' ),
-            __( 'Produits Importés', 'bihr-woocommerce-importer' ),
+            __( '✅ Produits Importés', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_imported_products',
+            'bihr-imported-products',
             array( $this, 'render_imported_products_page' )
         );
 
         add_submenu_page(
-            'bihrwi_auth',
+            'bihr-dashboard',
             __( 'Compatibilité Véhicules', 'bihr-woocommerce-importer' ),
-            __( 'Compatibilité', 'bihr-woocommerce-importer' ),
+            __( '🚗 Compatibilité', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_compatibility',
+            'bihr-compatibility',
             array( $this, 'render_compatibility_page' )
         );
 
         add_submenu_page(
-            'bihrwi_auth',
+            'bihr-dashboard',
             __( 'Synchronisation SKU (Compatibilité)', 'bihr-woocommerce-importer' ),
-            __( 'Synchro SKU', 'bihr-woocommerce-importer' ),
+            __( '🔄 Synchro SKU', 'bihr-woocommerce-importer' ),
             'manage_woocommerce',
-            'bihrwi_sku_sync_compat',
+            'bihr-sku-sync-compat',
             array( $this, 'render_sku_sync_compat_page' )
         );
     }
@@ -425,6 +437,10 @@ class BihrWI_Admin {
 
         update_option( 'bihrwi_margin_settings', $settings );
         $this->logger->log( 'Configuration des marges mise à jour' );
+    }
+
+    public function render_dashboard_page() {
+        include BIHRWI_PLUGIN_DIR . 'admin/views/dashboard-page.php';
     }
 
     public function render_auth_page() {
@@ -1917,6 +1933,26 @@ class BihrWI_Admin {
             'failed' => $failed,
             'duration' => $duration_formatted
         );
+    }
+
+    /**
+     * Toggle mode débutant/expert via AJAX
+     */
+    public function ajax_toggle_beginner_mode() {
+        check_ajax_referer( 'bihr_toggle_mode', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        $user_id = get_current_user_id();
+        $enabled = ! empty( $_POST['enabled'] );
+
+        update_user_meta( $user_id, '_bihr_beginner_mode', $enabled );
+
+        wp_send_json_success( array(
+            'mode' => $enabled ? 'beginner' : 'expert'
+        ) );
     }
 
 	
