@@ -1,42 +1,335 @@
+/* ============================================================
+   DESIGN SYSTEM - VARIABLES CSS
+   ============================================================ */
+:root {
+    /* Couleurs */
+    --primary: #2563eb;
+    --primary-dark: #1e40af;
+    --primary-light: #dbeafe;
+    --success: #10b981;
+    --success-light: #d1fae5;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --danger: #ef4444;
+    --danger-light: #fee2e2;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    
+    /* Espacements */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+    --spacing-2xl: 32px;
+    
+    /* Border */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    
+    /* Shadow */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================
+   RESET & BASE STYLES
+   ============================================================ */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ============================================================
+   LAYOUT PRINCIPAL
+   ============================================================ */
+.wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.wrap h1 {
+    color: var(--gray-900);
+    font-size: 28px;
+    font-weight: 700;
+    margin: var(--spacing-2xl) 0 var(--spacing-xl) 0;
+    letter-spacing: -0.5px;
+}
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+.bihr-section {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-200);
+    transition: all 0.3s ease;
+}
+
+.bihr-section:hover {
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-light);
+}
+
+.bihr-section h2 {
+    color: var(--gray-900);
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 var(--spacing-lg) 0;
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.bihr-section h3 {
+    color: var(--gray-800);
+    font-size: 14px;
+    font-weight: 600;
+    margin: var(--spacing-xl) 0 var(--spacing-md) 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--primary);
+}
+
+.bihr-section p {
+    color: var(--gray-700);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: var(--spacing-md) 0;
+}
+
+/* ============================================================
+   CARTES (SECTIONS INTERNES)
+   ============================================================ */
+.bihrwi-section {
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    border-left: 4px solid var(--primary);
+    transition: all 0.3s ease;
+}
+
+.bihrwi-section:hover {
+    background: white;
+    box-shadow: var(--shadow-md);
+}
+
+.bihrwi-section h3 {
+    color: var(--gray-900);
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 var(--spacing-md) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.bihrwi-section p {
+    color: var(--gray-700);
+    font-size: 13px;
+    margin: var(--spacing-sm) 0;
+    line-height: 1.5;
+}
+
+.bihrwi-section strong {
+    color: var(--gray-900);
+    font-weight: 600;
+}
+
+/* Variantes de sections */
+.section-status {
+    border-left-color: var(--success);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), transparent);
+}
+
+.section-client {
+    border-left-color: var(--primary);
+}
+
+.section-address {
+    border-left-color: var(--warning);
+}
+
+.section-articles {
+    border-left-color: var(--gray-500);
+}
+
+.section-prices {
+    border-left-color: var(--danger);
+}
+
+.section-shipping {
+    border-left-color: var(--primary);
+}
+
+/* ============================================================
+   BOUTONS
+   ============================================================ */
+.button,
+button,
+input[type="button"],
+input[type="submit"] {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.button:hover,
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover {
+    background: var(--primary-dark);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.button:active,
+button:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+.button.secondary {
+    background: var(--gray-200);
+    color: var(--gray-900);
+}
+
+.button.secondary:hover {
+    background: var(--gray-300);
+}
+
+.button.success {
+    background: var(--success);
+}
+
+.button.success:hover {
+    background: #059669;
+}
+
+.button.danger {
+    background: var(--danger);
+}
+
+.button.danger:hover {
+    background: #dc2626;
+}
+
+.button.large {
+    padding: var(--spacing-lg) var(--spacing-2xl);
+    font-size: 14px;
+    height: auto !important;
+}
+
+/* ============================================================
+   FORMULAIRES
+   ============================================================ */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="number"],
+textarea,
+select {
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 13px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+label {
+    color: var(--gray-900);
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: var(--spacing-sm);
+    display: block;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
 /* Styles pour les barres de progression */
 .bihr-progress-container {
     display: none;
-    margin: 20px 0;
-    padding: 15px;
-    background: #f0f0f1;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
+    margin: var(--spacing-lg) 0;
+    padding: var(--spacing-lg);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
 }
 
 .bihr-progress-bar-wrapper {
     width: 100%;
-    height: 30px;
-    background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 3px;
+    height: 32px;
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
     overflow: hidden;
-    margin-bottom: 10px;
+    margin-bottom: var(--spacing-lg);
     position: relative;
+    box-shadow: var(--shadow-sm);
 }
 
 .bihr-progress-bar {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #2271b1, #135e96);
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
     transition: width 0.3s ease;
     position: relative;
     overflow: hidden;
 }
 
-/* Animation de rotation pour les icônes */
-.dashicons.spin {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
 .bihr-progress-bar::after {
     content: '';
     position: absolute;
@@ -62,6 +355,11 @@
     }
 }
 
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 @keyframes rotation {
     0% {
         transform: rotate(0deg);
@@ -71,8 +369,28 @@
     }
 }
 
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
 .bihr-progress-bar.complete {
-    background: linear-gradient(90deg, #00a32a, #008a20);
+    background: linear-gradient(90deg, var(--success), #059669);
 }
 
 .bihr-progress-bar.complete::after {
@@ -80,7 +398,7 @@
 }
 
 .bihr-progress-bar.error {
-    background: linear-gradient(90deg, #d63638, #b32d2e);
+    background: linear-gradient(90deg, var(--danger), #dc2626);
 }
 
 .bihr-progress-bar.error::after {
@@ -88,97 +406,268 @@
 }
 
 .bihr-progress-text {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    color: #1d2327;
+    color: var(--gray-900);
     text-align: center;
-}
-
-/* Amélioration des boutons */
-.button.large {
-    height: auto !important;
-    padding: 12px 24px !important;
-    font-size: 14px !important;
-    line-height: 1.5 !important;
-}
-
-/* Sections avec bordures */
-.bihr-section {
-    padding: 20px;
-    margin-bottom: 20px;
-    background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
-    box-shadow: 0 1px 1px rgba(0,0,0,.04);
-}
-
-.bihr-section h3 {
-    margin-top: 0;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #c3c4c7;
-}
-
-/* Styles des filtres */
-.bihr-section select,
-.bihr-section input[type="text"] {
-    padding: 6px 10px;
-    border: 1px solid #8c8f94;
-    border-radius: 3px;
-    font-size: 13px;
-}
-
-.bihr-section select:focus,
-.bihr-section input[type="text"]:focus {
-    border-color: #2271b1;
-    outline: 1px solid #2271b1;
-}
-
-.bihr-section label {
-    color: #1d2327;
-    font-size: 13px;
-}
-
-/* Animation spinner pour refresh stock */
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+    margin-top: var(--spacing-md);
 }
 
 .dashicons.spin {
     animation: spin 1s linear infinite;
 }
 
-.stock-display {
-    display: flex;
+/* ============================================================
+   TABLEAUX
+   ============================================================ */
+table.widefat {
+    border-collapse: collapse;
+    width: 100%;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+table.widefat thead th {
+    background: linear-gradient(135deg, var(--gray-100), var(--gray-50));
+    color: var(--gray-900);
+    font-weight: 600;
+    padding: var(--spacing-md) var(--spacing-lg);
+    text-align: left;
+    border-bottom: 2px solid var(--gray-300);
+}
+
+table.widefat tbody tr {
+    border-bottom: 1px solid var(--gray-200);
+    transition: background-color 0.2s ease;
+}
+
+table.widefat tbody tr:hover {
+    background-color: var(--gray-50);
+}
+
+table.widefat td {
+    padding: var(--spacing-md) var(--spacing-lg);
+    color: var(--gray-700);
+    font-size: 13px;
+}
+
+table.widefat tbody tr:last-child {
+    border-bottom: none;
+}
+
+/* ============================================================
+   BADGES & ÉTIQUETTES
+   ============================================================ */
+.badge {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
 }
 
-.stock-cell {
-    transition: background-color 0.3s ease;
+.badge-success {
+    background: var(--success-light);
+    color: #059669;
 }
 
-.refresh-stock {
-    min-width: auto !important;
-    height: auto !important;
-    line-height: 1 !important;
+.badge-warning {
+    background: var(--warning-light);
+    color: #b45309;
 }
-/* ========================================
-   Styles pour l'affichage Order/Data
-   ======================================== */
 
-.bihrwi-order-data-formatted {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+.badge-danger {
+    background: var(--danger-light);
+    color: #b91c1c;
+}
+
+.badge-info {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+}
+
+/* ============================================================
+   PRÉ & CODE
+   ============================================================ */
+pre {
+    background: var(--gray-50) !important;
+    border: 1px solid var(--gray-300) !important;
+    border-radius: var(--radius-md) !important;
+    padding: var(--spacing-lg) !important;
+    color: var(--gray-800) !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    overflow-x: auto !important;
+    max-height: 380px !important;
+    overflow-y: auto !important;
+}
+
+code {
+    background: var(--gray-100);
+    color: var(--danger);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+}
+
+/* ============================================================
+   MESSAGES & ALERTES
+   ============================================================ */
+.notice,
+.notice-success,
+.notice-error,
+.notice-warning,
+.notice-info {
+    border-left: 4px solid var(--primary) !important;
+    background-color: var(--primary-light) !important;
+    padding: var(--spacing-lg) !important;
+    border-radius: var(--radius-md) !important;
+    margin-bottom: var(--spacing-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.notice-success {
+    border-left-color: var(--success) !important;
+    background-color: var(--success-light) !important;
+}
+
+.notice-error {
+    border-left-color: var(--danger) !important;
+    background-color: var(--danger-light) !important;
+}
+
+.notice-warning {
+    border-left-color: var(--warning) !important;
+    background-color: var(--warning-light) !important;
+}
+
+.notice p {
+    margin: 0 !important;
+    color: var(--gray-800) !important;
+    font-size: 13px !important;
+}
+
+/* ============================================================
+   CHAMPS DE TEXTE & SELECT
+   ============================================================ */
+.bihr-section input[type="text"],
+.bihr-section input[type="email"],
+.bihr-section input[type="number"],
+.bihr-section textarea,
+.bihr-section select {
+    width: 100%;
+    max-width: 500px;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.bihr-section input[type="text"]:focus,
+.bihr-section input[type="email"]:focus,
+.bihr-section input[type="number"]:focus,
+.bihr-section textarea:focus,
+.bihr-section select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* ============================================================
+   LISTES
+   ============================================================ */
+ol, ul {
+    color: var(--gray-700);
+    margin-left: var(--spacing-xl);
+}
+
+li {
+    margin-bottom: var(--spacing-sm);
     line-height: 1.6;
-    color: #333;
 }
 
-.bihrwi-order-data-formatted .bihrwi-section {
-    margin-bottom: 5px;
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+    .wrap {
+        margin: 0 var(--spacing-lg);
+    }
+    
+    .bihr-section {
+        padding: var(--spacing-lg);
+        margin-bottom: var(--spacing-lg);
+    }
+    
+    .wrap h1 {
+        font-size: 24px;
+    }
+    
+    .bihr-section h2 {
+        font-size: 16px;
+    }
+    
+    table.widefat {
+        font-size: 12px;
+    }
+    
+    table.widefat th,
+    table.widefat td {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+    
+    .button,
+    button {
+        padding: var(--spacing-md) var(--spacing-lg);
+    }
+    
+    .button.large {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .bihr-section input[type="text"],
+    .bihr-section input[type="email"],
+    .bihr-section input[type="number"],
+    .bihr-section textarea,
+    .bihr-section select {
+        max-width: 100%;
+    }
+}
+
+/* ============================================================
+   ANIMATIONS D'ENTRÉE
+   ============================================================ */
+.bihrwi-section {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* ============================================================
+   LOADER SPINNER
+   ============================================================ */
+.loader {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--gray-300);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ============================================================
+   ORDRE DATA DISPLAY
+   ============================================================ */
+.bihrwi-order-data-formatted {
+    font-family: inherit;
+    line-height: 1.6;
+    color: var(--gray-700);
+}
     padding: 8px 10px;
     background: #f9f9f9;
     border-left: 3px solid #2271b1;

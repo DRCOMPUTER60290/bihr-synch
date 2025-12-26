@@ -5,16 +5,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 
 <div class="wrap">
-    <h1><?php esc_html_e( 'Paramètres de Synchronisation des Commandes', 'bihr-woocommerce-importer' ); ?></h1>
+    <h1>⚙️ <?php esc_html_e( 'Paramètres de Synchronisation des Commandes', 'bihr-woocommerce-importer' ); ?></h1>
 
     <?php if ( isset( $success_message ) ) : ?>
         <div class="notice notice-success is-dismissible">
-            <p><?php echo esc_html( $success_message ); ?></p>
+            <p>✅ <?php echo esc_html( $success_message ); ?></p>
         </div>
     <?php endif; ?>
 
     <div class="bihr-section">
-        <h2><?php esc_html_e( 'Configuration de la Synchronisation Automatique', 'bihr-woocommerce-importer' ); ?></h2>
+        <h2>🔄 <?php esc_html_e( 'Configuration de la Synchronisation Automatique', 'bihr-woocommerce-importer' ); ?></h2>
         <p>
             <?php esc_html_e( 'Lorsqu\'une commande est créée dans WooCommerce, le plugin peut automatiquement la transmettre à l\'API BIHR pour traitement.', 'bihr-woocommerce-importer' ); ?>
         </p>
@@ -22,98 +22,71 @@ if ( ! defined( 'ABSPATH' ) ) {
         <form method="post" action="">
             <?php wp_nonce_field( 'bihrwi_order_settings_action', 'bihrwi_order_settings_nonce' ); ?>
 
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="bihrwi_auto_sync_orders">
-                            <?php esc_html_e( 'Synchronisation automatique', 'bihr-woocommerce-importer' ); ?>
-                        </label>
-                    </th>
-                    <td>
-                        <label>
-                            <input type="checkbox" 
-                                   id="bihrwi_auto_sync_orders" 
-                                   name="bihrwi_auto_sync_orders" 
-                                   value="1" 
-                                   <?php checked( $auto_sync_orders, 1 ); ?>>
-                            <?php esc_html_e( 'Activer la synchronisation automatique des commandes vers BIHR', 'bihr-woocommerce-importer' ); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e( 'Si activé, les commandes WooCommerce seront automatiquement envoyées à l\'API BIHR lors de leur création.', 'bihr-woocommerce-importer' ); ?>
-                        </p>
-                    </td>
-                </tr>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" 
+                           id="bihrwi_auto_sync_orders" 
+                           name="bihrwi_auto_sync_orders" 
+                           value="1" 
+                           <?php checked( $auto_sync_orders, 1 ); ?>>
+                    <strong><?php esc_html_e( 'Synchronisation automatique', 'bihr-woocommerce-importer' ); ?></strong>
+                </label>
+                <p style="margin-left: 24px; margin-top: 4px; color: #6b7280; font-size: 13px;">
+                    <?php esc_html_e( 'Envoyer automatiquement les commandes WooCommerce à l\'API BIHR lors de leur création.', 'bihr-woocommerce-importer' ); ?>
+                </p>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="bihrwi_auto_checkout">
-                            <?php esc_html_e( 'Validation automatique', 'bihr-woocommerce-importer' ); ?>
-                        </label>
-                    </th>
-                    <td>
-                        <label>
-                            <input type="checkbox" 
-                                   id="bihrwi_auto_checkout" 
-                                   name="bihrwi_auto_checkout" 
-                                   value="1" 
-                                   <?php checked( $auto_checkout, 1 ); ?>>
-                            <?php esc_html_e( 'Activer la validation automatique des commandes (IsAutomaticCheckoutActivated)', 'bihr-woocommerce-importer' ); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e( 'Si activé, les commandes seront automatiquement validées côté BIHR sans intervention manuelle.', 'bihr-woocommerce-importer' ); ?>
-                        </p>
-                    </td>
-                </tr>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" 
+                           id="bihrwi_auto_checkout" 
+                           name="bihrwi_auto_checkout" 
+                           value="1" 
+                           <?php checked( $auto_checkout, 1 ); ?>>
+                    <strong><?php esc_html_e( 'Validation automatique', 'bihr-woocommerce-importer' ); ?></strong>
+                </label>
+                <p style="margin-left: 24px; margin-top: 4px; color: #6b7280; font-size: 13px;">
+                    <?php esc_html_e( 'Valider automatiquement les commandes côté BIHR sans intervention manuelle.', 'bihr-woocommerce-importer' ); ?>
+                </p>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="bihrwi_weekly_free_shipping">
-                            <?php esc_html_e( 'Livraison gratuite hebdomadaire', 'bihr-woocommerce-importer' ); ?>
-                        </label>
-                    </th>
-                    <td>
-                        <label>
-                            <input type="checkbox" 
-                                   id="bihrwi_weekly_free_shipping" 
-                                   name="bihrwi_weekly_free_shipping" 
-                                   value="1" 
-                                   <?php checked( $weekly_free_shipping, 1 ); ?>>
-                            <?php esc_html_e( 'Activer la livraison gratuite hebdomadaire (IsWeeklyFreeShippingActivated)', 'bihr-woocommerce-importer' ); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e( 'Si activé, bénéficiez de la livraison gratuite hebdomadaire selon les conditions BIHR.', 'bihr-woocommerce-importer' ); ?>
-                        </p>
-                    </td>
-                </tr>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" 
+                           id="bihrwi_weekly_free_shipping" 
+                           name="bihrwi_weekly_free_shipping" 
+                           value="1" 
+                           <?php checked( $weekly_free_shipping, 1 ); ?>>
+                    <strong><?php esc_html_e( 'Livraison gratuite hebdomadaire', 'bihr-woocommerce-importer' ); ?></strong>
+                </label>
+                <p style="margin-left: 24px; margin-top: 4px; color: #6b7280; font-size: 13px;">
+                    <?php esc_html_e( 'Bénéficiez de la livraison gratuite hebdomadaire selon les conditions BIHR.', 'bihr-woocommerce-importer' ); ?>
+                </p>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="bihrwi_delivery_mode">
-                            <?php esc_html_e( 'Mode de livraison', 'bihr-woocommerce-importer' ); ?>
-                        </label>
-                    </th>
-                    <td>
-                        <select id="bihrwi_delivery_mode" name="bihrwi_delivery_mode">
-                            <option value="Default" <?php selected( $delivery_mode, 'Default' ); ?>>
-                                <?php esc_html_e( 'Par défaut (Default)', 'bihr-woocommerce-importer' ); ?>
-                            </option>
-                            <option value="Express" <?php selected( $delivery_mode, 'Express' ); ?>>
-                                <?php esc_html_e( 'Express', 'bihr-woocommerce-importer' ); ?>
-                            </option>
-                            <option value="Standard" <?php selected( $delivery_mode, 'Standard' ); ?>>
-                                <?php esc_html_e( 'Standard', 'bihr-woocommerce-importer' ); ?>
-                            </option>
-                        </select>
-                        <p class="description">
-                            <?php esc_html_e( 'Sélectionnez le mode de livraison par défaut pour toutes les commandes.', 'bihr-woocommerce-importer' ); ?>
-                        </p>
-                    </td>
-                </tr>
-            </table>
+            <div class="form-group">
+                <label for="bihrwi_delivery_mode">
+                    <strong><?php esc_html_e( 'Mode de livraison', 'bihr-woocommerce-importer' ); ?></strong>
+                </label>
+                <select id="bihrwi_delivery_mode" name="bihrwi_delivery_mode">
+                    <option value="Default" <?php selected( $delivery_mode, 'Default' ); ?>>
+                        <?php esc_html_e( 'Par défaut (Default)', 'bihr-woocommerce-importer' ); ?>
+                    </option>
+                    <option value="Express" <?php selected( $delivery_mode, 'Express' ); ?>>
+                        <?php esc_html_e( 'Express', 'bihr-woocommerce-importer' ); ?>
+                    </option>
+                    <option value="Standard" <?php selected( $delivery_mode, 'Standard' ); ?>>
+                        <?php esc_html_e( 'Standard', 'bihr-woocommerce-importer' ); ?>
+                    </option>
+                </select>
+                <p style="color: #6b7280; font-size: 13px; margin-top: 4px;">
+                    <?php esc_html_e( 'Sélectionnez le mode de livraison par défaut pour toutes les commandes.', 'bihr-woocommerce-importer' ); ?>
+                </p>
+            </div>
 
             <p class="submit">
-                <button type="submit" name="bihrwi_save_order_settings" class="button button-primary">
-                    <?php esc_html_e( 'Enregistrer les paramètres', 'bihr-woocommerce-importer' ); ?>
+                <button type="submit" name="bihrwi_save_order_settings" class="button button-primary large">
+                    💾 <?php esc_html_e( 'Enregistrer les paramètres', 'bihr-woocommerce-importer' ); ?>
                 </button>
             </p>
         </form>
@@ -653,15 +626,9 @@ if ( ! defined( 'ABSPATH' ) ) {
             return '';
         }
 
-        let totalExclVat = 0;
         let totalInclVat = 0;
 
         data.DeliveryOrders.forEach((order, idx) => {
-            if (order.ExclVatPrice !== undefined && order.ExclVatPrice !== null) {
-                const price = parseFloat(order.ExclVatPrice) || 0;
-                totalExclVat += price;
-                console.log('[BIHR] Prix HT [' + idx + ']:', price);
-            }
             if (order.InclVatPrice !== undefined && order.InclVatPrice !== null) {
                 const price = parseFloat(order.InclVatPrice) || 0;
                 totalInclVat += price;
@@ -669,26 +636,21 @@ if ( ! defined( 'ABSPATH' ) ) {
             }
         });
 
-        const tva = (totalInclVat - totalExclVat);
-        const hasPrice = totalInclVat > 0 || totalExclVat > 0;
-
-        if (!hasPrice) {
-            console.warn('[BIHR] buildPricesSection: Aucun montant trouvé');
+        if (totalInclVat <= 0) {
+            console.warn('[BIHR] buildPricesSection: Aucun montant TTC trouvé');
             return `
                 <div class="bihrwi-section section-prices">
-                    <h3>💰 Montants</h3>
+                    <h3>💰 Montant</h3>
                     <p><em>⚠️ Aucun montant disponible</em></p>
                 </div>
             `;
         }
 
-        console.log('[BIHR] Montants: HT=' + totalExclVat.toFixed(2) + ' € | TVA=' + tva.toFixed(2) + ' € | TTC=' + totalInclVat.toFixed(2) + ' €');
+        console.log('[BIHR] Montant TTC:', totalInclVat.toFixed(2) + ' €');
 
         return `
             <div class="bihrwi-section section-prices">
-                <h3>💰 Montants</h3>
-                ${totalExclVat > 0 ? `<p><strong>🏷️ HT:</strong> ${formatPrice(totalExclVat)}</p>` : ''}
-                ${tva > 0 ? `<p><strong>📊 TVA:</strong> ${formatPrice(tva)}</p>` : ''}
+                <h3>💰 Montant</h3>
                 <p><strong>✅ TTC:</strong> <span style="color: #d32f2f; font-weight: 700; font-size: 14px;">${formatPrice(totalInclVat)}</span></p>
             </div>
         `;
