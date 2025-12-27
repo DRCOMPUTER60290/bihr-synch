@@ -15,11 +15,58 @@ class BihrWI_Order_Sync {
         $this->logger     = $logger;
         $this->api_client = $api_client;
 
-        // Hook sur la création de commande WooCommerce
-        add_action( 'woocommerce_checkout_order_processed', array( $this, 'sync_order_to_bihr' ), 10, 3 );
+        // Hook sur la création de commande WooCommerce (on planifie l'envoi pour éviter de bloquer le checkout)
+        add_action( 'woocommerce_checkout_order_processed', array( $this, 'queue_order_sync' ), 10, 3 );
         
         // Hook sur le changement de statut de commande (optionnel)
         add_action( 'woocommerce_order_status_changed', array( $this, 'handle_order_status_change' ), 10, 4 );
+
+        // Tâche planifiée pour exécuter la synchro en arrière-plan
+        add_action( 'bihrwi_async_order_sync', array( $this, 'run_scheduled_order_sync' ), 10, 2 );
+    }
+
+    /**
+     * Planifie la synchronisation pour ne pas bloquer le checkout.
+     */
+    public function queue_order_sync( $order_id, $posted_data, $order ) {
+        // Si la synchro auto est désactivée, sortir immédiatement
+        if ( ! get_option( 'bihrwi_auto_sync_orders', 1 ) ) {
+            $this->logger->log( "[WC{$order_id}] ❌ Synchronisation automatique désactivée - aucune planification" );
+            return;
+        }
+
+        // Génération d'un Ticket ID unique pour tracer toutes les étapes
+        $ticket_id = 'WC' . $order_id . '-' . time() . '-' . substr( md5( uniqid( '', true ) ), 0, 8 );
+
+        // Stocker le ticket ID dans les métadonnées dès maintenant
+        update_post_meta( $order_id, '_bihr_sync_ticket_id', $ticket_id );
+
+        // Éviter les doublons de planification
+        if ( get_post_meta( $order_id, '_bihr_sync_scheduled', true ) ) {
+            $this->logger->log( "[{$ticket_id}] ⚠️ Synchronisation déjà planifiée, aucune action." );
+            return;
+        }
+
+        update_post_meta( $order_id, '_bihr_sync_scheduled', true );
+
+        // Planifier la tâche dans les secondes qui suivent (WP-Cron)
+        wp_schedule_single_event( time() + 5, 'bihrwi_async_order_sync', array( $order_id, $ticket_id ) );
+
+        $this->logger->log( "[{$ticket_id}] ⏳ Synchronisation BIHR planifiée (asynchrone) pour la commande #{$order_id}" );
+    }
+
+    /**
+     * Callback du cron pour exécuter la synchro planifiée.
+     */
+    public function run_scheduled_order_sync( $order_id, $ticket_id ) {
+        $order = wc_get_order( $order_id );
+
+        if ( ! $order ) {
+            $this->logger->log( "[{$ticket_id}] ❌ Impossible de charger la commande #{$order_id} pour la synchro." );
+            return;
+        }
+
+        $this->sync_order_to_bihr( $order_id, array(), $order, $ticket_id, true );
     }
 
     /**
@@ -29,15 +76,21 @@ class BihrWI_Order_Sync {
      * @param array $posted_data Données du formulaire de checkout
      * @param WC_Order $order Objet commande WooCommerce
      */
-    public function sync_order_to_bihr( $order_id, $posted_data, $order ) {
-        // Génération d'un Ticket ID unique pour tracer toutes les étapes
-        $ticket_id = 'WC' . $order_id . '-' . time() . '-' . substr( md5( uniqid( '', true ) ), 0, 8 );
-        
+    public function sync_order_to_bihr( $order_id, $posted_data, $order, $ticket_id = '', $is_async = false ) {
+        // Génération d'un Ticket ID unique si absent (cas réessai ou appel direct)
+        if ( empty( $ticket_id ) ) {
+            $ticket_id = 'WC' . $order_id . '-' . time() . '-' . substr( md5( uniqid( '', true ) ), 0, 8 );
+        }
+
+        // On n'est plus en phase de planification
+        delete_post_meta( $order_id, '_bihr_sync_scheduled' );
+
         $this->logger->log( "┌─────────────────────────────────────────────────────────────" );
         $this->logger->log( "│ 🎫 TICKET: {$ticket_id}" );
         $this->logger->log( "│ 📦 COMMANDE WC: #{$order_id}" );
         $this->logger->log( "│ 👤 CLIENT: {$order->get_billing_first_name()} {$order->get_billing_last_name()}" );
         $this->logger->log( "│ 💶 MONTANT: {$order->get_total()} {$order->get_currency()}" );
+        $this->logger->log( $is_async ? "│ 🔁 MODE: asynchrone (cron)" : "│ 🔁 MODE: immédiat" );
         $this->logger->log( "└─────────────────────────────────────────────────────────────" );
         
         // Stocker le ticket ID dans les métadonnées
@@ -91,6 +144,7 @@ class BihrWI_Order_Sync {
             if ( $result && isset( $result['success'] ) && $result['success'] ) {
                 $bihr_ticket_id = $result['bihr_ticket_id'] ?? '';
                 $result_code = $result['result_code'] ?? '';
+                $bihr_order_id = '';
                 
                 $this->logger->log( "[{$ticket_id}] ✅ ÉTAPE 4/6 : API BIHR - Demande de création acceptée" );
                 
@@ -109,6 +163,9 @@ class BihrWI_Order_Sync {
                     if ( $status_result && isset( $status_result['request_status'] ) ) {
                         $this->logger->log( "[{$ticket_id}]    → Statut: {$status_result['request_status']}" );
                     }
+
+                    // Tenter d'extraire un Order ID depuis le statut
+                    $bihr_order_id = $this->api_client->extract_order_id_from_generation_status( $status_result );
                     
                     // Récupérer les données complètes de la commande
                     $this->logger->log( "[{$ticket_id}] 📊 Récupération des données complètes de la commande..." );
@@ -116,6 +173,15 @@ class BihrWI_Order_Sync {
                     
                     if ( $order_data_result ) {
                         $this->logger->log( "[{$ticket_id}]    ✅ Données de commande récupérées avec succès" );
+                        // Fallback : chercher OrderId dans le payload complet
+                        if ( empty( $bihr_order_id ) && is_array( $order_data_result ) ) {
+                            foreach ( array( 'OrderId', 'orderId', 'id', 'Id' ) as $order_key ) {
+                                if ( ! empty( $order_data_result[ $order_key ] ) ) {
+                                    $bihr_order_id = $order_data_result[ $order_key ];
+                                    break;
+                                }
+                            }
+                        }
                     } else {
                         $this->logger->log( "[{$ticket_id}]    ⚠️ Impossible de récupérer les données de commande" );
                     }
@@ -129,7 +195,9 @@ class BihrWI_Order_Sync {
                 
                 // Marquer la commande comme synchronisée
                 update_post_meta( $order_id, '_bihr_order_synced', true );
-                update_post_meta( $order_id, '_bihr_order_id', $bihr_order_id );
+                if ( ! empty( $bihr_order_id ) ) {
+                    update_post_meta( $order_id, '_bihr_order_id', $bihr_order_id );
+                }
                 update_post_meta( $order_id, '_bihr_sync_date', current_time( 'mysql' ) );
                 
                 // Enregistrer le Ticket ID BIHR si disponible
@@ -143,7 +211,7 @@ class BihrWI_Order_Sync {
                     'Ticket WC: ' . $ticket_id,
                 );
                 
-                if ( $bihr_order_id && $bihr_order_id !== 'N/A' ) {
+                if ( ! empty( $bihr_order_id ) && $bihr_order_id !== 'N/A' ) {
                     $note_parts[] = 'BIHR Order ID: ' . $bihr_order_id;
                 }
                 
@@ -161,7 +229,7 @@ class BihrWI_Order_Sync {
                 $this->logger->log( "[{$ticket_id}] 📝 ÉTAPE 6/6 : Note ajoutée à la commande WC" );
                 
                 $success_msg = "🎉 SYNCHRONISATION RÉUSSIE - Commande #{$order_id}";
-                if ( $bihr_order_id && $bihr_order_id !== 'N/A' ) {
+                if ( ! empty( $bihr_order_id ) && $bihr_order_id !== 'N/A' ) {
                     $success_msg .= " → BIHR ID: {$bihr_order_id}";
                 }
                 if ( $bihr_ticket_id ) {
@@ -582,8 +650,8 @@ class BihrWI_Order_Sync {
         
         // Si la commande passe en "traitement" ou "terminée" et n'est pas encore synchronisée
         if ( in_array( $new_status, array( 'processing', 'completed' ) ) && ! get_post_meta( $order_id, '_bihr_order_synced', true ) ) {
-            $this->logger->log( "[{$ticket_id}] ⚡ Commande non synchronisée - Lancement de la synchronisation automatique..." );
-            $this->sync_order_to_bihr( $order_id, array(), $order );
+            $this->logger->log( "[{$ticket_id}] ⚡ Commande non synchronisée - Planification de la synchronisation..." );
+            $this->queue_order_sync( $order_id, array(), $order );
         } elseif ( in_array( $new_status, array( 'processing', 'completed' ) ) && get_post_meta( $order_id, '_bihr_order_synced', true ) ) {
             $bihr_order_id = get_post_meta( $order_id, '_bihr_order_id', true );
             $bihr_ticket_id = get_post_meta( $order_id, '_bihr_api_ticket_id', true );

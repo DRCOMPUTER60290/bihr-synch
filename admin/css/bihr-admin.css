@@ -919,6 +919,43 @@ li {
     background: linear-gradient(135deg, #607d8b 0%, #455a64 100%);
 }
 
+/* Dashboard connected chip */
+.status-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 13px;
+    background: var(--success-light);
+    color: #0f5132;
+    border: 1px solid #34d399;
+}
+
+.status-chip.status-connected {
+    background: linear-gradient(135deg, #10b981 0%, #0d9c6c 100%);
+    color: white;
+    border: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.status-action-link {
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.status-action-link:hover {
+    color: var(--primary-dark);
+}
+
 /* Tableau des articles */
 .bihrwi-items-table {
     width: 100%;

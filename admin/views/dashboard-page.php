@@ -13,6 +13,7 @@ if ( $is_beginner_mode === '' ) {
 // Récupérer les infos d'authentification
 $auth_token = get_option( 'bihrwi_api_token' );
 $is_authenticated = ! empty( $auth_token );
+$show_auth_success = isset( $_GET['bihrwi_auth_success'] );
 
 // Récupérer les statistiques
 $products_count = wp_count_posts( 'product' )->publish;
@@ -21,6 +22,12 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 ?>
 
 <div class="wrap bihr-dashboard">
+    <?php if ( $show_auth_success ) : ?>
+    <div class="notice notice-success is-dismissible" style="margin-top:16px;">
+        <p><strong>Connexion BIHR réussie.</strong> Vous êtes maintenant connecté.</p>
+    </div>
+    <?php endif; ?>
+
     <!-- Header avec toggle mode -->
     <div class="bihr-header">
         <h1>🚀 <?php esc_html_e( 'BIHR WooCommerce Importer', 'bihr-woocommerce-importer' ); ?></h1>
@@ -67,9 +74,12 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                 </p>
             </div>
             <?php if ( $is_authenticated ) : ?>
-            <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action">
-                <?php esc_html_e( 'Modifier', 'bihr-woocommerce-importer' ); ?>
-            </a>
+            <div class="status-actions">
+                <span class="status-chip status-connected">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></span>
+                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action-link">
+                    <?php esc_html_e( 'Modifier', 'bihr-woocommerce-importer' ); ?>
+                </a>
+            </div>
             <?php else : ?>
             <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action button-primary">
                 <?php esc_html_e( 'Se connecter', 'bihr-woocommerce-importer' ); ?>

@@ -550,21 +550,23 @@ class BihrWI_Admin {
 
         check_admin_referer( 'bihrwi_authenticate_action', 'bihrwi_authenticate_nonce' );
 
-        $username = isset( $_POST['bihrwi_username'] ) ? sanitize_text_field( wp_unslash( $_POST['bihrwi_username'] ) ) : '';
-        $password = isset( $_POST['bihrwi_password'] ) ? sanitize_text_field( wp_unslash( $_POST['bihrwi_password'] ) ) : '';
+        $username   = isset( $_POST['bihrwi_username'] ) ? sanitize_text_field( wp_unslash( $_POST['bihrwi_username'] ) ) : '';
+        $password   = isset( $_POST['bihrwi_password'] ) ? sanitize_text_field( wp_unslash( $_POST['bihrwi_password'] ) ) : '';
         $openai_key = isset( $_POST['bihrwi_openai_key'] ) ? sanitize_text_field( wp_unslash( $_POST['bihrwi_openai_key'] ) ) : '';
 
         update_option( 'bihrwi_username', $username );
         update_option( 'bihrwi_password', $password );
         update_option( 'bihrwi_openai_key', $openai_key );
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihr-auth' ), admin_url( 'admin.php' ) );
+        $redirect_dashboard = add_query_arg( array( 'page' => 'bihr-dashboard' ), admin_url( 'admin.php' ) );
+        $redirect_auth      = add_query_arg( array( 'page' => 'bihr-auth' ), admin_url( 'admin.php' ) );
+        $redirect_url       = $redirect_auth;
 
         // Test de l'authentification Bihr
         try {
             $token = $this->api_client->get_token();
             $this->logger->log( 'Auth: succès pour ' . $username );
-            $redirect_url = add_query_arg( array( 'bihrwi_auth_success' => 1 ), $redirect_url );
+            $redirect_url = add_query_arg( array( 'bihrwi_auth_success' => 1 ), $redirect_dashboard );
         } catch ( Exception $e ) {
             $this->logger->log( 'Auth: échec pour ' . $username . ' – ' . $e->getMessage() );
             $redirect_url = add_query_arg(

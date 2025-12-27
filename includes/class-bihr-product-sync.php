@@ -14,6 +14,41 @@ class BihrWI_Product_Sync {
         $this->table_name = $wpdb->prefix . 'bihr_products';
     }
 
+    /**
+     * Retrouve un produit WooCommerce existant via le SKU ou le code BIHR (meta).
+     */
+    protected function find_existing_product( $sku, $product_code ) {
+        // 1) Recherche par SKU (rapide)
+        if ( ! empty( $sku ) ) {
+            $product_id = wc_get_product_id_by_sku( $sku );
+            if ( $product_id ) {
+                return (int) $product_id;
+            }
+        }
+
+        // 2) Recherche par meta _bihr_product_code
+        if ( ! empty( $product_code ) ) {
+            $query = new WP_Query( array(
+                'post_type'      => 'product',
+                'post_status'    => 'any',
+                'posts_per_page' => 1,
+                'fields'         => 'ids',
+                'meta_query'     => array(
+                    array(
+                        'key'   => '_bihr_product_code',
+                        'value' => $product_code,
+                    ),
+                ),
+            ) );
+
+            if ( ! empty( $query->posts ) ) {
+                return (int) $query->posts[0];
+            }
+        }
+
+        return 0;
+    }
+
     /* =========================================================
      *   LECTURE / LISTE DES PRODUITS (pour la page d’admin)
      * ======================================================= */
@@ -216,15 +251,31 @@ class BihrWI_Product_Sync {
 
         $this->logger->log( 'Import WooCommerce: préparation produit ' . $row->product_code );
 
-        // Création d’un produit simple
-        $product = new WC_Product_Simple();
+        // Déterminer le SKU cible (priorité NewPartNumber)
+        $sku = ! empty( $row->new_part_number ) ? $row->new_part_number : $row->product_code;
+
+        // Tenter de réutiliser un produit existant (évite les doublons)
+        $existing_product_id = $this->find_existing_product( $sku, $row->product_code );
+
+        if ( $existing_product_id ) {
+            $product = wc_get_product( $existing_product_id );
+
+            // Si le type n'est pas simple, rebasculer sur un produit simple pour aligner avec la logique d'import
+            if ( ! $product instanceof WC_Product_Simple ) {
+                $product = new WC_Product_Simple( $existing_product_id );
+            }
+
+            $this->logger->log( 'Import WooCommerce: mise à jour du produit existant ID ' . $existing_product_id );
+        } else {
+            // Création d’un produit simple
+            $product = new WC_Product_Simple();
+        }
 
         // Nom du produit
         $name = $row->name ?: $row->product_code;
         $product->set_name( $name );
 
         // SKU : utiliser NewPartNumber si disponible, sinon ProductCode
-        $sku = ! empty( $row->new_part_number ) ? $row->new_part_number : $row->product_code;
         if ( ! empty( $sku ) ) {
             $product->set_sku( $sku );
         }
@@ -781,6 +832,58 @@ class BihrWI_Product_Sync {
     }
 
     /**
+     * Parcourt un CSV en streaming et appelle un callback pour chaque ligne.
+     * Retourne le nombre de lignes lues.
+     */
+    protected function iterate_csv_rows( $file_path, callable $callback ) {
+        if ( ! file_exists( $file_path ) ) {
+            return 0;
+        }
+
+        $handle = fopen( $file_path, 'r' );
+        if ( ! $handle ) {
+            return 0;
+        }
+
+        // Détection du séparateur ; ou ,
+        $first_line = fgets( $handle );
+        rewind( $handle );
+        $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+
+        $header = fgetcsv( $handle, 0, $delimiter );
+        if ( ! $header ) {
+            fclose( $handle );
+            return 0;
+        }
+
+        $header = array_map(
+            function( $h ) {
+                return strtolower( trim( $h ) );
+            },
+            $header
+        );
+
+        $count = 0;
+
+        while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+            if ( count( $data ) !== count( $header ) ) {
+                continue;
+            }
+
+            $row = array();
+            foreach ( $header as $i => $key ) {
+                $row[ $key ] = isset( $data[ $i ] ) ? $data[ $i ] : '';
+            }
+
+            $callback( $row, $count );
+            $count++;
+        }
+
+        fclose( $handle );
+        return $count;
+    }
+
+    /**
      * Essaie de récupérer le code produit à partir d’une ligne CSV
      * (ProductCode, ProductId, etc.)
      */
@@ -807,53 +910,52 @@ class BihrWI_Product_Sync {
     protected function parse_references_csv( $file_path ) {
         $this->logger->log( 'Parsing References CSV : ' . $file_path );
 
-        $rows   = $this->read_csv_assoc( $file_path );
         $result = array();
+        $first_logged = false;
 
-        // Log des en-têtes pour debug
-        if ( ! empty( $rows ) ) {
-            $first_row_keys = array_keys( $rows[0] );
-            $this->logger->log( 'En-têtes CSV References : ' . implode( ', ', $first_row_keys ) );
-            
-            // Log de la première ligne de données pour voir les valeurs
-            $first_code = $this->get_product_code_from_row( $rows[0] );
-            $first_long1 = isset( $rows[0]['longdescription1'] ) ? $rows[0]['longdescription1'] : 'N/A';
-            $first_short = isset( $rows[0]['shortdescription'] ) ? $rows[0]['shortdescription'] : 'N/A';
-            $this->logger->log( "Première ligne - Code: {$first_code}, LongDescription1: {$first_long1}, ShortDescription: {$first_short}" );
-        }
+        $count = $this->iterate_csv_rows(
+            $file_path,
+            function( $row ) use ( &$result, &$first_logged ) {
+                $code = $this->get_product_code_from_row( $row );
+                if ( $code === '' ) {
+                    return;
+                }
 
-        foreach ( $rows as $row ) {
-            $code = $this->get_product_code_from_row( $row );
-            if ( $code === '' ) {
-                continue;
+                if ( ! $first_logged ) {
+                    $first_logged = true;
+                    $this->logger->log( 'En-têtes CSV References : ' . implode( ', ', array_keys( $row ) ) );
+                    $first_long1 = isset( $row['longdescription1'] ) ? $row['longdescription1'] : 'N/A';
+                    $first_short = isset( $row['shortdescription'] ) ? $row['shortdescription'] : 'N/A';
+                    $this->logger->log( "Première ligne - Code: {$code}, LongDescription1: {$first_long1}, ShortDescription: {$first_short}" );
+                }
+
+                $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
+                $name            = '';
+
+                // Utiliser LongDescription1 pour le nom du produit
+                if ( ! empty( $row['longdescription1'] ) ) {
+                    $name = trim( $row['longdescription1'] );
+                } elseif ( ! empty( $row['shortdescription'] ) ) {
+                    $name = trim( $row['shortdescription'] );
+                } elseif ( ! empty( $row['furtherdescription'] ) ) {
+                    $name = trim( $row['furtherdescription'] );
+                }
+
+                $description = '';
+                if ( ! empty( $row['furtherdescription'] ) ) {
+                    $description = trim( $row['furtherdescription'] );
+                }
+
+                $result[ $code ] = array(
+                    'product_code'    => $code,
+                    'new_part_number' => $new_part_number ?: null,
+                    'name'            => $name ?: null,
+                    'description'     => $description ?: null,
+                );
             }
+        );
 
-            $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
-            $name            = '';
-
-            // Utiliser LongDescription1 pour le nom du produit
-            if ( ! empty( $row['longdescription1'] ) ) {
-                $name = trim( $row['longdescription1'] );
-            } elseif ( ! empty( $row['shortdescription'] ) ) {
-                $name = trim( $row['shortdescription'] );
-            } elseif ( ! empty( $row['furtherdescription'] ) ) {
-                $name = trim( $row['furtherdescription'] );
-            }
-
-            $description = '';
-            if ( ! empty( $row['furtherdescription'] ) ) {
-                $description = trim( $row['furtherdescription'] );
-            }
-
-            $result[ $code ] = array(
-                'product_code'    => $code,
-                'new_part_number' => $new_part_number ?: null,
-                'name'            => $name ?: null,
-                'description'     => $description ?: null,
-            );
-        }
-
-        $this->logger->log( 'Parsing References: ' . count( $result ) . ' lignes.' );
+        $this->logger->log( 'Parsing References: ' . $count . ' lignes.' );
 
         return $result;
     }
@@ -900,66 +1002,63 @@ class BihrWI_Product_Sync {
     protected function parse_extendedreferences_csv( $file_path ) {
         $this->logger->log( 'Parsing ExtendedReferences CSV : ' . $file_path );
 
-        $rows   = $this->read_csv_assoc( $file_path );
         $result = array();
+        $first_logged = false;
+        $category = $this->extract_category_from_filename( $file_path );
 
-        // Log des en-têtes pour debug
-        if ( ! empty( $rows ) ) {
-            $first_row_keys = array_keys( $rows[0] );
-            $this->logger->log( 'En-têtes CSV ExtendedReferences : ' . implode( ', ', $first_row_keys ) );
-            
-            // Log de la première ligne
-            $first_code = $this->get_product_code_from_row( $rows[0] );
-            $first_long1 = isset( $rows[0]['longdescription1'] ) ? substr( $rows[0]['longdescription1'], 0, 50 ) : 'N/A';
-            $first_long = isset( $rows[0]['longdescription'] ) ? substr( $rows[0]['longdescription'], 0, 50 ) : 'N/A';
-            $this->logger->log( "Première ligne ExtendedRef - Code: {$first_code}, LongDescription1: {$first_long1}, LongDescription: {$first_long}" );
-        }
+        $count = $this->iterate_csv_rows(
+            $file_path,
+            function( $row ) use ( &$result, &$first_logged, $category ) {
+                $code = $this->get_product_code_from_row( $row );
+                if ( $code === '' ) {
+                    return;
+                }
 
-        foreach ( $rows as $row ) {
-            $code = $this->get_product_code_from_row( $row );
-            if ( $code === '' ) {
-                continue;
+                if ( ! $first_logged ) {
+                    $first_logged = true;
+                    $this->logger->log( 'En-têtes CSV ExtendedReferences : ' . implode( ', ', array_keys( $row ) ) );
+                    $first_long1 = isset( $row['longdescription1'] ) ? substr( $row['longdescription1'], 0, 50 ) : 'N/A';
+                    $first_long  = isset( $row['longdescription'] ) ? substr( $row['longdescription'], 0, 50 ) : 'N/A';
+                    $this->logger->log( "Première ligne ExtendedRef - Code: {$code}, LongDescription1: {$first_long1}, LongDescription: {$first_long}" );
+                }
+
+                // Tentative de récupération de la description la plus complète
+                $description = '';
+                
+                // Priorité : LongDescription > TechnicalDescription > Description
+                if ( ! empty( $row['longdescription'] ) ) {
+                    $description = trim( $row['longdescription'] );
+                } elseif ( ! empty( $row['technicaldescription'] ) ) {
+                    $description = trim( $row['technicaldescription'] );
+                } elseif ( ! empty( $row['description'] ) ) {
+                    $description = trim( $row['description'] );
+                }
+
+                // Nom : utiliser LongDescription1 en priorité (pour le nom du produit WooCommerce)
+                $name = '';
+                if ( ! empty( $row['longdescription1'] ) ) {
+                    $name = trim( $row['longdescription1'] );
+                } elseif ( ! empty( $row['furtherdescription'] ) ) {
+                    $name = trim( $row['furtherdescription'] );
+                } elseif ( ! empty( $row['shortdescription'] ) ) {
+                    $name = trim( $row['shortdescription'] );
+                } elseif ( ! empty( $row['name'] ) ) {
+                    $name = trim( $row['name'] );
+                }
+
+                $result[ $code ] = array(
+                    'description' => $description ?: null,
+                    'category'    => $category,
+                );
+
+                // On écrase toujours le nom avec celui d'ExtendedReferences (priorité absolue)
+                if ( $name ) {
+                    $result[ $code ]['name'] = $name;
+                }
             }
+        );
 
-            // Tentative de récupération de la description la plus complète
-            $description = '';
-            
-            // Priorité : LongDescription > TechnicalDescription > Description
-            if ( ! empty( $row['longdescription'] ) ) {
-                $description = trim( $row['longdescription'] );
-            } elseif ( ! empty( $row['technicaldescription'] ) ) {
-                $description = trim( $row['technicaldescription'] );
-            } elseif ( ! empty( $row['description'] ) ) {
-                $description = trim( $row['description'] );
-            }
-
-            // Nom : utiliser LongDescription1 en priorité (pour le nom du produit WooCommerce)
-            $name = '';
-            if ( ! empty( $row['longdescription1'] ) ) {
-                $name = trim( $row['longdescription1'] );
-            } elseif ( ! empty( $row['furtherdescription'] ) ) {
-                $name = trim( $row['furtherdescription'] );
-            } elseif ( ! empty( $row['shortdescription'] ) ) {
-                $name = trim( $row['shortdescription'] );
-            } elseif ( ! empty( $row['name'] ) ) {
-                $name = trim( $row['name'] );
-            }
-
-            // Extraction de la catégorie depuis le nom du fichier
-            $category = $this->extract_category_from_filename( $file_path );
-
-            $result[ $code ] = array(
-                'description' => $description ?: null,
-                'category'    => $category,
-            );
-
-            // On écrase toujours le nom avec celui d'ExtendedReferences (priorité absolue)
-            if ( $name ) {
-                $result[ $code ]['name'] = $name;
-            }
-        }
-
-        $this->logger->log( 'Parsing ExtendedReferences: ' . count( $result ) . ' lignes.' );
+        $this->logger->log( 'Parsing ExtendedReferences: ' . $count . ' lignes.' );
 
         return $result;
     }
@@ -971,33 +1070,35 @@ class BihrWI_Product_Sync {
     protected function parse_prices_csv( $file_path ) {
         $this->logger->log( 'Parsing Prices CSV : ' . $file_path );
 
-        $rows   = $this->read_csv_assoc( $file_path );
         $result = array();
 
-        foreach ( $rows as $row ) {
-            $code = $this->get_product_code_from_row( $row );
-            if ( $code === '' ) {
-                continue;
+        $count = $this->iterate_csv_rows(
+            $file_path,
+            function( $row ) use ( &$result ) {
+                $code = $this->get_product_code_from_row( $row );
+                if ( $code === '' ) {
+                    return;
+                }
+
+                // Colonne DealerPrice, parfois DealerPriceHT, etc.
+                $price = null;
+                if ( isset( $row['dealerprice'] ) && $row['dealerprice'] !== '' ) {
+                    $price = (float) str_replace( ',', '.', $row['dealerprice'] );
+                } elseif ( isset( $row['dealerpriceht'] ) && $row['dealerpriceht'] !== '' ) {
+                    $price = (float) str_replace( ',', '.', $row['dealerpriceht'] );
+                }
+
+                if ( $price === null ) {
+                    return;
+                }
+
+                $result[ $code ] = array(
+                    'dealer_price_ht' => $price,
+                );
             }
+        );
 
-            // Colonne DealerPrice, parfois DealerPriceHT, etc.
-            $price = null;
-            if ( isset( $row['dealerprice'] ) && $row['dealerprice'] !== '' ) {
-                $price = (float) str_replace( ',', '.', $row['dealerprice'] );
-            } elseif ( isset( $row['dealerpriceht'] ) && $row['dealerpriceht'] !== '' ) {
-                $price = (float) str_replace( ',', '.', $row['dealerpriceht'] );
-            }
-
-            if ( $price === null ) {
-                continue;
-            }
-
-            $result[ $code ] = array(
-                'dealer_price_ht' => $price,
-            );
-        }
-
-        $this->logger->log( 'Parsing Prices: ' . count( $result ) . ' lignes.' );
+        $this->logger->log( 'Parsing Prices: ' . $count . ' lignes.' );
 
         return $result;
     }
@@ -1011,42 +1112,44 @@ class BihrWI_Product_Sync {
     protected function parse_images_csv( $file_path ) {
         $this->logger->log( 'Parsing Images CSV : ' . $file_path );
 
-        $rows   = $this->read_csv_assoc( $file_path );
         $result = array();
 
-        foreach ( $rows as $row ) {
-            $code = $this->get_product_code_from_row( $row );
-            if ( $code === '' ) {
-                continue;
+        $count = $this->iterate_csv_rows(
+            $file_path,
+            function( $row ) use ( &$result ) {
+                $code = $this->get_product_code_from_row( $row );
+                if ( $code === '' ) {
+                    return;
+                }
+
+                // Colonne URL du CSV (en minuscules -> 'url')
+                $url_path = isset( $row['url'] ) ? trim( $row['url'] ) : '';
+                if ( $url_path === '' ) {
+                    return;
+                }
+
+                // Colonne IsDefault (facultative) :
+                // On ne filtre pas sur ce champ pour l'instant,
+                // on prendra simplement la première image trouvée pour chaque produit.
+
+                // Si une image existe déjà pour ce code, on ne la remplace pas
+                if ( isset( $result[ $code ] ) ) {
+                    return;
+                }
+
+                $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
+
+                $result[ $code ] = array(
+                    'image_url' => $url_path, // chemin brut, sans préfixe
+                );
+
+                if ( $new_part_number !== '' ) {
+                    $result[ $code ]['new_part_number'] = $new_part_number;
+                }
             }
+        );
 
-            // Colonne URL du CSV (en minuscules -> 'url')
-            $url_path = isset( $row['url'] ) ? trim( $row['url'] ) : '';
-            if ( $url_path === '' ) {
-                continue;
-            }
-
-            // Colonne IsDefault (facultative) :
-            // On ne filtre pas sur ce champ pour l'instant,
-            // on prendra simplement la première image trouvée pour chaque produit.
-
-            // Si une image existe déjà pour ce code, on ne la remplace pas
-            if ( isset( $result[ $code ] ) ) {
-                continue;
-            }
-
-            $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
-
-            $result[ $code ] = array(
-                'image_url' => $url_path, // chemin brut, sans préfixe
-            );
-
-            if ( $new_part_number !== '' ) {
-                $result[ $code ]['new_part_number'] = $new_part_number;
-            }
-        }
-
-        $this->logger->log( 'Parsing Images: ' . count( $result ) . ' lignes.' );
+        $this->logger->log( 'Parsing Images: ' . $count . ' lignes.' );
 
         return $result;
     }
@@ -1058,42 +1161,41 @@ class BihrWI_Product_Sync {
     protected function parse_inventory_csv( $file_path ) {
         $this->logger->log( 'Parsing Inventory CSV : ' . $file_path );
 
-        $rows   = $this->read_csv_assoc( $file_path );
         $result = array();
+        $first_logged = false;
 
-        // Log des en-têtes pour debug
-        if ( ! empty( $rows ) ) {
-            $first_row_keys = array_keys( $rows[0] );
-            $this->logger->log( 'En-têtes CSV Inventory : ' . implode( ', ', $first_row_keys ) );
-            
-            // Log de la première ligne
-            $first_code = $this->get_product_code_from_row( $rows[0] );
-            $first_stock = isset( $rows[0]['stocklevel'] ) ? $rows[0]['stocklevel'] : 'N/A';
-            $this->logger->log( "Première ligne Inventory - Code: {$first_code}, StockLevel: {$first_stock}" );
-        }
+        $count = $this->iterate_csv_rows(
+            $file_path,
+            function( $row ) use ( &$result, &$first_logged ) {
+                $code = $this->get_product_code_from_row( $row );
+                if ( $code === '' ) {
+                    return;
+                }
 
-        foreach ( $rows as $row ) {
-            $code = $this->get_product_code_from_row( $row );
-            if ( $code === '' ) {
-                continue;
+                if ( ! $first_logged ) {
+                    $first_logged = true;
+                    $this->logger->log( 'En-têtes CSV Inventory : ' . implode( ', ', array_keys( $row ) ) );
+                    $first_stock = isset( $row['stocklevel'] ) ? $row['stocklevel'] : 'N/A';
+                    $this->logger->log( "Première ligne Inventory - Code: {$code}, StockLevel: {$first_stock}" );
+                }
+
+                $stock_level       = isset( $row['stocklevel'] ) ? (int) $row['stocklevel'] : null;
+                $stock_description = isset( $row['stockleveldescription'] ) ? trim( $row['stockleveldescription'] ) : '';
+
+                $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
+
+                $result[ $code ] = array(
+                    'stock_level'       => $stock_level,
+                    'stock_description' => $stock_description ?: null,
+                );
+
+                if ( $new_part_number !== '' ) {
+                    $result[ $code ]['new_part_number'] = $new_part_number;
+                }
             }
+        );
 
-            $stock_level       = isset( $row['stocklevel'] ) ? (int) $row['stocklevel'] : null;
-            $stock_description = isset( $row['stockleveldescription'] ) ? trim( $row['stockleveldescription'] ) : '';
-
-            $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
-
-            $result[ $code ] = array(
-                'stock_level'       => $stock_level,
-                'stock_description' => $stock_description ?: null,
-            );
-
-            if ( $new_part_number !== '' ) {
-                $result[ $code ]['new_part_number'] = $new_part_number;
-            }
-        }
-
-        $this->logger->log( 'Parsing Inventory: ' . count( $result ) . ' lignes.' );
+        $this->logger->log( 'Parsing Inventory: ' . $count . ' lignes.' );
 
         return $result;
     }
@@ -1105,39 +1207,41 @@ class BihrWI_Product_Sync {
     protected function parse_attributes_csv( $file_path ) {
         $this->logger->log( 'Parsing Attributes CSV : ' . $file_path );
 
-        $rows   = $this->read_csv_assoc( $file_path );
         $result = array();
 
-        foreach ( $rows as $row ) {
-            $code = $this->get_product_code_from_row( $row );
-            if ( $code === '' ) {
-                continue;
-            }
-
-            // On concatène grossièrement tous les champs (sauf le code) en texte
-            $parts = array();
-            foreach ( $row as $key => $value ) {
-                if ( in_array( $key, array( 'productcode', 'productid', 'code' ), true ) ) {
-                    continue;
+        $count = $this->iterate_csv_rows(
+            $file_path,
+            function( $row ) use ( &$result ) {
+                $code = $this->get_product_code_from_row( $row );
+                if ( $code === '' ) {
+                    return;
                 }
-                if ( $value === '' ) {
-                    continue;
+
+                // On concatène grossièrement tous les champs (sauf le code) en texte
+                $parts = array();
+                foreach ( $row as $key => $value ) {
+                    if ( in_array( $key, array( 'productcode', 'productid', 'code' ), true ) ) {
+                        continue;
+                    }
+                    if ( $value === '' ) {
+                        continue;
+                    }
+                    $parts[] = $key . '=' . $value;
                 }
-                $parts[] = $key . '=' . $value;
+
+                if ( empty( $parts ) ) {
+                    return;
+                }
+
+                $attr_text = 'Attributs Bihr : ' . implode( ' | ', $parts );
+
+                $result[ $code ] = array(
+                    'attributes_text' => $attr_text,
+                );
             }
+        );
 
-            if ( empty( $parts ) ) {
-                continue;
-            }
-
-            $attr_text = 'Attributs Bihr : ' . implode( ' | ', $parts );
-
-            $result[ $code ] = array(
-                'attributes_text' => $attr_text,
-            );
-        }
-
-        $this->logger->log( 'Parsing Attributes: ' . count( $result ) . ' lignes.' );
+        $this->logger->log( 'Parsing Attributes: ' . $count . ' lignes.' );
 
         return $result;
     }
