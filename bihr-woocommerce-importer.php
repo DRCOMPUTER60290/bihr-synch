@@ -179,11 +179,25 @@ function bihrwi_check_prices_catalog() {
                 $logger->log( 'CRON: Fichier Prices téléchargé : ' . $file_path );
                 
                 // Extraire le ZIP dans le dossier d'import
-                $product_sync = new BihrWI_Product_Sync( $logger );
+                $product_sync    = new BihrWI_Product_Sync( $logger );
                 $extracted_count = $product_sync->extract_zip_to_import_dir( $file_path );
                 
                 if ( $extracted_count > 0 ) {
                     $logger->log( "CRON: Prices extrait avec succès - {$extracted_count} fichier(s) CSV." );
+
+                    // Fusion automatique des catalogues après extraction
+                    try {
+                        $logger->log( 'CRON: Démarrage de la fusion automatique des catalogues…' );
+                        $total_products = $product_sync->merge_catalogs_from_directory();
+
+                        if ( $total_products > 0 ) {
+                            $logger->log( "CRON: Fusion automatique réussie — {$total_products} produits consolidés." );
+                        } else {
+                            $logger->log( 'CRON: Fusion automatique — aucun produit consolidé (peut-être fichiers manquants).' );
+                        }
+                    } catch ( Exception $merge_e ) {
+                        $logger->log( 'CRON: Exception lors de la fusion automatique: ' . $merge_e->getMessage() );
+                    }
                 } else {
                     $logger->log( 'CRON: Échec de l\'extraction du ZIP Prices.' );
                 }
