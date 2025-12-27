@@ -203,7 +203,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                 <div class="action-icon">🚗</div>
                 <h3><?php esc_html_e( 'Compatibilités Véhicules', 'bihr-woocommerce-importer' ); ?></h3>
                 <p><?php esc_html_e( 'Gérer les filtres par véhicule', 'bihr-woocommerce-importer' ); ?></p>
-                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-vehicle-compatibility', admin_url( 'admin.php' ) ) ); ?>" class="button">
+                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-compatibility', admin_url( 'admin.php' ) ) ); ?>" class="button">
                     <?php esc_html_e( 'Gérer', 'bihr-woocommerce-importer' ); ?>
                 </a>
             </div>
