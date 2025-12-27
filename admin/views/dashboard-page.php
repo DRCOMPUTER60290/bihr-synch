@@ -357,6 +357,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
     border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
+    flex-wrap: wrap; /* évite la troncature en petits espaces */
 }
 
 .status-card:hover {
@@ -426,6 +427,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
     color: white;
     border-color: #10b981;
     cursor: default;
+    padding: 6px 10px; /* version compacte */
+    font-size: 12px;
 }
 
 .status-action.button-success:hover,
@@ -437,7 +440,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    overflow: visible;
 }
 
 .status-action-link {
