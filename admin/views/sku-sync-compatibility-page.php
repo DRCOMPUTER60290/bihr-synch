@@ -20,7 +20,7 @@ $nonce = wp_create_nonce( $nonce_action );
 // Priorité : NewPartNumber (meta) -> SKU actuel -> Code BIHR
 $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)';
 
-$base_url = admin_url( 'admin.php?page=bihrwi_sku_sync_compat' );
+$base_url = admin_url( 'admin.php?page=bihr-sku-sync-compat' );
 $sync_url = add_query_arg(
     array(
         'action'   => 'sync',
