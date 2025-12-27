@@ -54,6 +54,15 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
         </div>
         <div class="welcome-icon">🔌</div>
     </div>
+    <?php else : ?>
+    <div class="bihr-connected-banner">
+        <div class="welcome-content">
+            <h2>✅ Connecté à BIHR</h2>
+            <p>Vous êtes authentifié. Vous pouvez importer et synchroniser.</p>
+            <a class="button button-success button-large" aria-disabled="true">✅ Connecté</a>
+        </div>
+        <div class="welcome-icon">🔗</div>
+    </div>
     <?php endif; ?>
 
     <!-- Statut du plugin -->
@@ -75,8 +84,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
             </div>
             <?php if ( $is_authenticated ) : ?>
             <div class="status-actions">
-                <span class="status-chip status-connected">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></span>
-                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action-link">
+                <a class="status-action button-success" aria-disabled="true">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></a>
+                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action">
                     <?php esc_html_e( 'Modifier', 'bihr-woocommerce-importer' ); ?>
                 </a>
             </div>
@@ -134,7 +143,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                         🔐 <?php esc_html_e( 'Se connecter', 'bihr-woocommerce-importer' ); ?>
                     </a>
                     <?php else : ?>
-                    <span class="step-badge">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></span>
+                    <a class="button button-success" aria-disabled="true">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -307,6 +316,17 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
     margin-bottom: 30px;
 }
 
+.bihr-connected-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: white;
+    padding: 40px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+}
+
 .welcome-content h2 {
     color: white;
     margin-top: 0;
@@ -395,6 +415,19 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 
 .status-action.button-primary:hover {
     background: #1e40af;
+}
+
+.status-action.button-success,
+.button-success {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+    cursor: default;
+}
+
+.status-action.button-success:hover,
+.button-success:hover {
+    background: #059669;
 }
 
 .beginner-steps {
