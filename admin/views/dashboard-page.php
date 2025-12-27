@@ -134,7 +134,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                         🔐 <?php esc_html_e( 'Se connecter', 'bihr-woocommerce-importer' ); ?>
                     </a>
                     <?php else : ?>
-                    <span class="step-badge">✅ <?php esc_html_e( 'Fait', 'bihr-woocommerce-importer' ); ?></span>
+                    <span class="step-badge">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></span>
                     <?php endif; ?>
                 </div>
             </div>
