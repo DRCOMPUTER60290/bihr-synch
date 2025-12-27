@@ -88,7 +88,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
             <?php if ( $is_authenticated ) : ?>
             <div class="status-actions">
                 <a class="status-action button-success" aria-disabled="true">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></a>
-                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action">
+                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action-link">
                     <?php esc_html_e( 'Modifier', 'bihr-woocommerce-importer' ); ?>
                 </a>
             </div>
@@ -431,6 +431,24 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 .status-action.button-success:hover,
 .button-success:hover {
     background: #059669;
+}
+
+.status-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-action-link {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 0;
+}
+
+.status-action-link:hover {
+    text-decoration: underline;
 }
 
 .beginner-steps {
