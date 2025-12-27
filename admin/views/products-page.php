@@ -42,6 +42,8 @@ if ( ! isset( $sort_by ) ) {
 $status_data = get_option( 'bihrwi_prices_generation', array() );
 $prices_schedule = get_option( 'bihrwi_prices_schedule', array( 'enabled' => false, 'weekday' => 'monday', 'interval' => 'weekly', 'time' => '02:00' ) );
 $next_prices_cron = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
+$wp_cron_disabled = ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON );
+$prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 ?>
 
 <div class="wrap">
@@ -353,10 +355,23 @@ $next_prices_cron = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
             <strong>Prochaine exécution planifiée :</strong>
             <?php if ( $next_prices_cron ) : ?>
                 <?php echo esc_html( date_i18n( 'l d/m/Y H:i', $next_prices_cron ) ); ?>
+                <?php if ( time() >= $next_prices_cron ) : ?>
+                    <span style="color:#b45309;">(échéance dépassée — en attente de déclenchement)</span>
+                <?php endif; ?>
             <?php else : ?>
                 <em>Aucune planification active.</em>
             <?php endif; ?>
         </p>
+
+        <div class="notice <?php echo $wp_cron_disabled ? 'notice-warning' : 'notice-success'; ?>" style="padding:8px;">
+            <p style="margin:0;">
+                <strong>WP‑Cron :</strong>
+                <?php echo $wp_cron_disabled ? 'désactivé (DISABLE_WP_CRON) — utilisez un cron serveur' : 'actif'; ?>
+                <?php if ( ! empty( $prices_last_run ) ) : ?>
+                    — Dernière exécution Prices : <em><?php echo esc_html( $prices_last_run ); ?></em>
+                <?php endif; ?>
+            </p>
+        </div>
     </div>
 
     <p>

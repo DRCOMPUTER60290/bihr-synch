@@ -1955,6 +1955,7 @@ class BihrWI_Admin {
         }
 
         try {
+            update_option( 'bihrwi_prices_last_run', current_time( 'mysql' ) );
             $ticket_id = $this->api_client->start_catalog_generation( 'Prices' );
             update_option(
                 'bihrwi_prices_generation',
