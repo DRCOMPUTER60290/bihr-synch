@@ -19,6 +19,7 @@ $nonce = wp_create_nonce( $nonce_action );
 // Expression SQL de la clé de correspondance vers la compatibilité
 // Priorité : NewPartNumber (meta) -> SKU actuel -> Code BIHR
 $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)';
+$match_key_expr     = $compat_lookup_expr; // clé de correspondance utilisée pour la recherche
 
 $base_url = admin_url( 'admin.php?page=bihr-sku-sync-compat' );
 $sync_url = add_query_arg(
@@ -94,6 +95,7 @@ $sync_url = add_query_arg(
                         pm_new.meta_value as new_part_number,
                         pm_sku.meta_value as current_sku,
                         vc.part_number,
+                        {$match_key_expr} AS match_key,
                         p.post_title as name
                     FROM {$wpdb->postmeta} pm_code
                     INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
@@ -123,6 +125,9 @@ $sync_url = add_query_arg(
                 $wc_product_id   = (int) $product['wc_product_id'];
                 $product_code    = (string) $product['product_code'];
                 $part_number     = (string) $product['part_number'];
+                if ( $part_number === '' && ! empty( $product['match_key'] ) ) {
+                    $part_number = (string) $product['match_key'];
+                }
                 $new_part_number = isset( $product['new_part_number'] ) ? (string) $product['new_part_number'] : '';
                 $sku             = $part_number;
 
@@ -273,7 +278,8 @@ $sync_url = add_query_arg(
                 pm_code.meta_value as product_code,
                 pm_new.meta_value as new_part_number,
                 pm_sku.meta_value as current_sku,
-                vc.part_number
+                vc.part_number,
+                {$match_key_expr} AS match_key
             FROM {$wpdb->postmeta} pm_code
             INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
             LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
@@ -295,6 +301,9 @@ $sync_url = add_query_arg(
         foreach ( $samples as $row ) {
             $current_sku = isset( $row['current_sku'] ) ? (string) $row['current_sku'] : '';
             $part_number = isset( $row['part_number'] ) ? (string) $row['part_number'] : '';
+            if ( $part_number === '' && ! empty( $row['match_key'] ) ) {
+                $part_number = (string) $row['match_key'];
+            }
 
             if ( $part_number === '' ) {
                 $status = '<span style="color:#d63638;">❌ ' . esc_html__( 'Pas de part_number', 'bihr-woocommerce-importer' ) . '</span>';
