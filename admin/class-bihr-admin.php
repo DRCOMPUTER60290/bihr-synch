@@ -30,6 +30,7 @@ class BihrWI_Admin {
         add_action( 'admin_post_bihrwi_import_compatibility', array( $this, 'handle_import_compatibility' ) );
         add_action( 'admin_post_bihrwi_import_all_compatibility', array( $this, 'handle_import_all_compatibility' ) );
         add_action( 'admin_post_bihrwi_save_prices_schedule', array( $this, 'handle_save_prices_schedule' ) );
+        add_action( 'admin_post_bihrwi_run_prices_cron_now', array( $this, 'handle_run_prices_cron_now' ) );
 
         // Handlers AJAX
         add_action( 'wp_ajax_bihrwi_download_all_catalogs_ajax', array( $this, 'ajax_download_all_catalogs' ) );
@@ -461,6 +462,21 @@ class BihrWI_Admin {
 
     public function render_logs_page() {
         $log_contents = $this->logger->get_log_contents();
+
+        // Si une tâche WP-Cron Prices est due, tenter de la déclencher immédiatement
+        $due = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
+        if ( $due && time() >= $due ) {
+            $this->logger->log( 'Logs: tâche WP-Cron Prices due — tentative de déclenchement.' );
+            if ( ! defined( 'DISABLE_WP_CRON' ) || ! DISABLE_WP_CRON ) {
+                if ( function_exists( 'spawn_cron' ) ) {
+                    spawn_cron();
+                } else {
+                    wp_remote_post( site_url( 'wp-cron.php' ), array( 'timeout' => 3 ) );
+                }
+            } else {
+                $this->logger->log( 'Logs: WP-Cron désactivé (DISABLE_WP_CRON). Utilisez un cron serveur.' );
+            }
+        }
         include BIHRWI_PLUGIN_DIR . 'admin/views/logs-page.php';
     }
 
@@ -745,6 +761,24 @@ class BihrWI_Admin {
         }
 
         $redirect_url = add_query_arg( array( 'bihrwi_prices_schedule_saved' => 1 ), $redirect_url );
+        wp_safe_redirect( $redirect_url );
+        exit;
+    }
+
+    /**
+     * Handler POST: Exécuter immédiatement la tâche de génération Prices (hors planning)
+     */
+    public function handle_run_prices_cron_now() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( 'Permission denied.' );
+        }
+
+        check_admin_referer( 'bihrwi_run_prices_cron_now_action', 'bihrwi_run_prices_cron_now_nonce' );
+
+        // Lancer la génération via le même flux que le cron planifié
+        $this->run_auto_prices_generation();
+
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-products', 'bihrwi_prices_started' => 1 ), admin_url( 'admin.php' ) );
         wp_safe_redirect( $redirect_url );
         exit;
     }

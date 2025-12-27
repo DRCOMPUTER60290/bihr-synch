@@ -281,6 +281,13 @@ $next_prices_cron = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
         <?php submit_button( 'Lancer la génération du catalog Prices', 'secondary' ); ?>
     </form>
 
+    <!-- Bouton pour exécuter immédiatement la tâche cron Prices -->
+    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:10px;">
+        <?php wp_nonce_field( 'bihrwi_run_prices_cron_now_action', 'bihrwi_run_prices_cron_now_nonce' ); ?>
+        <input type="hidden" name="action" value="bihrwi_run_prices_cron_now" />
+        <?php submit_button( '⚙️ Exécuter la tâche planifiée Prices maintenant', 'secondary' ); ?>
+    </form>
+
     <!-- Bouton pour vérifier immédiatement -->
     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:10px;">
         <?php wp_nonce_field( 'bihrwi_check_prices_now_action', 'bihrwi_check_prices_now_nonce' ); ?>
