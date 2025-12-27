@@ -10,8 +10,11 @@ if ( $is_beginner_mode === '' ) {
     $is_beginner_mode = true; // Défaut: mode débutant
 }
 
-// Récupérer les infos d'authentification
-$auth_token = get_option( 'bihrwi_api_token' );
+// Récupérer les infos d'authentification (transient puis fallback option)
+$auth_token = get_transient( 'bihrwi_api_token' );
+if ( false === $auth_token || empty( $auth_token ) ) {
+    $auth_token = get_option( 'bihrwi_api_token' );
+}
 $is_authenticated = ! empty( $auth_token );
 $show_auth_success = isset( $_GET['bihrwi_auth_success'] );
 
