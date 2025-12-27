@@ -124,7 +124,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                     <?php esc_html_e( 'commandes actives', 'bihr-woocommerce-importer' ); ?>
                 </p>
             </div>
-            <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders-settings', admin_url( 'admin.php' ) ) ); ?>" class="status-action">
+            <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders', admin_url( 'admin.php' ) ) ); ?>" class="status-action">
                 <?php esc_html_e( 'Voir', 'bihr-woocommerce-importer' ); ?>
             </a>
         </div>
@@ -169,7 +169,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                 <div class="step-content">
                     <h3><?php esc_html_e( 'Configurer les synchronisations', 'bihr-woocommerce-importer' ); ?></h3>
                     <p><?php esc_html_e( 'Activez la synchronisation automatique des stocks et commandes.', 'bihr-woocommerce-importer' ); ?></p>
-                    <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders-settings', admin_url( 'admin.php' ) ) ); ?>" class="button button-secondary">
+                    <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders', admin_url( 'admin.php' ) ) ); ?>" class="button button-secondary">
                         ⚙️ <?php esc_html_e( 'Configurer', 'bihr-woocommerce-importer' ); ?>
                     </a>
                 </div>
@@ -212,7 +212,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                 <div class="action-icon">🛒</div>
                 <h3><?php esc_html_e( 'Synchroniser Commandes', 'bihr-woocommerce-importer' ); ?></h3>
                 <p><?php esc_html_e( 'Configurer la synchro BIHR', 'bihr-woocommerce-importer' ); ?></p>
-                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders-settings', admin_url( 'admin.php' ) ) ); ?>" class="button">
+                <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders', admin_url( 'admin.php' ) ) ); ?>" class="button">
                     <?php esc_html_e( 'Configurer', 'bihr-woocommerce-importer' ); ?>
                 </a>
             </div>
