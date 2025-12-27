@@ -29,6 +29,7 @@ class BihrWI_Admin {
         add_action( 'admin_post_bihrwi_import_vehicles', array( $this, 'handle_import_vehicles' ) );
         add_action( 'admin_post_bihrwi_import_compatibility', array( $this, 'handle_import_compatibility' ) );
         add_action( 'admin_post_bihrwi_import_all_compatibility', array( $this, 'handle_import_all_compatibility' ) );
+        add_action( 'admin_post_bihrwi_save_prices_schedule', array( $this, 'handle_save_prices_schedule' ) );
 
         // Handlers AJAX
         add_action( 'wp_ajax_bihrwi_download_all_catalogs_ajax', array( $this, 'ajax_download_all_catalogs' ) );
@@ -52,9 +53,11 @@ class BihrWI_Admin {
         
         // WP-Cron hooks pour synchronisation automatique
         add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
+        add_action( 'bihrwi_auto_prices_generation', array( $this, 'run_auto_prices_generation' ) );
         
         // Initialiser le WP-Cron si activé
         add_action( 'init', array( $this, 'setup_stock_sync_cron' ) );
+        add_action( 'init', array( $this, 'setup_prices_schedule_cron' ) );
 
     }
 	
@@ -699,6 +702,53 @@ class BihrWI_Admin {
         exit;
     }
 
+    /**
+     * Handler POST: sauvegarde du planning de génération du catalog Prices
+     */
+    public function handle_save_prices_schedule() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( 'Permission denied.' );
+        }
+
+        check_admin_referer( 'bihrwi_prices_schedule_action', 'bihrwi_prices_schedule_nonce' );
+
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-products' ), admin_url( 'admin.php' ) );
+
+        $enabled  = isset( $_POST['prices_schedule_enabled'] );
+        $weekday  = sanitize_text_field( $_POST['prices_schedule_weekday'] ?? 'monday' );
+        $interval = sanitize_text_field( $_POST['prices_schedule_interval'] ?? 'weekly' ); // weekly | biweekly
+        $time     = sanitize_text_field( $_POST['prices_schedule_time'] ?? '02:00' );
+
+        $settings = array(
+            'enabled'  => $enabled,
+            'weekday'  => $weekday,
+            'interval' => $interval,
+            'time'     => $time,
+        );
+
+        update_option( 'bihrwi_prices_schedule', $settings );
+
+        // Déplanifie l'ancien cron
+        $timestamp = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
+        if ( $timestamp ) {
+            wp_unschedule_event( $timestamp, 'bihrwi_auto_prices_generation' );
+        }
+
+        // Replanifie si activé
+        if ( $enabled ) {
+            $next_run = $this->calculate_next_prices_time( $weekday, $time, $interval );
+            $recurrence = $interval === 'biweekly' ? 'biweekly' : 'weekly';
+            wp_schedule_event( $next_run, $recurrence, 'bihrwi_auto_prices_generation' );
+            $this->logger->log( 'Planning Prices sauvegardé. Prochaine exécution: ' . date( 'Y-m-d H:i:s', $next_run ) );
+        } else {
+            $this->logger->log( 'Planning Prices désactivé.' );
+        }
+
+        $redirect_url = add_query_arg( array( 'bihrwi_prices_schedule_saved' => 1 ), $redirect_url );
+        wp_safe_redirect( $redirect_url );
+        exit;
+    }
+
     public function handle_import_product() {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_die( 'Permission denied.' );
@@ -843,7 +893,7 @@ class BihrWI_Admin {
                 'Attributes'         => 'Attributes',
                 'Images'             => 'Images',
                 'Stocks'             => 'Stocks',
-            );			$downloaded_files = array();
+            );		$downloaded_files = array();
 
 			foreach ( $catalogs as $name => $path ) {
 				$this->logger->log( "Téléchargement du catalogue: {$name}" );
@@ -908,26 +958,6 @@ class BihrWI_Admin {
 			$catalogs_downloaded = count( $downloaded_files );
             $this->logger->log( "Téléchargement terminé: {$catalogs_downloaded} catalogues, {$total_extracted} fichiers CSV extraits" );
 
-            // Optionnel: démarrer aussi la génération du catalog Prices si l'utilisateur l'a demandé
-            $prices_started = false;
-            if ( isset( $_POST['bihrwi_start_prices'] ) && $_POST['bihrwi_start_prices'] == '1' ) {
-                try {
-                    $ticket_id = $this->api_client->start_catalog_generation( 'Prices' );
-                    update_option(
-                        'bihrwi_prices_generation',
-                        array(
-                            'ticket_id'  => $ticket_id,
-                            'started_at' => current_time( 'mysql' ),
-                        )
-                    );
-                    wp_schedule_single_event( time() + 300, 'bihrwi_check_prices_catalog_event' );
-                    $this->logger->log( 'Prices: génération démarrée via Télécharger tous les catalogues (ticket_id=' . $ticket_id . ').' );
-                    $prices_started = true;
-                } catch ( Exception $e_prices ) {
-                    $this->logger->log( 'Erreur démarrage Prices (après téléchargement): ' . $e_prices->getMessage() );
-                }
-            }
-
 			$redirect_url = add_query_arg(
 				array(
 					'bihrwi_download_success'   => 1,
@@ -935,11 +965,7 @@ class BihrWI_Admin {
 					'bihrwi_catalogs_count'     => $catalogs_downloaded,
 				),
                 $redirect_url
-			);
-
-            if ( $prices_started ) {
-                $redirect_url = add_query_arg( array( 'bihrwi_prices_started' => 1 ), $redirect_url );
-            }
+            );
 
 		} catch ( Exception $e ) {
 			$this->logger->log( 'Erreur téléchargement catalogues: ' . $e->getMessage() );
@@ -1776,6 +1802,37 @@ class BihrWI_Admin {
     }
 
     /**
+     * Calcule le prochain lancement Prices selon un jour de semaine, une heure et un intervalle (weekly/biweekly)
+     */
+    private function calculate_next_prices_time( $weekday = 'monday', $time = '02:00', $interval = 'weekly' ) {
+        $current_time = current_time( 'timestamp' );
+
+        // Normaliser inputs
+        $weekday = strtolower( $weekday );
+        $allowed_weekdays = array( 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday' );
+        if ( ! in_array( $weekday, $allowed_weekdays, true ) ) {
+            $weekday = 'monday';
+        }
+
+        if ( ! preg_match( '/^\d{2}:\d{2}$/', $time ) ) {
+            $time = '02:00';
+        }
+
+        $target_this_week = strtotime( 'next ' . $weekday, strtotime( 'yesterday 00:00', $current_time ) );
+        $hour_minute      = explode( ':', $time );
+        $target_timestamp = strtotime( date( 'Y-m-d', $target_this_week ) . ' ' . $hour_minute[0] . ':' . $hour_minute[1], $current_time );
+
+        // Si on est encore avant le créneau de cette semaine, prendre celui-ci
+        if ( $current_time < $target_timestamp ) {
+            return $target_timestamp;
+        }
+
+        // Sinon, ajouter 1 ou 2 semaines selon l'intervalle
+        $weeks = ( $interval === 'biweekly' ) ? 2 : 1;
+        return strtotime( '+' . $weeks . ' week', $target_timestamp );
+    }
+
+    /**
      * Handler POST: Sauvegarde des paramètres de synchronisation
      */
     public function handle_save_stock_sync_settings() {
@@ -1823,6 +1880,63 @@ class BihrWI_Admin {
 
         wp_redirect( $redirect_url );
         exit;
+    }
+
+    /**
+     * Planifie ou supprime le cron de génération Prices selon les réglages sauvegardés
+     */
+    public function setup_prices_schedule_cron() {
+        $settings = get_option( 'bihrwi_prices_schedule', array( 'enabled' => false ) );
+
+        if ( empty( $settings['enabled'] ) ) {
+            $timestamp = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
+            if ( $timestamp ) {
+                wp_unschedule_event( $timestamp, 'bihrwi_auto_prices_generation' );
+            }
+            return;
+        }
+
+        if ( ! wp_next_scheduled( 'bihrwi_auto_prices_generation' ) ) {
+            $weekday  = $settings['weekday'] ?? 'monday';
+            $interval = $settings['interval'] ?? 'weekly';
+            $time     = $settings['time'] ?? '02:00';
+
+            $next_run   = $this->calculate_next_prices_time( $weekday, $time, $interval );
+            $recurrence = $interval === 'biweekly' ? 'biweekly' : 'weekly';
+
+            wp_schedule_event( $next_run, $recurrence, 'bihrwi_auto_prices_generation' );
+            $this->logger->log( "WP-Cron planifié pour Prices: " . date( 'Y-m-d H:i:s', $next_run ) );
+        }
+    }
+
+    /**
+     * Exécution cron: démarre une génération Prices si aucune en cours
+     */
+    public function run_auto_prices_generation() {
+        // Évite de lancer si un ticket est déjà en cours
+        $status_data = get_option( 'bihrwi_prices_generation', array() );
+        if ( ! empty( $status_data['ticket_id'] ) ) {
+            $this->logger->log( 'Cron Prices: génération déjà en cours, skip.' );
+            return;
+        }
+
+        try {
+            $ticket_id = $this->api_client->start_catalog_generation( 'Prices' );
+            update_option(
+                'bihrwi_prices_generation',
+                array(
+                    'ticket_id'  => $ticket_id,
+                    'started_at' => current_time( 'mysql' ),
+                )
+            );
+
+            // Planifie la première vérification dans 5 minutes
+            wp_schedule_single_event( time() + 300, 'bihrwi_check_prices_catalog_event' );
+
+            $this->logger->log( 'Cron Prices: génération démarrée (ticket_id=' . $ticket_id . ').' );
+        } catch ( Exception $e ) {
+            $this->logger->log( 'Cron Prices: échec démarrage — ' . $e->getMessage() );
+        }
     }
 
     /**

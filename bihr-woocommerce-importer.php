@@ -89,6 +89,13 @@ add_filter( 'cron_schedules', function( $schedules ) {
             'display'  => __( 'Every 5 Minutes', 'bihr-woocommerce-importer' ),
         );
     }
+
+    if ( ! isset( $schedules['biweekly'] ) ) {
+        $schedules['biweekly'] = array(
+            'interval' => 1209600, // 14 jours
+            'display'  => __( 'Every 2 Weeks', 'bihr-woocommerce-importer' ),
+        );
+    }
     return $schedules;
 } );
 

@@ -40,6 +40,8 @@ if ( ! isset( $sort_by ) ) {
 }
 
 $status_data = get_option( 'bihrwi_prices_generation', array() );
+$prices_schedule = get_option( 'bihrwi_prices_schedule', array( 'enabled' => false, 'weekday' => 'monday', 'interval' => 'weekly', 'time' => '02:00' ) );
+$next_prices_cron = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
 ?>
 
 <div class="wrap">
@@ -168,6 +170,12 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
         </p></div>
     <?php endif; ?>
 
+    <?php if ( isset( $_GET['bihrwi_prices_schedule_saved'] ) ) : ?>
+        <div class="notice notice-success"><p>
+            Planning du catalog Prices enregistré.
+        </p></div>
+    <?php endif; ?>
+
     <?php if ( isset( $_GET['bihrwi_reset_success'] ) ) : ?>
         <div class="notice notice-success"><p>
             Toutes les données ont été effacées avec succès.
@@ -212,12 +220,6 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
             <?php wp_nonce_field( 'bihrwi_download_all_action', 'bihrwi_download_all_nonce' ); ?>
             <input type="hidden" name="action" value="bihrwi_download_all_catalogs" />
             <?php submit_button( '📥 Télécharger tous les catalogues (References, ExtendedReferences, Attributes, Images, Stocks)', 'primary large', 'submit', false ); ?>
-            <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
-                <input type="checkbox" id="bihrwi_start_prices" name="bihrwi_start_prices" value="1" />
-                <label for="bihrwi_start_prices">
-                    Démarrer aussi la génération du catalog <strong>Prices</strong> (prix)
-                </label>
-            </div>
         </form>
 
         <div id="bihr-download-progress" class="bihr-progress-container">
@@ -228,19 +230,7 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
         </div>
     </div>
 
-    <script>
-    (function(){
-        const form = document.getElementById('bihr-download-all-form');
-        if (!form) return;
-        form.addEventListener('submit', function(e){
-            const cb = document.getElementById('bihrwi_start_prices');
-            if (cb && !cb.checked) {
-                const ok = confirm('Souhaitez-vous aussi démarrer la génération du catalog Prices (prix) ?');
-                if (ok) cb.checked = true;
-            }
-        });
-    })();
-    </script>
+    
 
     <div class="bihr-section">
         <h3>Option B : Import manuel des fichiers CSV</h3>
@@ -297,6 +287,70 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
         <input type="hidden" name="action" value="bihrwi_check_prices_now" />
         <?php submit_button( 'Vérifier maintenant si le catalog Prices est prêt', 'secondary' ); ?>
     </form>
+
+    <!-- Planification automatique Prices -->
+    <div class="bihr-section" style="margin-top:20px;">
+        <h3>🗓️ Planifier la génération du catalog Prices</h3>
+        <p>Choisissez un jour et une fréquence (toutes les semaines ou toutes les 2 semaines). Le plugin lancera la génération automatiquement.</p>
+        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="bihr-filters-form">
+            <?php wp_nonce_field( 'bihrwi_prices_schedule_action', 'bihrwi_prices_schedule_nonce' ); ?>
+            <input type="hidden" name="action" value="bihrwi_save_prices_schedule" />
+
+            <div class="bihr-filters-grid">
+                <div class="bihr-filter-field" style="grid-column: span 2;">
+                    <label>
+                        <input type="checkbox" name="prices_schedule_enabled" <?php checked( ! empty( $prices_schedule['enabled'] ) ); ?> />
+                        Activer la planification automatique
+                    </label>
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="prices_schedule_weekday">Jour</label>
+                    <select name="prices_schedule_weekday" id="prices_schedule_weekday">
+                        <?php
+                        $days = array(
+                            'monday'    => 'Lundi',
+                            'tuesday'   => 'Mardi',
+                            'wednesday' => 'Mercredi',
+                            'thursday'  => 'Jeudi',
+                            'friday'    => 'Vendredi',
+                            'saturday'  => 'Samedi',
+                            'sunday'    => 'Dimanche',
+                        );
+                        foreach ( $days as $key => $label ) {
+                            printf( '<option value="%s" %s>%s</option>', esc_attr( $key ), selected( $prices_schedule['weekday'] ?? 'monday', $key, false ), esc_html( $label ) );
+                        }
+                        ?>
+                    </select>
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="prices_schedule_interval">Fréquence</label>
+                    <select name="prices_schedule_interval" id="prices_schedule_interval">
+                        <option value="weekly" <?php selected( $prices_schedule['interval'] ?? 'weekly', 'weekly' ); ?>>Chaque semaine</option>
+                        <option value="biweekly" <?php selected( $prices_schedule['interval'] ?? 'weekly', 'biweekly' ); ?>>Toutes les 2 semaines</option>
+                    </select>
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="prices_schedule_time">Heure</label>
+                    <input type="time" name="prices_schedule_time" id="prices_schedule_time" value="<?php echo esc_attr( $prices_schedule['time'] ?? '02:00' ); ?>" />
+                </div>
+            </div>
+
+            <div class="bihr-filters-actions">
+                <?php submit_button( 'Enregistrer le planning Prices', 'primary', 'submit', false ); ?>
+            </div>
+        </form>
+        <p style="margin-top:8px;">
+            <strong>Prochaine exécution planifiée :</strong>
+            <?php if ( $next_prices_cron ) : ?>
+                <?php echo esc_html( date_i18n( 'l d/m/Y H:i', $next_prices_cron ) ); ?>
+            <?php else : ?>
+                <em>Aucune planification active.</em>
+            <?php endif; ?>
+        </p>
+    </div>
 
     <p>
         <?php if ( ! empty( $status_data['ticket_id'] ) ) : ?>
