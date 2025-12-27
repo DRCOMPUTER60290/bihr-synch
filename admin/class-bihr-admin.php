@@ -833,7 +833,7 @@ class BihrWI_Admin {
 
 		$redirect_url = add_query_arg( array( 'page' => 'bihr-products' ), admin_url( 'admin.php' ) );
 
-		try {
+        try {
 			$this->logger->log( 'Téléchargement de tous les catalogues: démarrage' );
 
             // Liste des catalogues à télécharger
@@ -906,7 +906,27 @@ class BihrWI_Admin {
 			}
 
 			$catalogs_downloaded = count( $downloaded_files );
-			$this->logger->log( "Téléchargement terminé: {$catalogs_downloaded} catalogues, {$total_extracted} fichiers CSV extraits" );
+            $this->logger->log( "Téléchargement terminé: {$catalogs_downloaded} catalogues, {$total_extracted} fichiers CSV extraits" );
+
+            // Optionnel: démarrer aussi la génération du catalog Prices si l'utilisateur l'a demandé
+            $prices_started = false;
+            if ( isset( $_POST['bihrwi_start_prices'] ) && $_POST['bihrwi_start_prices'] == '1' ) {
+                try {
+                    $ticket_id = $this->api_client->start_catalog_generation( 'Prices' );
+                    update_option(
+                        'bihrwi_prices_generation',
+                        array(
+                            'ticket_id'  => $ticket_id,
+                            'started_at' => current_time( 'mysql' ),
+                        )
+                    );
+                    wp_schedule_single_event( time() + 300, 'bihrwi_check_prices_catalog_event' );
+                    $this->logger->log( 'Prices: génération démarrée via Télécharger tous les catalogues (ticket_id=' . $ticket_id . ').' );
+                    $prices_started = true;
+                } catch ( Exception $e_prices ) {
+                    $this->logger->log( 'Erreur démarrage Prices (après téléchargement): ' . $e_prices->getMessage() );
+                }
+            }
 
 			$redirect_url = add_query_arg(
 				array(
@@ -914,8 +934,12 @@ class BihrWI_Admin {
 					'bihrwi_files_count'        => $total_extracted,
 					'bihrwi_catalogs_count'     => $catalogs_downloaded,
 				),
-				$redirect_url
+                $redirect_url
 			);
+
+            if ( $prices_started ) {
+                $redirect_url = add_query_arg( array( 'bihrwi_prices_started' => 1 ), $redirect_url );
+            }
 
 		} catch ( Exception $e ) {
 			$this->logger->log( 'Erreur téléchargement catalogues: ' . $e->getMessage() );

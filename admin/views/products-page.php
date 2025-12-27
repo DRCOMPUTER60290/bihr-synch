@@ -212,6 +212,12 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
             <?php wp_nonce_field( 'bihrwi_download_all_action', 'bihrwi_download_all_nonce' ); ?>
             <input type="hidden" name="action" value="bihrwi_download_all_catalogs" />
             <?php submit_button( '📥 Télécharger tous les catalogues (References, ExtendedReferences, Attributes, Images, Stocks)', 'primary large', 'submit', false ); ?>
+            <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="bihrwi_start_prices" name="bihrwi_start_prices" value="1" />
+                <label for="bihrwi_start_prices">
+                    Démarrer aussi la génération du catalog <strong>Prices</strong> (prix)
+                </label>
+            </div>
         </form>
 
         <div id="bihr-download-progress" class="bihr-progress-container">
@@ -221,6 +227,20 @@ $status_data = get_option( 'bihrwi_prices_generation', array() );
             <div id="bihr-download-progress-text" class="bihr-progress-text">Initialisation...</div>
         </div>
     </div>
+
+    <script>
+    (function(){
+        const form = document.getElementById('bihr-download-all-form');
+        if (!form) return;
+        form.addEventListener('submit', function(e){
+            const cb = document.getElementById('bihrwi_start_prices');
+            if (cb && !cb.checked) {
+                const ok = confirm('Souhaitez-vous aussi démarrer la génération du catalog Prices (prix) ?');
+                if (ok) cb.checked = true;
+            }
+        });
+    })();
+    </script>
 
     <div class="bihr-section">
         <h3>Option B : Import manuel des fichiers CSV</h3>
