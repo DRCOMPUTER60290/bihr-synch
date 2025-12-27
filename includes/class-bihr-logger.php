@@ -6,7 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BihrWI_Logger {
 
     public function log( $message ) {
-        $date = gmdate( 'Y-m-d H:i:s' );
+        // Utilise le fuseau horaire du site WordPress
+        $date = function_exists( 'wp_date' ) ? wp_date( 'Y-m-d H:i:s' ) : current_time( 'mysql' );
         $line = "[$date] $message" . PHP_EOL;
 
         if ( ! file_exists( BIHRWI_LOG_FILE ) ) {

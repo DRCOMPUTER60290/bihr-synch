@@ -755,7 +755,7 @@ class BihrWI_Admin {
             $next_run = $this->calculate_next_prices_time( $weekday, $time, $interval );
             $recurrence = $interval === 'biweekly' ? 'biweekly' : 'weekly';
             wp_schedule_event( $next_run, $recurrence, 'bihrwi_auto_prices_generation' );
-            $this->logger->log( 'Planning Prices sauvegardé. Prochaine exécution: ' . date( 'Y-m-d H:i:s', $next_run ) );
+            $this->logger->log( 'Planning Prices sauvegardé. Prochaine exécution: ' . wp_date( 'Y-m-d H:i:s', $next_run ) );
         } else {
             $this->logger->log( 'Planning Prices désactivé.' );
         }
@@ -1788,7 +1788,7 @@ class BihrWI_Admin {
 
             wp_schedule_event( $first_run, $frequency, 'bihrwi_auto_stock_sync' );
             
-            $this->logger->log( "WP-Cron planifié pour synchronisation automatique: " . date( 'Y-m-d H:i:s', $first_run ) );
+            $this->logger->log( "WP-Cron planifié pour synchronisation automatique: " . wp_date( 'Y-m-d H:i:s', $first_run ) );
         }
     }
 
@@ -1899,7 +1899,7 @@ class BihrWI_Admin {
             $next_run = $this->calculate_next_sync_time( $frequency, $time );
             wp_schedule_event( $next_run, $frequency, 'bihrwi_auto_stock_sync' );
             
-            $this->logger->log( "Paramètres de synchronisation automatique sauvegardés. Prochaine exécution: " . date( 'Y-m-d H:i:s', $next_run ) );
+            $this->logger->log( "Paramètres de synchronisation automatique sauvegardés. Prochaine exécution: " . wp_date( 'Y-m-d H:i:s', $next_run ) );
         } else {
             $this->logger->log( "Synchronisation automatique désactivée." );
         }
@@ -1939,7 +1939,7 @@ class BihrWI_Admin {
             $recurrence = $interval === 'biweekly' ? 'biweekly' : 'weekly';
 
             wp_schedule_event( $next_run, $recurrence, 'bihrwi_auto_prices_generation' );
-            $this->logger->log( "WP-Cron planifié pour Prices: " . date( 'Y-m-d H:i:s', $next_run ) );
+            $this->logger->log( "WP-Cron planifié pour Prices: " . wp_date( 'Y-m-d H:i:s', $next_run ) );
         }
     }
 
