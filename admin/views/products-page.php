@@ -302,7 +302,37 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         <h3>🗓️ Planifier la génération du catalog Prices</h3>
         <p>Choisissez un jour et une fréquence (toutes les semaines ou toutes les 2 semaines). Le plugin lancera la génération automatiquement.</p>
         <?php if ( isset($is_premium) && !$is_premium ) : ?>
-            <div class="notice notice-warning"><p>La planification automatique du catalog Prices est réservée à la version Pro. <a href="<?php echo esc_url( bwi_fs()->get_upgrade_url() ); ?>" target="_blank">Passer à la version Pro</a></p></div>
+            <div class="bihr-section" style="opacity:0.5; pointer-events:none; user-select:none; position:relative;">
+                <div style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;"></div>
+                <div class="notice notice-warning" style="pointer-events:auto;opacity:1;position:relative;z-index:3;"><p>La planification automatique du catalog Prices est réservée à la version Pro.<br><a href="<?php echo esc_url( bwi_fs()->get_upgrade_url() ); ?>" target="_blank" style="font-weight:bold;">Mettre à niveau vers le plan Pro</a> pour activer cette fonctionnalité.</p></div>
+                <form method="post" action="#" class="bihr-filters-form">
+                    <fieldset disabled style="border:0;padding:0;margin:0;">
+                        <div class="bihr-filters-grid">
+                            <div class="bihr-filter-field" style="grid-column: span 2;">
+                                <label>
+                                    <input type="checkbox" disabled />
+                                    Activer la planification automatique
+                                </label>
+                            </div>
+                            <div class="bihr-filter-field">
+                                <label for="prices_schedule_weekday">Jour</label>
+                                <select id="prices_schedule_weekday" disabled><option>Lundi</option></select>
+                            </div>
+                            <div class="bihr-filter-field">
+                                <label for="prices_schedule_interval">Fréquence</label>
+                                <select id="prices_schedule_interval" disabled><option>Chaque semaine</option></select>
+                            </div>
+                            <div class="bihr-filter-field">
+                                <label for="prices_schedule_time">Heure</label>
+                                <input type="time" id="prices_schedule_time" value="02:00" disabled />
+                            </div>
+                        </div>
+                        <div class="bihr-filters-actions">
+                            <button class="button button-primary" disabled>Enregistrer le planning Prices</button>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
         <?php else : ?>
         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="bihr-filters-form">
             <?php wp_nonce_field( 'bihrwi_prices_schedule_action', 'bihrwi_prices_schedule_nonce' ); ?>
