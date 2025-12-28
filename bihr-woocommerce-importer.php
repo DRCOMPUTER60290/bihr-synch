@@ -28,33 +28,32 @@ if ( ! function_exists( 'bwi_fs' ) ) {
         global $bwi_fs;
 
         if ( ! isset( $bwi_fs ) ) {
-            // Include Freemius SDK.
-            require_once dirname( __FILE__ ) . '/freemius/start.php';
+            // Include Freemius SDK - avec gestion d'erreur
+            $freemius_path = dirname( __FILE__ ) . '/freemius/start.php';
+            if ( file_exists( $freemius_path ) ) {
+                require_once $freemius_path;
 
-            $bwi_fs = fs_dynamic_init( array(
-                'id'                  => '22615',
-                'slug'                => 'bihr-woocommerce-importer',
-                'type'                => 'plugin',
-                'public_key'          => 'pk_9339663c54962dd345ba8f2dfd5bd',
-                'is_premium'          => true,
-                'premium_suffix'      => 'Professional',
-                // If your plugin is a serviceware, set this option to false.
-                'has_premium_version' => true,
-                'has_addons'          => false,
-                'has_paid_plans'      => true,
-                // Automatically removed in the free version. If you're not using the
-                // auto-generated free version, delete this line before uploading to wp.org.
-                'wp_org_gatekeeper'   => 'OA7#BoRiBNqdf52FvzEf!!074aRLPs8fspif$7K1#4u4Csys1fQlCecVcUTOs2mcpeVHi#C2j9d09fOTvbC0HloPT7fFee5WdS3G',
-                'trial'               => array(
-                    'days'               => 7,
-                    'is_require_payment' => false,
-                ),
-                'menu'                => array(
-                    'slug'           => 'bihr-import-auth',
-                    'first-path'     => 'admin.php?page=bihr-import-auth&welcome=1',
-                    'support'        => false,
-                ),
-            ) );
+                $bwi_fs = fs_dynamic_init( array(
+                    'id'                  => '22615',
+                    'slug'                => 'bihr-woocommerce-importer',
+                    'type'                => 'plugin',
+                    'public_key'          => 'pk_9339663c54962dd345ba8f2dfd5bd',
+                    'is_premium'          => true,
+                    'premium_suffix'      => 'Professional',
+                    'has_premium_version' => true,
+                    'has_addons'          => false,
+                    'has_paid_plans'      => true,
+                    'wp_org_gatekeeper'   => 'OA7#BoRiBNqdf52FvzEf!!074aRLPs8fspif$7K1#4u4Csys1fQlCecVcUTOs2mcpeVHi#C2j9d09fOTvbC0HloPT7fFee5WdS3G',
+                    'trial'               => array(
+                        'days'               => 7,
+                        'is_require_payment' => false,
+                    ),
+                    'menu'                => array(
+                        'slug'           => 'bihr-import-auth',
+                        'support'        => false,
+                    ),
+                ) );
+            }
         }
 
         return $bwi_fs;
