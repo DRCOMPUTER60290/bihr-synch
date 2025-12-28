@@ -414,7 +414,7 @@ class BihrWI_Admin {
 
     public function render_margins_page() {
         // Blocage premium
-        if ( ! bwi_fs()->is__premium_only() ) {
+        if ( ! bwi_fs()->can_use_premium_code() ) {
             echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
             return;
         }
@@ -479,7 +479,7 @@ class BihrWI_Admin {
 
     public function render_sku_sync_compat_page() {
         // Blocage premium
-        if ( ! bwi_fs()->is__premium_only() ) {
+        if ( ! bwi_fs()->can_use_premium_code() ) {
             echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
             return;
         }
@@ -494,7 +494,7 @@ class BihrWI_Admin {
             wp_die( 'Permission denied.' );
         }
         // Blocage premium
-        if ( ! bwi_fs()->is__premium_only() ) {
+        if ( ! bwi_fs()->can_use_premium_code() ) {
             echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
             return;
         }
