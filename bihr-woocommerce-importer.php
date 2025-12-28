@@ -90,6 +90,14 @@ add_filter( 'cron_schedules', function( $schedules ) {
         );
     }
 
+    // Ajoute un intervalle hebdomadaire si absent (WordPress ne le fournit pas par défaut)
+    if ( ! isset( $schedules['weekly'] ) ) {
+        $schedules['weekly'] = array(
+            'interval' => 604800, // 7 jours
+            'display'  => __( 'Every Week', 'bihr-woocommerce-importer' ),
+        );
+    }
+
     if ( ! isset( $schedules['biweekly'] ) ) {
         $schedules['biweekly'] = array(
             'interval' => 1209600, // 14 jours

@@ -1653,7 +1653,12 @@ class BihrWI_Admin {
             }
 
         } catch ( Exception $e ) {
-            $redirect_url = add_query_arg( 'error', urlencode( $e->getMessage() ), $redirect_url );
+                $scheduled = wp_schedule_event( $next_run, $recurrence, 'bihrwi_auto_prices_generation' );
+                if ( false === $scheduled ) {
+                    $this->logger->log( 'WP-Cron: échec planification Prices (intervalle manquant?).' );
+                } else {
+                    $this->logger->log( 'Planning Prices sauvegardé. Prochaine exécution: ' . wp_date( 'Y-m-d H:i:s', $next_run ) );
+                }
         }
 
         wp_safe_redirect( $redirect_url );
@@ -1696,7 +1701,12 @@ class BihrWI_Admin {
 
             if ( $result['success'] ) {
                 $redirect_url = add_query_arg( array(
-                    'compatibility_imported' => $result['imported'],
+                $scheduled = wp_schedule_event( $next_run, $recurrence, 'bihrwi_auto_stock_sync' );
+                if ( false === $scheduled ) {
+                    $this->logger->log( 'WP-Cron: échec planification stocks (intervalle manquant?).' );
+                } else {
+                    $this->logger->log( 'Planning Stocks sauvegardé. Prochaine exécution: ' . wp_date( 'Y-m-d H:i:s', $next_run ) );
+                }
                     'brand' => urlencode( $brand )
                 ), $redirect_url );
             } else {
