@@ -20,11 +20,9 @@ $stats = $compatibility->get_statistics();
 <div class="wrap">
     <h1>📋 Compatibilité Véhicule-Produit</h1>
     <?php if ( !$is_premium ) : ?>
-    <div class="bihr-section" style="opacity:0.5; pointer-events:none; user-select:none; position:relative;">
-        <div style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;"></div>
-        <div class="notice notice-warning" style="pointer-events:auto;opacity:1;position:relative;z-index:3;"><p>L'import de compatibilités avancé est réservé à la version Pro.<br><a href="<?php echo esc_url( function_exists('bwi_fs') ? bwi_fs()->get_upgrade_url() : '#' ); ?>" target="_blank" style="font-weight:bold;">Mettre à niveau vers le plan Pro</a> pour activer cette fonctionnalité.</p></div>
-    </div>
-    <?php endif; ?>
+        <div class="notice notice-warning" style="margin-top:30px;"><p>L'import de compatibilités avancé est réservé à la version Pro.<br><a href="<?php echo esc_url( function_exists('bwi_fs') ? bwi_fs()->get_upgrade_url() : '#' ); ?>" target="_blank" style="font-weight:bold;">Mettre à niveau vers le plan Pro</a> pour activer cette fonctionnalité.</p></div>
+        </div>
+        <?php return; endif; ?>
 
     <?php
     // Notifications
