@@ -568,9 +568,9 @@ class BihrWI_Admin {
         // Debug optionnel (affiché dans la vue uniquement si demandé)
         $bihrwi_debug = isset( $_GET['bihrwi_debug'] ) ? (int) $_GET['bihrwi_debug'] : 0;
 
-        // On transmet à la vue si l'utilisateur est premium
-        $is_premium = bwi_fs()->is__premium_only();
-        include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
+        // On transmet à la vue si l'utilisateur a accès aux fonctionnalités Pro (licence active ou essai)
+$is_premium = bwi_fs()->can_use_premium_code();
+include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
     }
 
     public function render_imported_products_page() {
