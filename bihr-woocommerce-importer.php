@@ -78,7 +78,8 @@ function bihrwi_activate_plugin() {
     
     // Tables pour la compatibilité véhicules
     require_once( dirname( __FILE__ ) . '/includes/class-bihr-vehicle-compatibility.php' );
-    BihrWI_Vehicle_Compatibility::create_tables();
+    $vc = new BihrWI_Vehicle_Compatibility( new BihrWI_Logger() );
+    $vc->create_tables();
 }
 
 // Ajoute un intervalle "tous les 5 minutes" pour WP-Cron
