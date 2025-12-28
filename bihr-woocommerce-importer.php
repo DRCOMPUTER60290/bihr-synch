@@ -29,7 +29,7 @@ if ( ! function_exists( 'bwi_fs' ) ) {
 
         if ( ! isset( $bwi_fs ) ) {
             // Include Freemius SDK.
-            require_once dirname( __FILE__ ) . '/vendor/freemius/start.php';
+            require_once dirname( __FILE__ ) . '/freemius/start.php';
 
             $bwi_fs = fs_dynamic_init( array(
                 'id'                  => '22615',
