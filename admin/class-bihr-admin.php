@@ -1701,13 +1701,8 @@ class BihrWI_Admin {
 
             if ( $result['success'] ) {
                 $redirect_url = add_query_arg( array(
-                $scheduled = wp_schedule_event( $next_run, $recurrence, 'bihrwi_auto_stock_sync' );
-                if ( false === $scheduled ) {
-                    $this->logger->log( 'WP-Cron: échec planification stocks (intervalle manquant?).' );
-                } else {
-                    $this->logger->log( 'Planning Stocks sauvegardé. Prochaine exécution: ' . wp_date( 'Y-m-d H:i:s', $next_run ) );
-                }
-                    'brand' => urlencode( $brand )
+                    'compatibility_imported' => intval( $result['imported'] ?? 0 ),
+                    'brand'                   => urlencode( $brand )
                 ), $redirect_url );
             } else {
                 $redirect_url = add_query_arg( 'error', urlencode( $result['message'] ), $redirect_url );
