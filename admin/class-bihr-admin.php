@@ -1796,50 +1796,60 @@ class BihrWI_Admin {
      * Calcule le timestamp de la prochaine synchronisation
      */
     private function calculate_next_sync_time( $frequency, $time = '02:00' ) {
-        $current_time = current_time( 'timestamp' );
+        // Calcule en fuseau horaire du site, puis convertit en UTC pour WP‑Cron
+        $tz  = wp_timezone();
+        $now = new DateTimeImmutable( 'now', $tz );
 
         switch ( $frequency ) {
             case 'hourly':
-                return strtotime( '+1 hour', $current_time );
+                $next = $now->modify( '+1 hour' );
+                break;
 
             case 'twicedaily':
-                // Deux fois par jour: 06:00 et 18:00
-                $today_morning = strtotime( 'today 06:00', $current_time );
-                $today_evening = strtotime( 'today 18:00', $current_time );
-                
-                if ( $current_time < $today_morning ) {
-                    return $today_morning;
-                } elseif ( $current_time < $today_evening ) {
-                    return $today_evening;
+                // Deux fois par jour: 06:00 et 18:00 (heure locale du site)
+                $morning = $now->setTime( 6, 0 );
+                $evening = $now->setTime( 18, 0 );
+                if ( $now < $morning ) {
+                    $next = $morning;
+                } elseif ( $now < $evening ) {
+                    $next = $evening;
                 } else {
-                    return strtotime( 'tomorrow 06:00', $current_time );
+                    $next = $now->modify( 'tomorrow' )->setTime( 6, 0 );
                 }
+                break;
 
             case 'weekly':
-                // Une fois par semaine, le dimanche à l'heure spécifiée
+                // Une fois par semaine, le dimanche à l'heure spécifiée (heure locale du site)
                 list( $hour, $minute ) = explode( ':', $time );
-                $next_sunday = strtotime( 'next sunday ' . $hour . ':' . $minute, $current_time );
-                return $next_sunday;
+                $weekdayName = 'Sunday';
+                if ( strtolower( $now->format( 'l' ) ) === 'sunday' ) {
+                    $candidate = $now->setTime( (int) $hour, (int) $minute );
+                    $next = ( $now < $candidate ) ? $candidate : $now->modify( 'next Sunday' )->setTime( (int) $hour, (int) $minute );
+                } else {
+                    $next = $now->modify( 'next ' . $weekdayName )->setTime( (int) $hour, (int) $minute );
+                }
+                break;
 
             case 'daily':
             default:
-                // Une fois par jour à l'heure spécifiée
+                // Une fois par jour à l'heure spécifiée (heure locale du site)
                 list( $hour, $minute ) = explode( ':', $time );
-                $today = strtotime( 'today ' . $hour . ':' . $minute, $current_time );
-                
-                if ( $current_time < $today ) {
-                    return $today;
-                } else {
-                    return strtotime( 'tomorrow ' . $hour . ':' . $minute, $current_time );
-                }
+                $today = $now->setTime( (int) $hour, (int) $minute );
+                $next  = ( $now < $today ) ? $today : $now->modify( 'tomorrow' )->setTime( (int) $hour, (int) $minute );
+                break;
         }
+
+        // WP‑Cron attend un timestamp UTC
+        return $next->setTimezone( new DateTimeZone( 'UTC' ) )->getTimestamp();
     }
 
     /**
      * Calcule le prochain lancement Prices selon un jour de semaine, une heure et un intervalle (weekly/biweekly)
      */
     private function calculate_next_prices_time( $weekday = 'monday', $time = '02:00', $interval = 'weekly' ) {
-        $current_time = current_time( 'timestamp' );
+        // Calcule en heure locale WordPress, convertit en UTC pour WP‑Cron
+        $tz  = wp_timezone();
+        $now = new DateTimeImmutable( 'now', $tz );
 
         // Normaliser inputs
         $weekday = strtolower( $weekday );
@@ -1852,18 +1862,20 @@ class BihrWI_Admin {
             $time = '02:00';
         }
 
-        $target_this_week = strtotime( 'next ' . $weekday, strtotime( 'yesterday 00:00', $current_time ) );
-        $hour_minute      = explode( ':', $time );
-        $target_timestamp = strtotime( date( 'Y-m-d', $target_this_week ) . ' ' . $hour_minute[0] . ':' . $hour_minute[1], $current_time );
+        list( $hour, $minute ) = explode( ':', $time );
+        $weekdayName = ucfirst( $weekday );
 
-        // Si on est encore avant le créneau de cette semaine, prendre celui-ci
-        if ( $current_time < $target_timestamp ) {
-            return $target_timestamp;
+        // Choisir le créneau imminent: si aujourd'hui correspond et l'heure n'est pas passée, on prend aujourd'hui
+        if ( strtolower( $now->format( 'l' ) ) === $weekday ) {
+            $candidate = $now->setTime( (int) $hour, (int) $minute );
+            $next = ( $now < $candidate ) ? $candidate : $now->modify( 'next ' . $weekdayName )->setTime( (int) $hour, (int) $minute );
+        } else {
+            $next = $now->modify( 'next ' . $weekdayName )->setTime( (int) $hour, (int) $minute );
         }
 
-        // Sinon, ajouter 1 ou 2 semaines selon l'intervalle
-        $weeks = ( $interval === 'biweekly' ) ? 2 : 1;
-        return strtotime( '+' . $weeks . ' week', $target_timestamp );
+        // Pour biweekly, la récurrence sera de 14 jours; le premier lancement reste le prochain créneau
+        // Convertir en UTC pour WP‑Cron
+        return $next->setTimezone( new DateTimeZone( 'UTC' ) )->getTimestamp();
     }
 
     /**
