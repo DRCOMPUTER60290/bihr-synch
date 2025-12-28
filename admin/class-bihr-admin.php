@@ -392,6 +392,15 @@ class BihrWI_Admin {
             'bihr-sku-sync-compat',
             array( $this, 'render_sku_sync_compat_page' )
         );
+
+        add_submenu_page(
+            'bihr-dashboard',
+            __( 'Diagnostic WP‑Cron', 'bihr-woocommerce-importer' ),
+            __( '⚙️ WP‑Cron', 'bihr-woocommerce-importer' ),
+            'manage_woocommerce',
+            'bihr-wpcron',
+            array( $this, 'render_wpcron_diagnostic_page' )
+        );
     }
 
     // === RENDER PAGES ===
@@ -459,6 +468,16 @@ class BihrWI_Admin {
 
     public function render_sku_sync_compat_page() {
         include BIHRWI_PLUGIN_DIR . 'admin/views/sku-sync-compatibility-page.php';
+    }
+
+    /**
+     * Affiche la page de diagnostic WP‑Cron
+     */
+    public function render_wpcron_diagnostic_page() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( 'Permission denied.' );
+        }
+        include BIHRWI_PLUGIN_DIR . 'admin/views/wpcron-diagnostic.php';
     }
 
     public function render_logs_page() {
@@ -1996,6 +2015,9 @@ class BihrWI_Admin {
      * Exécution cron: démarre une génération Prices si aucune en cours
      */
     public function run_auto_prices_generation() {
+        // Log pour confirmer l'appel réel de la fonction
+        $this->logger->log( '[TRACE] run_auto_prices_generation() appelée à ' . current_time( 'mysql' ) );
+
         // Évite de lancer si un ticket est déjà en cours
         $status_data = get_option( 'bihrwi_prices_generation', array() );
         if ( ! empty( $status_data['ticket_id'] ) ) {
