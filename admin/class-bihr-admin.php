@@ -717,15 +717,15 @@ class BihrWI_Admin {
         
         // Tenter d'exécuter directement les tâches "due"
         $crons = _get_cron_array();
-        $now = time();
+        $now = current_time( 'timestamp' ); // Heure locale du site (UTC+1 pour vous)
         $executed = 0;
         
-        $this->logger->log( '[DEBUG] Heure actuelle (time()): ' . $now . ' (' . date( 'Y-m-d H:i:s', $now ) . ')' );
+        $this->logger->log( '[DEBUG] Heure actuelle (locale): ' . $now . ' (' . wp_date( 'Y-m-d H:i:s', $now ) . ')' );
         $this->logger->log( '[DEBUG] Total d\'événements cron trouvés: ' . count( $crons ?? array() ) );
         
         if ( $crons ) {
             foreach ( $crons as $timestamp => $cron ) {
-                $this->logger->log( '[DEBUG] Événement à ' . $timestamp . ' (' . date( 'Y-m-d H:i:s', $timestamp ) . ') — hooks: ' . implode( ', ', array_keys( $cron ) ) );
+                $this->logger->log( '[DEBUG] Événement planifié à ' . $timestamp . ' (' . wp_date( 'Y-m-d H:i:s', $timestamp ) . ') — hooks: ' . implode( ', ', array_keys( $cron ) ) );
                 
                 // Inclure les événements passés ET ceux dans les 60 prochaines secondes (marge de sécurité)
                 if ( $timestamp <= ( $now + 60 ) ) {
