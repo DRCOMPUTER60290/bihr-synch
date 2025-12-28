@@ -575,12 +575,12 @@ include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
 
     public function render_imported_products_page() {
         // Blocage premium
-        if ( ! bwi_fs()->is__premium_only() ) {
+        if ( ! bwi_fs()->can_use_premium_code() ) {
             echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
             return;
         }
         // Blocage premium
-        if ( ! bwi_fs()->is__premium_only() ) {
+        if ( ! bwi_fs()->can_use_premium_code() ) {
             echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
             return;
         }
