@@ -120,9 +120,75 @@ if ( ! defined( 'ABSPATH' ) ) {
         </p></div>
     <?php endif; ?>
 
-    <h2 style="margin-top:30px;">Guide d'installation d'un cron serveur</h2>
+    <h2 style="margin-top:30px;">Guide Hostinger 🌐</h2>
 
-    <p><strong>Accès à cPanel/WHM :</strong></p>
+    <p><strong>Étapes pour configurer le cron sur Hostinger (hPanel) :</strong></p>
+
+    <ol style="line-height:1.9; font-size:15px;">
+        <li>
+            <strong>Connectez-vous à hPanel :</strong> 
+            <a href="https://hpanel.hostinger.com" target="_blank">https://hpanel.hostinger.com</a>
+        </li>
+        <li>
+            <strong>Sélectionnez votre domaine</strong> dans la liste
+        </li>
+        <li>
+            <strong>Cherchez "Tâches planifiées"</strong> ou <strong>"Cron Jobs"</strong> dans le menu gauche (sous "Outils" ou "Avancé")
+        </li>
+        <li>
+            <strong>Cliquez sur "Ajouter une tâche cron"</strong>
+        </li>
+        <li>
+            <strong>Remplissez les champs :</strong>
+            <ul style="margin-top:10px;">
+                <li><strong>Exécution :</strong> Sélectionnez <code>Personnalisé</code> → <code>5 minutes</code></li>
+                <li><strong>Commande :</strong> Collez ceci :<br>
+                    <code style="display:block; background:#f0f0f0; padding:12px; margin:8px 0; border-radius:4px; font-family:monospace; font-size:13px; word-break:break-all;">
+                    curl -s <?php echo esc_html( site_url( 'wp-cron.php' ) ); ?> > /dev/null 2>&1
+                    </code>
+                </li>
+                <li><strong>Email de notification :</strong> (optionnel) Laissez vide ou mettez votre email</li>
+            </ul>
+        </li>
+        <li>
+            <strong>Cliquez sur "Sauvegarder"</strong>
+        </li>
+        <li>
+            ✅ <strong>Voilà !</strong> Votre cron est maintenant configuré. Les tâches BIHR se déclencheront toutes les 5 minutes.
+        </li>
+    </ol>
+
+    <div style="margin-top:20px; padding:15px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:4px;">
+        <p style="margin:0; font-weight:bold;">💡 Conseil :</p>
+        <p style="margin:8px 0 0;">Après configuration, allez sur la page <strong>📊 Logs</strong> et cliquez sur <strong>"⚙️ Exécuter WP‑Cron maintenant"</strong> pour tester. Vous devriez voir dans les logs :</p>
+        <code style="display:block; background:#fff; padding:8px; margin:8px 0; border-radius:3px; font-family:monospace; font-size:12px;">
+        [TRACE] run_auto_prices_generation() appelée à ...
+        </code>
+        <p style="margin:8px 0 0;">Si ce message apparaît, c'est que le cron fonctionne ! 🎉</p>
+    </div>
+
+    <h2 style="margin-top:30px;">Vérification du statut</h2>
+
+    <p>Vous pouvez vérifier le statut du cron à tout moment dans hPanel :</p>
+    <ol>
+        <li>Allez dans <strong>Tâches planifiées</strong></li>
+        <li>Vous verrez votre tâche avec un <strong>statut "Actif"</strong></li>
+        <li>Cliquez sur la tâche pour voir l'historique d'exécution (derniers déclenchements)</li>
+    </ol>
+
+    <h2 style="margin-top:30px;">Dépannage Hostinger</h2>
+
+    <div style="background:#fef2f2; border-left:4px solid #ef4444; padding:15px; border-radius:4px; margin-bottom:20px;">
+        <p style="margin:0 0 10px 0;"><strong>❌ Si la tâche ne s'exécute pas :</strong></p>
+        <ul style="margin:0; padding-left:20px;">
+            <li>Vérifiez dans hPanel → <strong>Tâches planifiées</strong> → Historique : vous verrez les erreurs d'exécution</li>
+            <li>Assurez-vous que l'URL cron est <strong>exactement</strong> celle indiquée ci-dessus (copiez-la depuis cette page)</li>
+            <li>Si l'historique affiche "Erreur de connexion", contactez le support Hostinger pour vérifier les requêtes HTTP sortantes</li>
+            <li>En attendant, utilisez le bouton <strong>"⚙️ Exécuter WP‑Cron maintenant"</strong> manuellement sur la page Logs (solution temporaire)</li>
+        </ul>
+    </div>
+
+    <h2 style="margin-top:30px;">Guide cPanel/SSH (si vous changez d'hébergeur)</h2>
     <ol style="line-height:1.8;">
         <li>Allez dans <strong>Cron Jobs</strong></li>
         <li>Sélectionnez <strong>Ajouter une nouvelle tâche cron</strong></li>
