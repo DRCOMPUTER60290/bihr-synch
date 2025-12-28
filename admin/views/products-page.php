@@ -301,6 +301,9 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <div class="bihr-section" style="margin-top:20px;">
         <h3>🗓️ Planifier la génération du catalog Prices</h3>
         <p>Choisissez un jour et une fréquence (toutes les semaines ou toutes les 2 semaines). Le plugin lancera la génération automatiquement.</p>
+        <?php if ( isset($is_premium) && !$is_premium ) : ?>
+            <div class="notice notice-warning"><p>La planification automatique du catalog Prices est réservée à la version Pro. <a href="<?php echo esc_url( bwi_fs()->get_upgrade_url() ); ?>" target="_blank">Passer à la version Pro</a></p></div>
+        <?php else : ?>
         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="bihr-filters-form">
             <?php wp_nonce_field( 'bihrwi_prices_schedule_action', 'bihrwi_prices_schedule_nonce' ); ?>
             <input type="hidden" name="action" value="bihrwi_save_prices_schedule" />
@@ -351,6 +354,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 <?php submit_button( 'Enregistrer le planning Prices', 'primary', 'submit', false ); ?>
             </div>
         </form>
+        <?php endif; ?>
         <p style="margin-top:8px;">
             <strong>Prochaine exécution planifiée :</strong>
             <?php if ( $next_prices_cron ) : ?>

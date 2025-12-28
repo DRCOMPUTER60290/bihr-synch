@@ -413,13 +413,17 @@ class BihrWI_Admin {
     // === RENDER PAGES ===
 
     public function render_margins_page() {
+        // Blocage premium
+        if ( ! bwi_fs()->is__premium_only() ) {
+            echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
+            return;
+        }
         // Traitement du formulaire de sauvegarde
         if ( isset( $_POST['bihrwi_margins_nonce'] ) && wp_verify_nonce( $_POST['bihrwi_margins_nonce'], 'bihrwi_save_margins' ) ) {
             $this->save_margin_settings();
             wp_redirect( add_query_arg( 'margin_saved', '1', admin_url( 'admin.php?page=bihrwi_margins' ) ) );
             exit;
         }
-
         include BIHRWI_PLUGIN_DIR . 'admin/views/margin-page.php';
     }
 
@@ -474,6 +478,11 @@ class BihrWI_Admin {
     }
 
     public function render_sku_sync_compat_page() {
+        // Blocage premium
+        if ( ! bwi_fs()->is__premium_only() ) {
+            echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
+            return;
+        }
         include BIHRWI_PLUGIN_DIR . 'admin/views/sku-sync-compatibility-page.php';
     }
 
@@ -483,6 +492,11 @@ class BihrWI_Admin {
     public function render_wpcron_diagnostic_page() {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_die( 'Permission denied.' );
+        }
+        // Blocage premium
+        if ( ! bwi_fs()->is__premium_only() ) {
+            echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
+            return;
         }
         include BIHRWI_PLUGIN_DIR . 'admin/views/wpcron-diagnostic.php';
     }
@@ -554,10 +568,22 @@ class BihrWI_Admin {
         // Debug optionnel (affiché dans la vue uniquement si demandé)
         $bihrwi_debug = isset( $_GET['bihrwi_debug'] ) ? (int) $_GET['bihrwi_debug'] : 0;
 
+        // On transmet à la vue si l'utilisateur est premium
+        $is_premium = bwi_fs()->is__premium_only();
         include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
     }
 
     public function render_imported_products_page() {
+        // Blocage premium
+        if ( ! bwi_fs()->is__premium_only() ) {
+            echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
+            return;
+        }
+        // Blocage premium
+        if ( ! bwi_fs()->is__premium_only() ) {
+            echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
+            return;
+        }
         include BIHRWI_PLUGIN_DIR . 'admin/views/imported-products-page.php';
     }
 
