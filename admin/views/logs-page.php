@@ -39,6 +39,18 @@ if ( ! defined( 'ABSPATH' ) ) {
         <?php submit_button( 'Effacer les logs', 'delete' ); ?>
     </form>
 
+    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:15px;">
+        <?php wp_nonce_field( 'bihrwi_spawn_cron_action', 'bihrwi_spawn_cron_nonce' ); ?>
+        <input type="hidden" name="action" value="bihrwi_spawn_cron" />
+        <?php submit_button( '⚙️ Exécuter WP‑Cron maintenant', 'secondary' ); ?>
+    </form>
+
+    <?php if ( isset( $_GET['bihrwi_cron_spawned'] ) ) : ?>
+        <div class="notice <?php echo $_GET['bihrwi_cron_spawned'] ? 'notice-success' : 'notice-error'; ?>"><p>
+            <?php echo $_GET['bihrwi_cron_spawned'] ? 'WP‑Cron déclenché.' : 'Échec du déclenchement WP‑Cron.'; ?>
+        </p></div>
+    <?php endif; ?>
+
     <h2>Contenu du fichier de logs</h2>
     <textarea readonly style="width:100%;height:500px;"><?php echo esc_textarea( $log_contents ); ?></textarea>
 </div>

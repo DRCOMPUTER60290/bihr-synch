@@ -20,6 +20,7 @@ class BihrWI_Admin {
         // Handlers des formulaires
         add_action( 'admin_post_bihrwi_authenticate', array( $this, 'handle_authenticate' ) );
         add_action( 'admin_post_bihrwi_clear_logs', array( $this, 'handle_clear_logs' ) );
+        add_action( 'admin_post_bihrwi_spawn_cron', array( $this, 'handle_spawn_cron' ) );
         add_action( 'admin_post_bihrwi_start_prices_generation', array( $this, 'handle_start_prices_generation' ) );
         add_action( 'admin_post_bihrwi_import_product', array( $this, 'handle_import_product' ) );
         add_action( 'admin_post_bihrwi_merge_catalogs', array( $this, 'handle_merge_catalogs' ) );
@@ -672,6 +673,37 @@ class BihrWI_Admin {
             admin_url( 'admin.php' )
         );
 
+        wp_safe_redirect( $redirect_url );
+        exit;
+    }
+
+    /**
+     * Force l’exécution de WP‑Cron (utile si l’hébergeur bloque les requêtes loopback)
+     */
+    public function handle_spawn_cron() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( 'Permission denied.' );
+        }
+
+        check_admin_referer( 'bihrwi_spawn_cron_action', 'bihrwi_spawn_cron_nonce' );
+
+        $ok = false;
+        if ( function_exists( 'spawn_cron' ) ) {
+            // Déclenche le cron en tâche de fond
+            spawn_cron();
+            $ok = true;
+        } else {
+            $resp = wp_remote_post( site_url( 'wp-cron.php' ), array( 'timeout' => 3, 'blocking' => false ) );
+            $ok = ! is_wp_error( $resp );
+        }
+
+        if ( $ok ) {
+            $this->logger->log( 'WP‑Cron forcé manuellement (spawn_cron).' );
+        } else {
+            $this->logger->log( 'WP‑Cron: échec du déclenchement manuel.' );
+        }
+
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-logs', 'bihrwi_cron_spawned' => $ok ? 1 : 0 ), admin_url( 'admin.php' ) );
         wp_safe_redirect( $redirect_url );
         exit;
     }
