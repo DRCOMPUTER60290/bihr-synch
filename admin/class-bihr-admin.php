@@ -28,8 +28,10 @@ class BihrWI_Admin {
 		add_action( 'admin_post_bihrwi_reset_data', array( $this, 'handle_reset_data' ) );
 		add_action( 'admin_post_bihrwi_download_all_catalogs', array( $this, 'handle_download_all_catalogs' ) );
         add_action( 'admin_post_bihrwi_import_vehicles', array( $this, 'handle_import_vehicles' ) );
-        add_action( 'admin_post_bihrwi_import_compatibility', array( $this, 'handle_import_compatibility' ) );
-        add_action( 'admin_post_bihrwi_import_all_compatibility', array( $this, 'handle_import_all_compatibility' ) );
+        if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
+            add_action( 'admin_post_bihrwi_import_compatibility', array( $this, 'handle_import_compatibility' ) );
+            add_action( 'admin_post_bihrwi_import_all_compatibility', array( $this, 'handle_import_all_compatibility' ) );
+        }
         add_action( 'admin_post_bihrwi_save_prices_schedule', array( $this, 'handle_save_prices_schedule' ) );
         add_action( 'admin_post_bihrwi_run_prices_cron_now', array( $this, 'handle_run_prices_cron_now' ) );
 
@@ -39,13 +41,15 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_import_single_product', array( $this, 'ajax_import_single_product' ) );
         add_action( 'wp_ajax_bihr_refresh_stock', array( $this, 'ajax_refresh_stock' ) );
         add_action( 'wp_ajax_bihrwi_import_vehicles', array( $this, 'ajax_import_vehicles' ) );
-        add_action( 'wp_ajax_bihrwi_import_compatibility', array( $this, 'ajax_import_compatibility' ) );
-        add_action( 'wp_ajax_bihrwi_import_all_compatibility', array( $this, 'ajax_import_all_compatibility' ) );
-        add_action( 'wp_ajax_bihrwi_create_compatibility_tables', array( $this, 'ajax_create_compatibility_tables' ) );
-        add_action( 'wp_ajax_bihrwi_import_vehicles_async', array( $this, 'ajax_import_vehicles_async' ) );
-        add_action( 'wp_ajax_bihrwi_clear_compatibility', array( $this, 'ajax_clear_compatibility' ) );
-        add_action( 'wp_ajax_bihrwi_upload_vehicles_zip', array( $this, 'ajax_upload_vehicles_zip' ) );
-        add_action( 'wp_ajax_bihrwi_upload_links_zip', array( $this, 'ajax_upload_links_zip' ) );
+        if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
+            add_action( 'wp_ajax_bihrwi_import_compatibility', array( $this, 'ajax_import_compatibility' ) );
+            add_action( 'wp_ajax_bihrwi_import_all_compatibility', array( $this, 'ajax_import_all_compatibility' ) );
+            add_action( 'wp_ajax_bihrwi_create_compatibility_tables', array( $this, 'ajax_create_compatibility_tables' ) );
+            add_action( 'wp_ajax_bihrwi_import_vehicles_async', array( $this, 'ajax_import_vehicles_async' ) );
+            add_action( 'wp_ajax_bihrwi_clear_compatibility', array( $this, 'ajax_clear_compatibility' ) );
+            add_action( 'wp_ajax_bihrwi_upload_vehicles_zip', array( $this, 'ajax_upload_vehicles_zip' ) );
+            add_action( 'wp_ajax_bihrwi_upload_links_zip', array( $this, 'ajax_upload_links_zip' ) );
+        }
         add_action( 'wp_ajax_bihrwi_get_order_data', array( $this, 'ajax_get_order_data' ) );
         add_action( 'wp_ajax_bihr_toggle_beginner_mode', array( $this, 'ajax_toggle_beginner_mode' ) );
 
@@ -424,7 +428,9 @@ class BihrWI_Admin {
             wp_redirect( add_query_arg( 'margin_saved', '1', admin_url( 'admin.php?page=bihrwi_margins' ) ) );
             exit;
         }
-        include BIHRWI_PLUGIN_DIR . 'admin/views/margin-page.php';
+        if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
+            include BIHRWI_PLUGIN_DIR . 'admin/views/margin-page.php';
+        }
     }
 
     private function save_margin_settings() {
@@ -483,7 +489,9 @@ class BihrWI_Admin {
             echo '<div class="notice notice-error"><p>Cette page est réservée à la version Pro. <a href="' . esc_url( bwi_fs()->get_upgrade_url() ) . '" target="_blank">Passer à la version Pro</a></p></div>';
             return;
         }
-        include BIHRWI_PLUGIN_DIR . 'admin/views/sku-sync-compatibility-page.php';
+        if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
+            include BIHRWI_PLUGIN_DIR . 'admin/views/sku-sync-compatibility-page.php';
+        }
     }
 
     /**
