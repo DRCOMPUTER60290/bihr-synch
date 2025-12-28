@@ -1959,8 +1959,11 @@ class BihrWI_Admin {
         list( $hour, $minute ) = explode( ':', $time );
         $weekdayName = ucfirst( $weekday );
 
+        // Obtenir le jour de la semaine actuellement (en minuscules pour comparaison)
+        $currentDayName = strtolower( $now->format( 'l' ) );
+
         // Choisir le créneau imminent: si aujourd'hui correspond et l'heure n'est pas passée, on prend aujourd'hui
-        if ( strtolower( $now->format( 'l' ) ) === $weekday ) {
+        if ( $currentDayName === $weekday ) {
             $candidate = $now->setTime( (int) $hour, (int) $minute );
             $next = ( $now < $candidate ) ? $candidate : $now->modify( 'next ' . $weekdayName )->setTime( (int) $hour, (int) $minute );
         } else {
