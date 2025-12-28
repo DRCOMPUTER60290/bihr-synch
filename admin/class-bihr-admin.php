@@ -55,11 +55,18 @@ class BihrWI_Admin {
         
         // WP-Cron hooks pour synchronisation automatique
         add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
-        add_action( 'bihrwi_auto_prices_generation', array( $this, 'run_auto_prices_generation' ) );
+        add_action( 'bihrwi_auto_prices_generation', array( $this, 'run_auto_prices_generation' ), 10, 0 );
         
         // Initialiser le WP-Cron si activé
         add_action( 'init', array( $this, 'setup_stock_sync_cron' ) );
         add_action( 'init', array( $this, 'setup_prices_schedule_cron' ) );
+        
+        // Log pour confirmer que les hooks sont attachés
+        add_action( 'init', function() {
+            if ( has_action( 'bihrwi_auto_prices_generation' ) ) {
+                error_log( '[BIHR] Hook bihrwi_auto_prices_generation attaché avec succès' );
+            }
+        }, 999 );
 
     }
 	
@@ -706,6 +713,29 @@ class BihrWI_Admin {
 
         check_admin_referer( 'bihrwi_spawn_cron_action', 'bihrwi_spawn_cron_nonce' );
 
+        $this->logger->log( '[DEBUG] handle_spawn_cron: démarrage...' );
+        
+        // Tenter d'exécuter directement les tâches "due"
+        $crons = _get_cron_array();
+        $now = time();
+        $executed = 0;
+        
+        if ( $crons ) {
+            foreach ( $crons as $timestamp => $cron ) {
+                if ( $timestamp <= $now ) {
+                    foreach ( $cron as $hook => $details ) {
+                        if ( strpos( $hook, 'bihrwi' ) !== false ) {
+                            $this->logger->log( "[DEBUG] Exécution directe de l'événement: {$hook}" );
+                            do_action( $hook );
+                            $executed++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        $this->logger->log( "[DEBUG] {$executed} événement(s) BIHR exécuté(s) directement" );
+
         $ok = false;
         if ( function_exists( 'spawn_cron' ) ) {
             // Déclenche le cron en tâche de fond
@@ -722,7 +752,7 @@ class BihrWI_Admin {
             $this->logger->log( 'WP‑Cron: échec du déclenchement manuel.' );
         }
 
-        $redirect_url = add_query_arg( array( 'page' => 'bihr-logs', 'bihrwi_cron_spawned' => $ok ? 1 : 0 ), admin_url( 'admin.php' ) );
+        $redirect_url = add_query_arg( array( 'page' => 'bihr-logs', 'bihrwi_cron_spawned' => $ok ? 1 : 0, 'executed' => $executed ), admin_url( 'admin.php' ) );
         wp_safe_redirect( $redirect_url );
         exit;
     }
