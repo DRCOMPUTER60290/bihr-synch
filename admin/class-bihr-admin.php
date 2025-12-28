@@ -720,18 +720,26 @@ class BihrWI_Admin {
         $now = time();
         $executed = 0;
         
+        $this->logger->log( '[DEBUG] Heure actuelle (time()): ' . $now . ' (' . date( 'Y-m-d H:i:s', $now ) . ')' );
+        $this->logger->log( '[DEBUG] Total d\'événements cron trouvés: ' . count( $crons ?? array() ) );
+        
         if ( $crons ) {
             foreach ( $crons as $timestamp => $cron ) {
-                if ( $timestamp <= $now ) {
+                $this->logger->log( '[DEBUG] Événement à ' . $timestamp . ' (' . date( 'Y-m-d H:i:s', $timestamp ) . ') — hooks: ' . implode( ', ', array_keys( $cron ) ) );
+                
+                // Inclure les événements passés ET ceux dans les 60 prochaines secondes (marge de sécurité)
+                if ( $timestamp <= ( $now + 60 ) ) {
                     foreach ( $cron as $hook => $details ) {
                         if ( strpos( $hook, 'bihrwi' ) !== false ) {
-                            $this->logger->log( "[DEBUG] Exécution directe de l'événement: {$hook}" );
+                            $this->logger->log( "[DEBUG] ✓ Exécution directe de: {$hook}" );
                             do_action( $hook );
                             $executed++;
                         }
                     }
                 }
             }
+        } else {
+            $this->logger->log( '[DEBUG] Aucun événement cron trouvé!' );
         }
         
         $this->logger->log( "[DEBUG] {$executed} événement(s) BIHR exécuté(s) directement" );
