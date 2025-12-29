@@ -309,7 +309,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                                             class="button button-secondary bihrwi-order-data-refresh-btn"
                                             data-order-id="<?php echo esc_attr( $post->ID ); ?>"
                                         >
-                                            <?php esc_html_e( 'Actualiser', 'bihr-woocommerce-importer' ); ?>
+                                            <?php esc_html_e( 'Actualiser', 'BIHR-SYNCH-main' ); ?>
                                         </button>
                                     </div>
                                 </div>

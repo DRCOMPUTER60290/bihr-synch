@@ -218,19 +218,19 @@ $total_pages = $results->max_num_pages;
                 <div>
                     <label for="stock-filter"><?php esc_html_e( 'Stock', 'BIHR-SYNCH-main' ); ?></label>
                     <select id="stock-filter" name="stock_status">
-                        <option value=""><?php esc_html_e( 'Tous', 'bihr-woocommerce-importer' ); ?></option>
-                        <option value="instock" <?php selected( $stock_filter, 'instock' ); ?>><?php esc_html_e( 'En stock', 'bihr-woocommerce-importer' ); ?></option>
-                        <option value="outofstock" <?php selected( $stock_filter, 'outofstock' ); ?>><?php esc_html_e( 'Rupture', 'bihr-woocommerce-importer' ); ?></option>
-                        <option value="onbackorder" <?php selected( $stock_filter, 'onbackorder' ); ?>><?php esc_html_e( 'Sur commande', 'bihr-woocommerce-importer' ); ?></option>
+                        <option value=""><?php esc_html_e( 'Tous', 'BIHR-SYNCH-main' ); ?></option>
+                        <option value="instock" <?php selected( $stock_filter, 'instock' ); ?>><?php esc_html_e( 'En stock', 'BIHR-SYNCH-main' ); ?></option>
+                        <option value="outofstock" <?php selected( $stock_filter, 'outofstock' ); ?>><?php esc_html_e( 'Rupture', 'BIHR-SYNCH-main' ); ?></option>
+                        <option value="onbackorder" <?php selected( $stock_filter, 'onbackorder' ); ?>><?php esc_html_e( 'Sur commande', 'BIHR-SYNCH-main' ); ?></option>
                     </select>
                 </div>
                 
                 <button type="submit" class="button button-primary">
-                    <?php esc_html_e( 'Filtrer', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Filtrer', 'BIHR-SYNCH-main' ); ?>
                 </button>
                 
                 <a href="?page=bihrwi_imported_products" class="button">
-                    <?php esc_html_e( 'Réinitialiser', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Réinitialiser', 'BIHR-SYNCH-main' ); ?>
                 </a>
             </div>
         </form>
@@ -240,7 +240,7 @@ $total_pages = $results->max_num_pages;
         <p style="margin: 0;">
             <?php
             /* translators: %d: nombre de produits */
-            printf( esc_html__( '%d produit(s) trouvé(s)', 'bihr-woocommerce-importer' ), intval( $total ) );
+            printf( esc_html__( '%d produit(s) trouvé(s)', 'BIHR-SYNCH-main' ), intval( $total ) );
             ?>
         </p>
         
@@ -248,12 +248,12 @@ $total_pages = $results->max_num_pages;
             <div>
                 <button type="button" id="refresh-selected-stocks" class="button button-primary" disabled>
                     <span class="dashicons dashicons-update" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Actualiser les stocks sélectionnés', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Actualiser les stocks sélectionnés', 'BIHR-SYNCH-main' ); ?>
                     (<span id="selected-count">0</span>)
                 </button>
                 <button type="button" id="refresh-all-stocks" class="button">
                     <span class="dashicons dashicons-update" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Actualiser tous les stocks', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Actualiser tous les stocks', 'BIHR-SYNCH-main' ); ?>
                 </button>
             </div>
         <?php endif; ?>
@@ -272,22 +272,22 @@ $total_pages = $results->max_num_pages;
 
     <?php if ( empty( $products ) ) : ?>
         <div class="notice notice-info">
-            <p><?php esc_html_e( 'Aucun produit trouvé.', 'bihr-woocommerce-importer' ); ?></p>
+            <p><?php esc_html_e( 'Aucun produit trouvé.', 'BIHR-SYNCH-main' ); ?></p>
         </div>
     <?php else : ?>
         <table class="wp-list-table widefat fixed striped" id="imported-products-table">
             <thead>
                 <tr>
                     <th style="width: 40px;">
-                        <input type="checkbox" id="select-all-products" title="<?php esc_attr_e( 'Tout sélectionner', 'bihr-woocommerce-importer' ); ?>">
+                        <input type="checkbox" id="select-all-products" title="<?php esc_attr_e( 'Tout sélectionner', 'BIHR-SYNCH-main' ); ?>">
                     </th>
-                    <th style="width: 80px;"><?php esc_html_e( 'Image', 'bihr-woocommerce-importer' ); ?></th>
-                    <th style="width: 30%;"><?php esc_html_e( 'Nom du produit', 'bihr-woocommerce-importer' ); ?></th>
-                    <th style="width: 150px;"><?php esc_html_e( 'Code BIHR', 'bihr-woocommerce-importer' ); ?></th>
-                    <th style="width: 100px;"><?php esc_html_e( 'Prix', 'bihr-woocommerce-importer' ); ?></th>
-                    <th style="width: 150px;"><?php esc_html_e( 'Stock', 'bihr-woocommerce-importer' ); ?></th>
-                    <th style="width: 100px;"><?php esc_html_e( 'Statut', 'bihr-woocommerce-importer' ); ?></th>
-                    <th style="width: 180px;"><?php esc_html_e( 'Actions', 'bihr-woocommerce-importer' ); ?></th>
+                    <th style="width: 80px;"><?php esc_html_e( 'Image', 'BIHR-SYNCH-main' ); ?></th>
+                    <th style="width: 30%;"><?php esc_html_e( 'Nom du produit', 'BIHR-SYNCH-main' ); ?></th>
+                    <th style="width: 150px;"><?php esc_html_e( 'Code BIHR', 'BIHR-SYNCH-main' ); ?></th>
+                    <th style="width: 100px;"><?php esc_html_e( 'Prix', 'BIHR-SYNCH-main' ); ?></th>
+                    <th style="width: 150px;"><?php esc_html_e( 'Stock', 'BIHR-SYNCH-main' ); ?></th>
+                    <th style="width: 100px;"><?php esc_html_e( 'Statut', 'BIHR-SYNCH-main' ); ?></th>
+                    <th style="width: 180px;"><?php esc_html_e( 'Actions', 'BIHR-SYNCH-main' ); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -435,7 +435,7 @@ jQuery(document).ready(function($) {
     // Utiliser la bonne URL AJAX
     var ajaxUrl = typeof bihrProgressData !== 'undefined' && bihrProgressData.ajaxurl 
         ? bihrProgressData.ajaxurl 
-        : (typeof ajaxurl !== 'undefined' ? ajaxurl : '<?php echo admin_url( 'admin-ajax.php' ); ?>');
+        : (typeof ajaxurl !== 'undefined' ? ajaxurl : '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>');
     
     console.log('URL AJAX utilisée:', ajaxUrl);
     
