@@ -5,7 +5,7 @@
  * Author: DrComputer60290 - Albert Benjamin
  * Author URI: https://drcomputer60290.fr
  * Version: 1.4.0
- * Text Domain: bihr-importer
+ * Text Domain: bihr-synchronisation
  * License: GPLv2 or later
  * 
  * Développé par: DrComputer60290

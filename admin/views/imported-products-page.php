@@ -45,13 +45,13 @@ $total_pages = $results->max_num_pages;
 ?>
 
 <div class="wrap">
-    <h1><?php echo esc_html__( 'Produits Importés de BIHR', 'bihr-importer' ); ?></h1>
+    <h1><?php echo esc_html__( 'Produits Importés de BIHR', 'bihr-synchronisation' ); ?></h1>
     
     <!-- Section de configuration de synchronisation automatique des stocks -->
     <div class="bihrwi-stock-sync-config" style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #0073aa; border-radius: 4px;">
         <h2 style="margin-top: 0; display: flex; align-items: center; gap: 10px;">
             <span class="dashicons dashicons-update-alt" style="color: #0073aa;"></span>
-            <?php esc_html_e( 'Synchronisation Automatique des Stocks', 'bihr-importer' ); ?>
+            <?php esc_html_e( 'Synchronisation Automatique des Stocks', 'bihr-synchronisation' ); ?>
         </h2>
         
         <?php
@@ -76,7 +76,7 @@ $total_pages = $results->max_num_pages;
             <table class="form-table">
                 <tr>
                     <th scope="row">
-                        <label for="sync_enabled"><?php esc_html_e( 'Activer la synchronisation automatique', 'bihr-importer' ); ?></label>
+                        <label for="sync_enabled"><?php esc_html_e( 'Activer la synchronisation automatique', 'bihr-synchronisation' ); ?></label>
                     </th>
                     <td>
                         <label for="sync_enabled">
@@ -85,42 +85,42 @@ $total_pages = $results->max_num_pages;
                                    name="sync_enabled" 
                                    value="1" 
                                    <?php checked( $sync_settings['enabled'], true ); ?>>
-                            <?php esc_html_e( 'Mettre à jour automatiquement les stocks depuis l\'API BIHR', 'bihr-importer' ); ?>
+                            <?php esc_html_e( 'Mettre à jour automatiquement les stocks depuis l\'API BIHR', 'bihr-synchronisation' ); ?>
                         </label>
                         <p class="description">
-                            <?php esc_html_e( 'Les stocks de tous les produits importés seront synchronisés selon la fréquence choisie.', 'bihr-importer' ); ?>
+                            <?php esc_html_e( 'Les stocks de tous les produits importés seront synchronisés selon la fréquence choisie.', 'bihr-synchronisation' ); ?>
                         </p>
                     </td>
                 </tr>
                 
                 <tr id="frequency-row" style="<?php echo $sync_settings['enabled'] ? '' : 'display:none;'; ?>">
                     <th scope="row">
-                        <label for="sync_frequency"><?php esc_html_e( 'Fréquence de synchronisation', 'bihr-importer' ); ?></label>
+                        <label for="sync_frequency"><?php esc_html_e( 'Fréquence de synchronisation', 'bihr-synchronisation' ); ?></label>
                     </th>
                     <td>
                         <select id="sync_frequency" name="sync_frequency" style="min-width: 250px;">
                             <option value="hourly" <?php selected( $sync_settings['frequency'], 'hourly' ); ?>>
-                                <?php esc_html_e( 'Toutes les heures', 'bihr-importer' ); ?>
+                                <?php esc_html_e( 'Toutes les heures', 'bihr-synchronisation' ); ?>
                             </option>
                             <option value="twicedaily" <?php selected( $sync_settings['frequency'], 'twicedaily' ); ?>>
-                                <?php esc_html_e( 'Deux fois par jour (matin et soir)', 'bihr-importer' ); ?>
+                                <?php esc_html_e( 'Deux fois par jour (matin et soir)', 'bihr-synchronisation' ); ?>
                             </option>
                             <option value="daily" <?php selected( $sync_settings['frequency'], 'daily' ); ?>>
-                                <?php esc_html_e( 'Une fois par jour', 'bihr-importer' ); ?>
+                                <?php esc_html_e( 'Une fois par jour', 'bihr-synchronisation' ); ?>
                             </option>
                             <option value="weekly" <?php selected( $sync_settings['frequency'], 'weekly' ); ?>>
-                                <?php esc_html_e( 'Une fois par semaine', 'bihr-importer' ); ?>
+                                <?php esc_html_e( 'Une fois par semaine', 'bihr-synchronisation' ); ?>
                             </option>
                         </select>
                         <p class="description">
-                            <?php esc_html_e( 'Choisissez la fréquence de mise à jour automatique des stocks.', 'bihr-importer' ); ?>
+                            <?php esc_html_e( 'Choisissez la fréquence de mise à jour automatique des stocks.', 'bihr-synchronisation' ); ?>
                         </p>
                     </td>
                 </tr>
                 
                 <tr id="time-row" style="<?php echo ( $sync_settings['enabled'] && in_array( $sync_settings['frequency'], array( 'daily', 'weekly' ) ) ) ? '' : 'display:none;'; ?>">
                     <th scope="row">
-                        <label for="sync_time"><?php esc_html_e( 'Heure de synchronisation', 'bihr-importer' ); ?></label>
+                        <label for="sync_time"><?php esc_html_e( 'Heure de synchronisation', 'bihr-synchronisation' ); ?></label>
                     </th>
                     <td>
                         <input type="time" 
@@ -129,14 +129,14 @@ $total_pages = $results->max_num_pages;
                                value="<?php echo esc_attr( $sync_settings['time'] ); ?>" 
                                style="min-width: 150px;">
                         <p class="description">
-                            <?php esc_html_e( 'Heure à laquelle la synchronisation quotidienne/hebdomadaire doit s\'exécuter (format 24h).', 'bihr-importer' ); ?>
+                            <?php esc_html_e( 'Heure à laquelle la synchronisation quotidienne/hebdomadaire doit s\'exécuter (format 24h).', 'bihr-synchronisation' ); ?>
                         </p>
                     </td>
                 </tr>
                 
                 <?php if ( ! empty( $sync_settings['last_sync'] ) ) : ?>
                 <tr>
-                    <th scope="row"><?php esc_html_e( 'Dernière synchronisation', 'bihr-importer' ); ?></th>
+                    <th scope="row"><?php esc_html_e( 'Dernière synchronisation', 'bihr-synchronisation' ); ?></th>
                     <td>
                         <strong><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $sync_settings['last_sync'] ) ); ?></strong>
                         <?php
@@ -145,7 +145,7 @@ $total_pages = $results->max_num_pages;
                             echo '<p class="description">';
                             printf(
                                 /* translators: %1$d: total produits, %2$d: réussis, %3$d: échoués, %4$s: durée */
-                                esc_html__( 'Produits synchronisés: %1$d | Réussis: %2$d | Échoués: %3$d | Durée: %4$s', 'bihr-importer' ),
+                                esc_html__( 'Produits synchronisés: %1$d | Réussis: %2$d | Échoués: %3$d | Durée: %4$s', 'bihr-synchronisation' ),
                                 intval( $last_sync_log['total'] ?? 0 ),
                                 intval( $last_sync_log['success'] ?? 0 ),
                                 intval( $last_sync_log['failed'] ?? 0 ),
@@ -160,14 +160,14 @@ $total_pages = $results->max_num_pages;
                 
                 <?php if ( ! empty( $sync_settings['next_sync'] ) ) : ?>
                 <tr>
-                    <th scope="row"><?php esc_html_e( 'Prochaine synchronisation', 'bihr-importer' ); ?></th>
+                    <th scope="row"><?php esc_html_e( 'Prochaine synchronisation', 'bihr-synchronisation' ); ?></th>
                     <td>
                         <strong><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $sync_settings['next_sync'] ) ); ?></strong>
                         <p class="description">
                             <?php
                             $time_until = human_time_diff( current_time( 'timestamp' ), $sync_settings['next_sync'] );
                             /* translators: %s: temps restant */
-                            printf( esc_html__( 'Dans %s', 'bihr-importer' ), esc_html( $time_until ) );
+                            printf( esc_html__( 'Dans %s', 'bihr-synchronisation' ), esc_html( $time_until ) );
                             ?>
                         </p>
                     </td>
@@ -178,12 +178,12 @@ $total_pages = $results->max_num_pages;
             <p class="submit">
                 <button type="submit" class="button button-primary">
                     <span class="dashicons dashicons-saved" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Enregistrer les paramètres', 'bihr-importer' ); ?>
+                    <?php esc_html_e( 'Enregistrer les paramètres', 'bihr-synchronisation' ); ?>
                 </button>
                 
                 <button type="button" id="manual-sync-now" class="button button-secondary" style="margin-left: 10px;">
                     <span class="dashicons dashicons-update" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Synchroniser maintenant', 'bihr-importer' ); ?>
+                    <?php esc_html_e( 'Synchroniser maintenant', 'bihr-synchronisation' ); ?>
                 </button>
             </p>
         </form>
@@ -272,22 +272,22 @@ $total_pages = $results->max_num_pages;
 
     <?php if ( empty( $products ) ) : ?>
         <div class="notice notice-info">
-            <p><?php esc_html_e( 'Aucun produit trouvé.', 'bihr-importer' ); ?></p>
+            <p><?php esc_html_e( 'Aucun produit trouvé.', 'bihr-synchronisation' ); ?></p>
         </div>
     <?php else : ?>
         <table class="wp-list-table widefat fixed striped" id="imported-products-table">
             <thead>
                 <tr>
                     <th style="width: 40px;">
-                        <input type="checkbox" id="select-all-products" title="<?php esc_attr_e( 'Tout sélectionner', 'bihr-importer' ); ?>">
+                        <input type="checkbox" id="select-all-products" title="<?php esc_attr_e( 'Tout sélectionner', 'bihr-synchronisation' ); ?>">
                     </th>
-                    <th style="width: 80px;"><?php esc_html_e( 'Image', 'bihr-importer' ); ?></th>
-                    <th style="width: 30%;"><?php esc_html_e( 'Nom du produit', 'bihr-importer' ); ?></th>
-                    <th style="width: 150px;"><?php esc_html_e( 'Code BIHR', 'bihr-importer' ); ?></th>
-                    <th style="width: 100px;"><?php esc_html_e( 'Prix', 'bihr-importer' ); ?></th>
-                    <th style="width: 150px;"><?php esc_html_e( 'Stock', 'bihr-importer' ); ?></th>
-                    <th style="width: 100px;"><?php esc_html_e( 'Statut', 'bihr-importer' ); ?></th>
-                    <th style="width: 180px;"><?php esc_html_e( 'Actions', 'bihr-importer' ); ?></th>
+                    <th style="width: 80px;"><?php esc_html_e( 'Image', 'bihr-synchronisation' ); ?></th>
+                    <th style="width: 30%;"><?php esc_html_e( 'Nom du produit', 'bihr-synchronisation' ); ?></th>
+                    <th style="width: 150px;"><?php esc_html_e( 'Code BIHR', 'bihr-synchronisation' ); ?></th>
+                    <th style="width: 100px;"><?php esc_html_e( 'Prix', 'bihr-synchronisation' ); ?></th>
+                    <th style="width: 150px;"><?php esc_html_e( 'Stock', 'bihr-synchronisation' ); ?></th>
+                    <th style="width: 100px;"><?php esc_html_e( 'Statut', 'bihr-synchronisation' ); ?></th>
+                    <th style="width: 180px;"><?php esc_html_e( 'Actions', 'bihr-synchronisation' ); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -316,7 +316,7 @@ $total_pages = $results->max_num_pages;
                         </td>
                         <td>
                             <code style="background: #f0f0f1; padding: 3px 6px; border-radius: 3px; font-size: 12px;">
-                                <?php echo esc_html( $product_code ? $product_code : __( 'N/A', 'bihr-importer' ) ); ?>
+                                <?php echo esc_html( $product_code ? $product_code : __( 'N/A', 'bihr-synchronisation' ) ); ?>
                             </code>
                         </td>
                         <td>
