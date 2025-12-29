@@ -206,31 +206,31 @@ $total_pages = $results->max_num_pages;
             
             <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                 <div>
-                    <label for="search-input"><?php esc_html_e( 'Recherche', 'BIHR-SYNCH-main' ); ?></label>
+                    <label for="search-input"><?php esc_html_e( 'Recherche', 'bihr-synchronisation' ); ?></label>
                     <input type="text" 
                            id="search-input" 
                            name="s" 
                            value="<?php echo esc_attr( $search ); ?>" 
-                           placeholder="<?php esc_attr_e( 'Nom ou code produit...', 'BIHR-SYNCH-main' ); ?>"
+                           placeholder="<?php esc_attr_e( 'Nom ou code produit...', 'bihr-synchronisation' ); ?>"
                            style="width: 250px;">
                 </div>
                 
                 <div>
-                    <label for="stock-filter"><?php esc_html_e( 'Stock', 'BIHR-SYNCH-main' ); ?></label>
+                    <label for="stock-filter"><?php esc_html_e( 'Stock', 'bihr-synchronisation' ); ?></label>
                     <select id="stock-filter" name="stock_status">
-                        <option value=""><?php esc_html_e( 'Tous', 'BIHR-SYNCH-main' ); ?></option>
-                        <option value="instock" <?php selected( $stock_filter, 'instock' ); ?>><?php esc_html_e( 'En stock', 'BIHR-SYNCH-main' ); ?></option>
-                        <option value="outofstock" <?php selected( $stock_filter, 'outofstock' ); ?>><?php esc_html_e( 'Rupture', 'BIHR-SYNCH-main' ); ?></option>
-                        <option value="onbackorder" <?php selected( $stock_filter, 'onbackorder' ); ?>><?php esc_html_e( 'Sur commande', 'BIHR-SYNCH-main' ); ?></option>
+                        <option value=""><?php esc_html_e( 'Tous', 'bihr-synchronisation' ); ?></option>
+                        <option value="instock" <?php selected( $stock_filter, 'instock' ); ?>><?php esc_html_e( 'En stock', 'bihr-synchronisation' ); ?></option>
+                        <option value="outofstock" <?php selected( $stock_filter, 'outofstock' ); ?>><?php esc_html_e( 'Rupture', 'bihr-synchronisation' ); ?></option>
+                        <option value="onbackorder" <?php selected( $stock_filter, 'onbackorder' ); ?>><?php esc_html_e( 'Sur commande', 'bihr-synchronisation' ); ?></option>
                     </select>
                 </div>
                 
                 <button type="submit" class="button button-primary">
-                    <?php esc_html_e( 'Filtrer', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Filtrer', 'bihr-synchronisation' ); ?>
                 </button>
                 
                 <a href="?page=bihrwi_imported_products" class="button">
-                    <?php esc_html_e( 'Réinitialiser', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Réinitialiser', 'bihr-synchronisation' ); ?>
                 </a>
             </div>
         </form>
@@ -240,7 +240,7 @@ $total_pages = $results->max_num_pages;
         <p style="margin: 0;">
             <?php
             /* translators: %d: nombre de produits */
-            printf( esc_html__( '%d produit(s) trouvé(s)', 'BIHR-SYNCH-main' ), intval( $total ) );
+            printf( esc_html__( '%d produit(s) trouvé(s)', 'bihr-synchronisation' ), intval( $total ) );
             ?>
         </p>
         
@@ -248,12 +248,12 @@ $total_pages = $results->max_num_pages;
             <div>
                 <button type="button" id="refresh-selected-stocks" class="button button-primary" disabled>
                     <span class="dashicons dashicons-update" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Actualiser les stocks sélectionnés', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Actualiser les stocks sélectionnés', 'bihr-synchronisation' ); ?>
                     (<span id="selected-count">0</span>)
                 </button>
                 <button type="button" id="refresh-all-stocks" class="button">
                     <span class="dashicons dashicons-update" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Actualiser tous les stocks', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Actualiser tous les stocks', 'bihr-synchronisation' ); ?>
                 </button>
             </div>
         <?php endif; ?>
@@ -330,7 +330,7 @@ $total_pages = $results->max_num_pages;
                                         if ( $stock_quantity !== null ) {
                                             echo '<strong>' . esc_html( $stock_quantity ) . '</strong>';
                                         } else {
-                                            echo '<strong>' . esc_html__( 'N/A', 'BIHR-SYNCH-main' ) . '</strong>';
+                                            echo '<strong>' . esc_html__( 'N/A', 'bihr-synchronisation' ) . '</strong>';
                                         }
                                         ?>
                                     </div>
@@ -338,13 +338,13 @@ $total_pages = $results->max_num_pages;
                                         <?php
                                         switch ( $stock_status ) {
                                             case 'instock':
-                                                esc_html_e( 'En stock', 'BIHR-SYNCH-main' );
+                                                esc_html_e( 'En stock', 'bihr-synchronisation' );
                                                 break;
                                             case 'outofstock':
-                                                esc_html_e( 'Rupture', 'BIHR-SYNCH-main' );
+                                                esc_html_e( 'Rupture', 'bihr-synchronisation' );
                                                 break;
                                             case 'onbackorder':
-                                                esc_html_e( 'Sur commande', 'BIHR-SYNCH-main' );
+                                                esc_html_e( 'Sur commande', 'bihr-synchronisation' );
                                                 break;
                                         }
                                         ?>
@@ -352,7 +352,7 @@ $total_pages = $results->max_num_pages;
                                 </div>
                                 <button type="button" 
                                         class="refresh-stock button button-small" 
-                                        title="<?php esc_attr_e( 'Rafraîchir le stock', 'BIHR-SYNCH-main' ); ?>"
+                                        title="<?php esc_attr_e( 'Rafraîchir le stock', 'bihr-synchronisation' ); ?>"
                                         style="padding: 4px 8px;">
                                     <span class="dashicons dashicons-update" style="font-size: 16px;"></span>
                                 </button>
@@ -362,10 +362,10 @@ $total_pages = $results->max_num_pages;
                             <?php
                             $status = $product->get_status();
                             $status_labels = array(
-                                'publish' => __( 'Publié', 'BIHR-SYNCH-main' ),
-                                'draft'   => __( 'Brouillon', 'BIHR-SYNCH-main' ),
-                                'pending' => __( 'En attente', 'BIHR-SYNCH-main' ),
-                                'private' => __( 'Privé', 'BIHR-SYNCH-main' ),
+                                'publish' => __( 'Publié', 'bihr-synchronisation' ),
+                                'draft'   => __( 'Brouillon', 'bihr-synchronisation' ),
+                                'pending' => __( 'En attente', 'bihr-synchronisation' ),
+                                'private' => __( 'Privé', 'bihr-synchronisation' ),
                             );
                             echo '<span class="status-' . esc_attr( $status ) . '">';
                             echo esc_html( $status_labels[ $status ] ?? $status );
@@ -374,10 +374,10 @@ $total_pages = $results->max_num_pages;
                         </td>
                         <td>
                             <a href="<?php echo esc_url( get_edit_post_link( $product->get_id() ) ); ?>" class="button button-small">
-                                <?php esc_html_e( 'Modifier', 'BIHR-SYNCH-main' ); ?>
+                                <?php esc_html_e( 'Modifier', 'bihr-synchronisation' ); ?>
                             </a>
                             <a href="<?php echo esc_url( get_permalink( $product->get_id() ) ); ?>" class="button button-small" target="_blank">
-                                <?php esc_html_e( 'Voir', 'BIHR-SYNCH-main' ); ?>
+                                <?php esc_html_e( 'Voir', 'bihr-synchronisation' ); ?>
                             </a>
                         </td>
                     </tr>
@@ -392,8 +392,8 @@ $total_pages = $results->max_num_pages;
                     $page_links = paginate_links( array(
                         'base'      => add_query_arg( 'paged', '%#%' ),
                         'format'    => '',
-                        'prev_text' => __( '&laquo;', 'BIHR-SYNCH-main' ),
-                        'next_text' => __( '&raquo;', 'BIHR-SYNCH-main' ),
+                        'prev_text' => __( '&laquo;', 'bihr-synchronisation' ),
+                        'next_text' => __( '&raquo;', 'bihr-synchronisation' ),
                         'total'     => $total_pages,
                         'current'   => $paged,
                     ) );
