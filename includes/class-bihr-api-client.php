@@ -121,7 +121,7 @@ class BihrWI_API_Client {
         $this->logger->log( 'Catalog start: code ' . $code . ' – réponse : ' . $body );
 
         if ( $code < 200 || $code >= 300 ) {
-            throw new Exception( 'Erreur API Bihr lors du démarrage du catalog : ' . $body );
+            throw new Exception( 'Erreur API Bihr lors du démarrage du catalog : ' . esc_html( $body ) );
         }
 
         $data = json_decode( $body, true );
@@ -164,7 +164,7 @@ class BihrWI_API_Client {
         $this->logger->log( 'Catalog status: code ' . $code . ' – réponse : ' . $body );
 
         if ( $code < 200 || $code >= 300 ) {
-            throw new Exception( 'Erreur API Bihr lors de la récupération du status : ' . $body );
+            throw new Exception( 'Erreur API Bihr lors de la récupération du status : ' . esc_html( $body ) );
         }
 
         $data = json_decode( $body, true );
@@ -230,7 +230,7 @@ class BihrWI_API_Client {
             wp_mkdir_p( $upload_dir );
         }
 
-        $filename = $prefix . '-' . date( 'Ymd-His' ) . '.zip';
+        $filename = $prefix . '-' . gmdate( 'Ymd-His' ) . '.zip';
         $filepath = trailingslashit( $upload_dir ) . $filename;
 
         file_put_contents( $filepath, $body );

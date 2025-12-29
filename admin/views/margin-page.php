@@ -150,13 +150,13 @@ $categories = array(
                             <tr class="price-range-row">
                                 <td style="text-align: center;">
                                     <input type="checkbox" 
-                                           name="price_range_margins[<?php echo $index; ?>][enabled]" 
+                                           name="price_range_margins[<?php echo esc_attr( $index ); ?>][enabled]" 
                                            value="1"
                                            <?php checked( $range['enabled'], true ); ?> />
                                 </td>
                                 <td>
                                     <input type="number" 
-                                           name="price_range_margins[<?php echo $index; ?>][min]" 
+                                           name="price_range_margins[<?php echo esc_attr( $index ); ?>][min]" 
                                            value="<?php echo esc_attr( $range['min'] ); ?>" 
                                            step="0.01" 
                                            min="0"
@@ -165,7 +165,7 @@ $categories = array(
                                 </td>
                                 <td>
                                     <input type="number" 
-                                           name="price_range_margins[<?php echo $index; ?>][max]" 
+                                           name="price_range_margins[<?php echo esc_attr( $index ); ?>][max]" 
                                            value="<?php echo esc_attr( $range['max'] ); ?>" 
                                            step="0.01" 
                                            min="0"
@@ -173,14 +173,14 @@ $categories = array(
                                            style="width: 100%;" />
                                 </td>
                                 <td>
-                                    <select name="price_range_margins[<?php echo $index; ?>][type]" style="width: 100%;">
+                                    <select name="price_range_margins[<?php echo esc_attr( $index ); ?>][type]" style="width: 100%;">
                                         <option value="percentage" <?php selected( $range['type'], 'percentage' ); ?>>Pourcentage (%)</option>
                                         <option value="fixed" <?php selected( $range['type'], 'fixed' ); ?>>Fixe (€)</option>
                                     </select>
                                 </td>
                                 <td>
                                     <input type="number" 
-                                           name="price_range_margins[<?php echo $index; ?>][value]" 
+                                           name="price_range_margins[<?php echo esc_attr( $index ); ?>][value]" 
                                            value="<?php echo esc_attr( $range['value'] ); ?>" 
                                            step="0.01" 
                                            min="0"

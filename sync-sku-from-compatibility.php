@@ -93,7 +93,7 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             
             $progress_percent = $total > 0 ? ($offset / $total) * 100 : 0;
             echo '<div class="progress">';
-            echo '<div class="progress-bar" style="width: ' . $progress_percent . '%">' . round($progress_percent, 1) . '%</div>';
+            echo '<div class="progress-bar" style="width: ' . esc_attr( $progress_percent ) . '%">' . esc_html( round( $progress_percent, 1 ) ) . '%</div>';
             echo '</div>';
             
             // Récupérer un batch de produits avec leur part_number
@@ -131,7 +131,7 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
                 $sku = $part_number; // Le SKU = part_number (pas product_code!)
                 
                 if (empty($sku)) {
-                    echo '<div class="log-entry warning">⚠️ WC #' . $wc_product_id . ' : part_number vide</div>';
+                    echo '<div class="log-entry warning">⚠️ WC #' . esc_html( $wc_product_id ) . ' : part_number vide</div>';
                     $errors++;
                     continue;
                 }
@@ -153,7 +153,7 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
                         array('%s'),
                         array('%d', '%s')
                     );
-                    echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' : SKU mis à jour → ' . $sku . ' (code: ' . $product_code . ($new_part_number ? ', new: ' . $new_part_number : '') . ')</div>';
+                    echo '<div class="log-entry success">✅ WC #' . esc_html( $wc_product_id ) . ' : SKU mis à jour → ' . esc_html( $sku ) . ' (code: ' . esc_html( $product_code ) . ( $new_part_number ? ', new: ' . esc_html( $new_part_number ) : '' ) . ')</div>';
                     $sku_updated++;
                 } else {
                     // INSERT
@@ -168,10 +168,10 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
                     );
                     
                     if ($result) {
-                        echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' : SKU créé → ' . $sku . ' (code: ' . $product_code . ($new_part_number ? ', new: ' . $new_part_number : '') . ')</div>';
+                        echo '<div class="log-entry success">✅ WC #' . esc_html( $wc_product_id ) . ' : SKU créé → ' . esc_html( $sku ) . ' (code: ' . esc_html( $product_code ) . ( $new_part_number ? ', new: ' . esc_html( $new_part_number ) : '' ) . ')</div>';
                         $sku_inserted++;
                     } else {
-                        echo '<div class="log-entry error">❌ WC #' . $wc_product_id . ' : Erreur INSERT</div>';
+                        echo '<div class="log-entry error">❌ WC #' . esc_html( $wc_product_id ) . ' : Erreur INSERT</div>';
                         $errors++;
                     }
                 }
@@ -185,9 +185,9 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             echo '</div>';
             
             echo '<div class="stats">';
-            echo '<div class="stat-box"><strong class="success">' . $sku_inserted . '</strong> SKU créés</div>';
-            echo '<div class="stat-box"><strong class="warning">' . $sku_updated . '</strong> SKU mis à jour</div>';
-            echo '<div class="stat-box"><strong class="error">' . $errors . '</strong> Erreurs</div>';
+            echo '<div class="stat-box"><strong class="success">' . esc_html( $sku_inserted ) . '</strong> SKU créés</div>';
+            echo '<div class="stat-box"><strong class="warning">' . esc_html( $sku_updated ) . '</strong> SKU mis à jour</div>';
+            echo '<div class="stat-box"><strong class="error">' . esc_html( $errors ) . '</strong> Erreurs</div>';
             echo '</div>';
             
             $new_offset = $offset + $batch_size;
@@ -196,7 +196,7 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
                 // Continuer
                 echo '<script>
                     setTimeout(function() {
-                        window.location.href = "?action=sync&offset=' . $new_offset . '";
+                        window.location.href = "?action=sync&offset=' . esc_js( $new_offset ) . '";
                     }, 1000);
                 </script>';
                 echo '<p class="warning">⏳ Rechargement dans 1 seconde...</p>';
@@ -284,12 +284,12 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
                 }
                 
                 echo '<tr>';
-                echo '<td>' . $row['wc_id'] . '</td>';
-                echo '<td>' . substr($row['name'], 0, 40) . '...</td>';
-                echo '<td>' . $row['product_code'] . '</td>';
-                echo '<td>' . ($row['new_part_number'] ?: '-') . '</td>';
-                echo '<td><strong>' . ($part_number ?: '-') . '</strong></td>';
-                echo '<td>' . ($current_sku ?: '-') . '</td>';
+                echo '<td>' . esc_html( $row['wc_id'] ) . '</td>';
+                echo '<td>' . esc_html( substr( $row['name'], 0, 40 ) ) . '...</td>';
+                echo '<td>' . esc_html( $row['product_code'] ) . '</td>';
+                echo '<td>' . ( ! empty( $row['new_part_number'] ) ? esc_html( $row['new_part_number'] ) : '-' ) . '</td>';
+                echo '<td><strong>' . ( ! empty( $part_number ) ? esc_html( $part_number ) : '-' ) . '</strong></td>';
+                echo '<td>' . ( ! empty( $current_sku ) ? esc_html( $current_sku ) : '-' ) . '</td>';
                 echo '<td>' . $status . '</td>';
                 echo '</tr>';
             }

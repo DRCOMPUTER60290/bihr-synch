@@ -125,16 +125,75 @@ class BihrWI_Vehicle_Compatibility {
         $file_path = $file_path ?: $this->import_dir . 'VehiclesList.csv';
         $this->logger->log( "Fichier: {$file_path}" );
 
-        if ( ! file_exists( $file_path ) ) {
-            $this->logger->log( 'Erreur: Fichier introuvable' );
-            return array(
-                'success' => false,
-                'message' => 'Fichier introuvable: ' . $file_path,
-                'imported' => 0,
-                'errors' => 0
-            );
-        }
 
+            global $wp_filesystem;
+            if ( ! function_exists( 'WP_Filesystem' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+            }
+            WP_Filesystem();
+            if ( ! $wp_filesystem->exists( $file_path ) ) {
+                $this->logger->log( 'Erreur: Impossible d\'ouvrir le fichier' );
+                return array(
+                    'success' => false,
+                    'message' => 'Impossible d\'ouvrir le fichier',
+                    'imported' => 0,
+                    'errors' => 0
+                );
+            }
+            $content = $wp_filesystem->get_contents( $file_path );
+            if ( false === $content ) {
+                $this->logger->log( 'Erreur: Impossible de lire le fichier' );
+                return array(
+                    'success' => false,
+                    'message' => 'Impossible de lire le fichier',
+                    'imported' => 0,
+                    'errors' => 0
+                );
+            }
+            $lines = explode( "\n", $content );
+            $header = str_getcsv( array_shift( $lines ), ',' );
+            if ( ! $header ) {
+                return array(
+                    'success' => false,
+                    'message' => 'Fichier CSV invalide (header manquant)',
+                    'imported' => 0,
+                    'errors' => 0
+                );
+            }
+            $count = 0;
+            $errors = 0;
+            foreach ( $lines as $line ) {
+                if ( trim( $line ) === '' ) continue;
+                $row = str_getcsv( $line, ',' );
+                if ( count( $row ) < 11 ) {
+                    continue;
+                }
+                $vehicle_data = array(
+                    'vehicle_code'           => $row[0],
+                    'version_code'           => $row[1],
+                    'commercial_model_code'  => $row[2],
+                    'manufacturer_code'      => $row[3],
+                    'vehicle_year'           => $row[4],
+                    'version_name'           => $row[5],
+                    'commercial_model_name'  => $row[6],
+                    'manufacturer_name'      => $row[7],
+                    'universe_name'          => $row[8],
+                    'category_name'          => $row[9],
+                    'displacement_cm3'       => intval( $row[10] ),
+                );
+                $result = $wpdb->insert( $this->vehicles_table, $vehicle_data );
+                if ( $result ) {
+                    $count++;
+                } else {
+                    $errors++;
+                }
+            }
+            $this->logger->log( "✓ Import terminé: {$count} véhicules importés, {$errors} erreurs" );
+            return array(
+                'success' => true,
+                'imported' => $count,
+                'errors' => $errors
+            );
         global $wpdb;
 
         // Vider la table avant import
@@ -301,9 +360,12 @@ class BihrWI_Vehicle_Compatibility {
         }
 
         $batch_size = 5000; // Traiter 5000 lignes par batch (optimisé pour très gros fichiers)
-        $h = fopen( $file_path, 'r' );
-        
-        if ( ! $h ) {
+        global $wp_filesystem;
+        if ( ! function_exists( 'WP_Filesystem' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+        WP_Filesystem();
+        if ( ! $wp_filesystem->exists( $file_path ) ) {
             return array(
                 'success'       => false,
                 'imported'      => 0,
@@ -314,11 +376,21 @@ class BihrWI_Vehicle_Compatibility {
                 'is_complete'   => false
             );
         }
-
-        // Lire le header
-        $header = fgetcsv( $h, 10000, ',' );
+        $content = $wp_filesystem->get_contents( $file_path );
+        if ( false === $content ) {
+            return array(
+                'success'       => false,
+                'imported'      => 0,
+                'errors'        => 0,
+                'total_lines'   => $total_lines,
+                'processed'     => 0,
+                'progress'      => 0,
+                'is_complete'   => false
+            );
+        }
+        $lines = explode( "\n", $content );
+        $header = str_getcsv( array_shift( $lines ), ',' );
         if ( ! $header ) {
-            fclose( $h );
             delete_transient( $transient_key );
             return array(
                 'success'       => false,
@@ -330,24 +402,21 @@ class BihrWI_Vehicle_Compatibility {
                 'is_complete'   => false
             );
         }
-
         // Sauter aux lignes précédentes si reprise
         for ( $i = 0; $i < $batch_start; $i++ ) {
-            fgetcsv( $h, 10000, ',' );
+            array_shift( $lines );
         }
-
         $count = 0;
         $errors = 0;
         $batch = array();
         $current_line = $batch_start;
-
-        // Traiter un batch
-        while ( ( $row = fgetcsv( $h, 10000, ',' ) ) !== false && $current_line < $batch_start + $batch_size ) {
+        foreach ( $lines as $line ) {
+            if ( trim( $line ) === '' || $current_line >= $batch_start + $batch_size ) continue;
+            $row = str_getcsv( $line, ',' );
             if ( count( $row ) < 3 ) {
                 $current_line++;
                 continue;
             }
-
             $batch[] = array(
                 'vehicle_code'              => trim( $row[0] ?? '' ),
                 'part_number'               => trim( $row[1] ?? '' ),
@@ -358,11 +427,8 @@ class BihrWI_Vehicle_Compatibility {
                 'attributes'                => trim( $row[6] ?? '' ),
                 'source_brand'              => $brand_name,
             );
-
             $current_line++;
         }
-
-        fclose( $h );
 
         // Insérer le batch en masse (optimisé)
         if ( ! empty( $batch ) ) {
@@ -428,21 +494,25 @@ class BihrWI_Vehicle_Compatibility {
      */
     protected function count_csv_lines( $file_path ) {
         $count = 0;
-        $h = fopen( $file_path, 'r' );
-        
-        if ( ! $h ) {
+        global $wp_filesystem;
+        if ( ! function_exists( 'WP_Filesystem' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+        WP_Filesystem();
+        if ( ! $wp_filesystem->exists( $file_path ) ) {
             return 0;
         }
-
-        // Passer le header
-        fgetcsv( $h, 10000, ',' );
-
-        // Compter les lignes
-        while ( fgetcsv( $h, 10000, ',' ) !== false ) {
+        $content = $wp_filesystem->get_contents( $file_path );
+        if ( false === $content ) {
+            return 0;
+        }
+        $lines = explode( "\n", $content );
+        array_shift( $lines ); // header
+        $count = 0;
+        foreach ( $lines as $line ) {
+            if ( trim( $line ) === '' ) continue;
             $count++;
         }
-
-        fclose( $h );
         return $count;
     }
 

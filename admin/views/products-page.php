@@ -190,8 +190,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             <?php 
             $catalogs = isset( $_GET['bihrwi_catalogs_count'] ) ? intval( $_GET['bihrwi_catalogs_count'] ) : 0;
             $files = intval( $_GET['bihrwi_files_count'] );
-            echo $catalogs > 0 ? $catalogs . ' catalogue(s) téléchargé(s), ' : '';
-            echo $files . ' fichier(s) CSV extrait(s) dans le dossier d\'import.';
+            echo $catalogs > 0 ? esc_html( $catalogs ) . ' catalogue(s) téléchargé(s), ' : '';
+            echo esc_html( $files ) . ' fichier(s) CSV extrait(s) dans le dossier d\'import.';
             ?>
         </p></div>
     <?php endif; ?>

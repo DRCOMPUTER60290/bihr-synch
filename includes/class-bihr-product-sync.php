@@ -426,7 +426,8 @@ class BihrWI_Product_Sync {
         }
 
         // Détecte le type MIME du fichier téléchargé
-        $file_type = wp_check_filetype_and_ext( $tmp, basename( parse_url( $image_url, PHP_URL_PATH ) ) );
+        $parsed_url = wp_parse_url( $image_url );
+        $file_type = wp_check_filetype_and_ext( $tmp, basename( $parsed_url['path'] ) );
         
         // Si le type n'est pas détecté, on essaie avec mime_content_type
         if ( ! $file_type['ext'] && function_exists( 'mime_content_type' ) ) {
@@ -446,7 +447,7 @@ class BihrWI_Product_Sync {
         }
         
         // Génère un nom de fichier avec l'extension appropriée
-        $filename = basename( parse_url( $image_url, PHP_URL_PATH ) );
+        $filename = basename( $parsed_url['path'] );
         
         // Si le fichier n'a pas d'extension reconnue, on ajoute celle détectée
         if ( ! empty( $file_type['ext'] ) ) {
@@ -466,7 +467,9 @@ class BihrWI_Product_Sync {
 
         if ( is_wp_error( $attachment_id ) ) {
             $this->logger->log( 'Erreur media_handle_sideload : ' . $attachment_id->get_error_message() );
-            @unlink( $tmp );
+            if ( file_exists( $tmp ) ) {
+                wp_delete_file( $tmp );
+            }
             return 0;
         }
 
@@ -1386,7 +1389,9 @@ class BihrWI_Product_Sync {
         $this->logger->log( "Extraction ZIP réussie: {$count} fichiers CSV dans {$import_dir}" );
 
         // Supprime le fichier ZIP après extraction
-        @unlink( $zip_file );
+        if ( file_exists( $zip_file ) ) {
+            wp_delete_file( $zip_file );
+        }
 
         return $count;
     }

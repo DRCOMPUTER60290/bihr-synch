@@ -400,15 +400,15 @@ class BihrWI_Vehicle_Filter_Widget extends WP_Widget {
     }
 
     public function widget( $args, $instance ) {
-        echo $args['before_widget'];
+        echo isset( $args['before_widget'] ) ? wp_kses_post( $args['before_widget'] ) : '';
 
         if ( ! empty( $instance['title'] ) ) {
-            echo $args['before_title'] . esc_html( $instance['title'] ) . $args['after_title'];
+            echo ( isset( $args['before_title'] ) ? wp_kses_post( $args['before_title'] ) : '' ) . esc_html( $instance['title'] ) . ( isset( $args['after_title'] ) ? wp_kses_post( $args['after_title'] ) : '' );
         }
 
         echo do_shortcode( '[bihr_vehicle_filter show_button="yes"]' );
 
-        echo $args['after_widget'];
+        echo isset( $args['after_widget'] ) ? wp_kses_post( $args['after_widget'] ) : '';
     }
 
     public function form( $instance ) {

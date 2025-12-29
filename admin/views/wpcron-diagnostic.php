@@ -30,7 +30,7 @@ if ( ! defined( 'ABSPATH' ) ) {
             </tr>
             <tr style="background:#fff;">
                 <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>Requêtes loopback</strong></td>
-                <td style="padding:8px; border-bottom:1px solid #ddd;"><?php echo $loopback_status; ?></td>
+                <td style="padding:8px; border-bottom:1px solid #ddd;"><?php echo esc_html( $loopback_status ); ?></td>
             </tr>
             <tr style="background:#fff;">
                 <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>Heure du serveur</strong></td>

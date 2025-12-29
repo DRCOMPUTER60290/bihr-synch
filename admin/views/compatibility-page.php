@@ -272,7 +272,7 @@ $stats = $compatibility->get_statistics();
 
 <script>
 jQuery(function($) {
-    const nonce = '<?php echo wp_create_nonce( 'bihrwi_ajax_nonce' ); ?>';
+    const nonce = '<?php echo esc_js( wp_create_nonce( 'bihrwi_ajax_nonce' ) ); ?>';
     const ajaxUrl = ajaxurl;
     const brands = <?php echo wp_json_encode( array_keys( $brands ) ); ?>;
 

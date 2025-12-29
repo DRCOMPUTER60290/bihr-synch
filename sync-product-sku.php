@@ -87,7 +87,7 @@ set_time_limit(0);
             
             $progress_percent = $total > 0 ? ($offset / $total) * 100 : 0;
             echo '<div class="progress">';
-            echo '<div class="progress-bar" style="width: ' . $progress_percent . '%">' . round($progress_percent, 1) . '%</div>';
+            echo '<div class="progress-bar" style="width: ' . esc_attr( $progress_percent ) . '%">' . esc_html( round( $progress_percent, 1 ) ) . '%</div>';
             echo '</div>';
             
             // Récupérer un batch de produits WC avec leur code BIHR
@@ -149,7 +149,7 @@ set_time_limit(0);
                         array('%s'),
                         array('%d', '%s')
                     );
-                    echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' ← BIHR #' . $bihr_id . ' : SKU → ' . $sku . '</div>';
+                    echo '<div class="log-entry success">✅ WC #' . esc_html( $wc_product_id ) . ' ← BIHR #' . esc_html( $bihr_id ) . ' : SKU → ' . esc_html( $sku ) . '</div>';
                     $sku_updated++;
                 } else {
                     // INSERT
@@ -164,10 +164,10 @@ set_time_limit(0);
                     );
                     
                     if ($result) {
-                        echo '<div class="log-entry success">✅ WC #' . $wc_product_id . ' ← BIHR #' . $bihr_id . ' : SKU créé → ' . $sku . '</div>';
+                        echo '<div class="log-entry success">✅ WC #' . esc_html( $wc_product_id ) . ' ← BIHR #' . esc_html( $bihr_id ) . ' : SKU créé → ' . esc_html( $sku ) . '</div>';
                         $sku_inserted++;
                     } else {
-                        echo '<div class="log-entry error">❌ WC #' . $wc_product_id . ' : Erreur INSERT</div>';
+                        echo '<div class="log-entry error">❌ WC #' . esc_html( $wc_product_id ) . ' : Erreur INSERT</div>';
                         $errors++;
                     }
                 }
@@ -181,10 +181,10 @@ set_time_limit(0);
             echo '</div>';
             
             echo '<div class="stats">';
-            echo '<div class="stat-box"><strong class="success">' . $linked . '</strong> Produits liés</div>';
-            echo '<div class="stat-box"><strong class="success">' . $sku_inserted . '</strong> SKU créés</div>';
-            echo '<div class="stat-box"><strong class="warning">' . $sku_updated . '</strong> SKU mis à jour</div>';
-            echo '<div class="stat-box"><strong class="error">' . $not_found . '</strong> Non trouvés</div>';
+            echo '<div class="stat-box"><strong class="success">' . esc_html( $linked ) . '</strong> Produits liés</div>';
+            echo '<div class="stat-box"><strong class="success">' . esc_html( $sku_inserted ) . '</strong> SKU créés</div>';
+            echo '<div class="stat-box"><strong class="warning">' . esc_html( $sku_updated ) . '</strong> SKU mis à jour</div>';
+            echo '<div class="stat-box"><strong class="error">' . esc_html( $not_found ) . '</strong> Non trouvés</div>';
             echo '</div>';
             
             $new_offset = $offset + $batch_size;
@@ -193,7 +193,7 @@ set_time_limit(0);
                 // Continuer
                 echo '<script>
                     setTimeout(function() {
-                        window.location.href = "?action=sync&offset=' . $new_offset . '";
+                        window.location.href = "?action=sync&offset=' . esc_js( $new_offset ) . '";
                     }, 1000);
                 </script>';
                 echo '<p class="warning">⏳ Rechargement dans 1 seconde...</p>';
@@ -270,11 +270,11 @@ set_time_limit(0);
                 }
                 
                 echo '<tr>';
-                echo '<td>' . $row['wc_id'] . '</td>';
-                echo '<td>' . substr($row['name'], 0, 50) . '...</td>';
-                echo '<td><strong>' . $row['product_code'] . '</strong></td>';
-                echo '<td>' . ($row['current_sku'] ?: '-') . '</td>';
-                echo '<td>' . ($row['bihr_id'] ?: '-') . '</td>';
+                echo '<td>' . esc_html( $row['wc_id'] ) . '</td>';
+                echo '<td>' . esc_html( substr( $row['name'], 0, 50 ) ) . '...</td>';
+                echo '<td><strong>' . esc_html( $row['product_code'] ) . '</strong></td>';
+                echo '<td>' . ( ! empty( $row['current_sku'] ) ? esc_html( $row['current_sku'] ) : '-' ) . '</td>';
+                echo '<td>' . ( ! empty( $row['bihr_id'] ) ? esc_html( $row['bihr_id'] ) : '-' ) . '</td>';
                 echo '<td>' . $status . '</td>';
                 echo '</tr>';
             }
