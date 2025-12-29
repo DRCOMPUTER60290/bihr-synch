@@ -313,8 +313,8 @@ class BihrWI_Admin {
     public function register_menus() {
         // Menu principal avec dashboard
         add_menu_page(
-            __( 'BIHR WooCommerce', 'bihr-woocommerce-importer' ),
-            __( 'BIHR', 'bihr-woocommerce-importer' ),
+            __( 'BIHR WooCommerce', 'BIHR-SYNCH-main' ),
+            __( 'BIHR', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-dashboard',
             array( $this, 'render_dashboard_page' ),
@@ -325,8 +325,8 @@ class BihrWI_Admin {
         // Dashboard (page d'accueil)
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Dashboard BIHR', 'bihr-woocommerce-importer' ),
-            __( '🏠 Accueil', 'bihr-woocommerce-importer' ),
+            __( 'Dashboard BIHR', 'BIHR-SYNCH-main' ),
+            __( '🏠 Accueil', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-dashboard',
             array( $this, 'render_dashboard_page' )
@@ -334,8 +334,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Authentification Bihr', 'bihr-woocommerce-importer' ),
-            __( '🔐 Authentification', 'bihr-woocommerce-importer' ),
+            __( 'Authentification Bihr', 'BIHR-SYNCH-main' ),
+            __( '🔐 Authentification', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-auth',
             array( $this, 'render_auth_page' )
@@ -343,8 +343,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Logs Bihr', 'bihr-woocommerce-importer' ),
-            __( '📊 Logs', 'bihr-woocommerce-importer' ),
+            __( 'Logs Bihr', 'BIHR-SYNCH-main' ),
+            __( '📊 Logs', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-logs',
             array( $this, 'render_logs_page' )
@@ -352,8 +352,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Produits Bihr', 'bihr-woocommerce-importer' ),
-            __( '📦 Produits BIHR', 'bihr-woocommerce-importer' ),
+            __( 'Produits Bihr', 'BIHR-SYNCH-main' ),
+            __( '📦 Produits BIHR', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-products',
             array( $this, 'render_products_page' )
@@ -361,8 +361,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Paramètres Commandes', 'bihr-woocommerce-importer' ),
-            __( '🛒 Commandes', 'bihr-woocommerce-importer' ),
+            __( 'Paramètres Commandes', 'BIHR-SYNCH-main' ),
+            __( '🛒 Commandes', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-orders',
             array( $this, 'render_orders_settings_page' )
@@ -370,8 +370,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Gestion des marges', 'bihr-woocommerce-importer' ),
-            __( '💰 Marges', 'bihr-woocommerce-importer' ),
+            __( 'Gestion des marges', 'BIHR-SYNCH-main' ),
+            __( '💰 Marges', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-margins',
             array( $this, 'render_margins_page' )
@@ -379,8 +379,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Produits Importés', 'bihr-woocommerce-importer' ),
-            __( '✅ Produits Importés', 'bihr-woocommerce-importer' ),
+            __( 'Produits Importés', 'BIHR-SYNCH-main' ),
+            __( '✅ Produits Importés', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-imported-products',
             array( $this, 'render_imported_products_page' )
@@ -388,8 +388,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Compatibilité Véhicules', 'bihr-woocommerce-importer' ),
-            __( '🚗 Compatibilité', 'bihr-woocommerce-importer' ),
+            __( 'Compatibilité Véhicules', 'BIHR-SYNCH-main' ),
+            __( '🚗 Compatibilité', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-compatibility',
             array( $this, 'render_compatibility_page' )
@@ -397,8 +397,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Synchronisation SKU (Compatibilité)', 'bihr-woocommerce-importer' ),
-            __( '🔄 Synchro SKU', 'bihr-woocommerce-importer' ),
+            __( 'Synchronisation SKU (Compatibilité)', 'BIHR-SYNCH-main' ),
+            __( '🔄 Synchro SKU', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-sku-sync-compat',
             array( $this, 'render_sku_sync_compat_page' )
@@ -406,8 +406,8 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
-            __( 'Diagnostic WP‑Cron', 'bihr-woocommerce-importer' ),
-            __( '⚙️ WP‑Cron', 'bihr-woocommerce-importer' ),
+            __( 'Diagnostic WP‑Cron', 'BIHR-SYNCH-main' ),
+            __( '⚙️ WP‑Cron', 'BIHR-SYNCH-main' ),
             'manage_woocommerce',
             'bihr-wpcron',
             array( $this, 'render_wpcron_diagnostic_page' )
@@ -532,13 +532,13 @@ class BihrWI_Admin {
     public function render_products_page() {
         // Vérifier les permissions
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_die( esc_html__( 'Vous n\'avez pas les permissions nécessaires pour accéder à cette page.', 'bihr-woocommerce-importer' ) );
+            wp_die( esc_html__( 'Vous n\'avez pas les permissions nécessaires pour accéder à cette page.', 'BIHR-SYNCH-main' ) );
         }
 
         // Vérifier le nonce si présent (filtres appliqués)
         if ( isset( $_GET['bihrwi_filter_nonce_field'] ) ) {
             if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['bihrwi_filter_nonce_field'] ) ), 'bihrwi_filter_nonce' ) ) {
-                wp_die( esc_html__( 'Erreur de sécurité. Veuillez réessayer.', 'bihr-woocommerce-importer' ) );
+                wp_die( esc_html__( 'Erreur de sécurité. Veuillez réessayer.', 'BIHR-SYNCH-main' ) );
             }
         }
 
@@ -1004,10 +1004,14 @@ include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
     $import_dir = WP_CONTENT_DIR . '/uploads/bihr-import/';
     if ( is_dir( $import_dir ) ) {
         foreach ( glob( $import_dir . '*.csv' ) as $file ) {
-            @unlink( $file );
+            if ( file_exists( $file ) ) {
+                wp_delete_file( $file );
+            }
         }
         foreach ( glob( $import_dir . '*.zip' ) as $file ) {
-            @unlink( $file );
+            if ( file_exists( $file ) ) {
+                wp_delete_file( $file );
+            }
         }
     }
 
@@ -1461,19 +1465,21 @@ include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
 					
 					$product->save();
 					
-					$this->logger->log( sprintf(
-						'Stock WooCommerce mis à jour pour %s (ID: %d): %d unités',
-						$product_code,
-						$product_id,
-						$stock_level
-					) );
+                    $this->logger->log( sprintf(
+                        /* translators: 1: code produit, 2: ID produit, 3: stock */
+                        'Stock WooCommerce mis à jour pour %1$s (ID: %2$d): %3$d unités',
+                        $product_code,
+                        $product_id,
+                        $stock_level
+                    ) );
 				}
 			} else {
-				$this->logger->log( sprintf(
-					'Stock temps réel récupéré pour %s: %d unités (pas de mise à jour WooCommerce)',
-					$product_code,
-					$stock_level
-				) );
+                $this->logger->log( sprintf(
+                    /* translators: 1: code produit, 2: stock */
+                    'Stock temps réel récupéré pour %1$s: %2$d unités (pas de mise à jour WooCommerce)',
+                    $product_code,
+                    $stock_level
+                ) );
 			}
 
 			wp_send_json_success( array(
@@ -1505,7 +1511,8 @@ include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
 			if ( $result['success'] ) {
 				wp_send_json_success( array(
 					'message' => sprintf(
-						'Import terminé : %d véhicules importés, %d échecs',
+                        /* translators: 1: nombre de véhicules importés, 2: nombre d'échecs */
+                        'Import terminé : %1$d véhicules importés, %2$d échecs',
 						$result['imported'],
 						$result['errors']
 					),
@@ -1547,7 +1554,8 @@ include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
 			if ( $result['success'] ) {
 				wp_send_json_success( array(
 					'message' => sprintf(
-						'%s : %d compatibilités importées (batch)',
+                        /* translators: 1: marque, 2: nombre de compatibilités */
+                        '%1$s : %2$d compatibilités importées (batch)',
 						$brand,
 						$result['imported']
 					),
@@ -2161,7 +2169,8 @@ include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
             update_option( 'bihrwi_stock_sync_settings', $settings );
 
             $this->logger->log( sprintf(
-                'Synchronisation automatique terminée: %d produits, %d réussis, %d échoués',
+                /* translators: 1: nombre de produits, 2: nombre de réussites, 3: nombre d'échecs */
+                'Synchronisation automatique terminée: %1$d produits, %2$d réussis, %3$d échoués',
                 $result['total'],
                 $result['success'],
                 $result['failed']

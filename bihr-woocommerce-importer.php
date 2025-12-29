@@ -5,7 +5,7 @@
  * Author: DrComputer60290 - Albert Benjamin
  * Author URI: https://drcomputer60290.fr
  * Version: 1.4.0
- * Text Domain: bihr-woocommerce-importer
+ * Text Domain: BIHR-SYNCH-main
  * 
  * Développé par: DrComputer60290
  * Entreprise: DrComputer60290
@@ -33,7 +33,7 @@ if ( ! function_exists( 'bwi_fs' ) ) {
 
             $bwi_fs = fs_dynamic_init( array(
                 'id'                  => '22615',
-                'slug'                => 'bihr-woocommerce-importer',
+                'slug'                => 'BIHR-SYNCH-main',
                 'type'                => 'plugin',
                 'public_key'          => 'pk_9339663c54962dd345ba8f2dfd5bd',
                 'is_premium'          => true,
@@ -131,7 +131,7 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['five_minutes'] ) ) {
         $schedules['five_minutes'] = array(
             'interval' => 300,
-            'display'  => __( 'Every 5 Minutes', 'bihr-woocommerce-importer' ),
+            'display'  => __( 'Every 5 Minutes', 'BIHR-SYNCH-main' ),
         );
     }
 
@@ -139,14 +139,14 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['weekly'] ) ) {
         $schedules['weekly'] = array(
             'interval' => 604800, // 7 jours
-            'display'  => __( 'Every Week', 'bihr-woocommerce-importer' ),
+            'display'  => __( 'Every Week', 'BIHR-SYNCH-main' ),
         );
     }
 
     if ( ! isset( $schedules['biweekly'] ) ) {
         $schedules['biweekly'] = array(
             'interval' => 1209600, // 14 jours
-            'display'  => __( 'Every 2 Weeks', 'bihr-woocommerce-importer' ),
+            'display'  => __( 'Every 2 Weeks', 'BIHR-SYNCH-main' ),
         );
     }
     return $schedules;
