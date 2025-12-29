@@ -253,7 +253,7 @@ class BihrWI_Order_Sync {
                 // Ajouter une note d'erreur
                 $order->add_order_note( 
                     sprintf( 
-                        __( '❌ Échec synchronisation BIHR%sTicket: %s%sErreur: %s', 'BIHR-SYNCH-main' ),
+                        __( '❌ Échec synchronisation BIHR%sTicket: %s%sErreur: %s', 'bihr-importer' ),
                         "\n",
                         $ticket_id,
                         "\n",
@@ -277,7 +277,7 @@ class BihrWI_Order_Sync {
             
             $order->add_order_note( 
                 sprintf( 
-                    __( '💥 Exception lors de la synchronisation BIHR%sTicket: %s%sErreur: %s', 'BIHR-SYNCH-main' ),
+                    __( '💥 Exception lors de la synchronisation BIHR%sTicket: %s%sErreur: %s', 'bihr-importer' ),
                     "\n",
                     $ticket_id,
                     "\n",
