@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 
 <div class="wrap">
-    <h1>⚙️ <?php esc_html_e( 'Paramètres de Synchronisation des Commandes', 'bihr-woocommerce-importer' ); ?></h1>
+    <h1>⚙️ <?php esc_html_e( 'Paramètres de Synchronisation des Commandes', 'BIHR-SYNCH-main' ); ?></h1>
 
     <?php if ( isset( $success_message ) ) : ?>
         <div class="notice notice-success is-dismissible">
@@ -14,9 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
     <?php endif; ?>
 
     <div class="bihr-section">
-        <h2>🔄 <?php esc_html_e( 'Configuration de la Synchronisation Automatique', 'bihr-woocommerce-importer' ); ?></h2>
+        <h2>🔄 <?php esc_html_e( 'Configuration de la Synchronisation Automatique', 'BIHR-SYNCH-main' ); ?></h2>
         <p>
-            <?php esc_html_e( 'Lorsqu\'une commande est créée dans WooCommerce, le plugin peut automatiquement la transmettre à l\'API BIHR pour traitement.', 'bihr-woocommerce-importer' ); ?>
+            <?php esc_html_e( 'Lorsqu\'une commande est créée dans WooCommerce, le plugin peut automatiquement la transmettre à l\'API BIHR pour traitement.', 'BIHR-SYNCH-main' ); ?>
         </p>
 
         <form method="post" action="">
@@ -29,10 +29,10 @@ if ( ! defined( 'ABSPATH' ) ) {
                            name="bihrwi_auto_sync_orders" 
                            value="1" 
                            <?php checked( $auto_sync_orders, 1 ); ?>>
-                    <strong><?php esc_html_e( 'Synchronisation automatique', 'bihr-woocommerce-importer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Synchronisation automatique', 'BIHR-SYNCH-main' ); ?></strong>
                 </label>
                 <p style="margin-left: 24px; margin-top: 4px; color: #6b7280; font-size: 13px;">
-                    <?php esc_html_e( 'Envoyer automatiquement les commandes WooCommerce à l\'API BIHR lors de leur création.', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Envoyer automatiquement les commandes WooCommerce à l\'API BIHR lors de leur création.', 'BIHR-SYNCH-main' ); ?>
                 </p>
             </div>
 
@@ -43,10 +43,10 @@ if ( ! defined( 'ABSPATH' ) ) {
                            name="bihrwi_auto_checkout" 
                            value="1" 
                            <?php checked( $auto_checkout, 1 ); ?>>
-                    <strong><?php esc_html_e( 'Validation automatique', 'bihr-woocommerce-importer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Validation automatique', 'BIHR-SYNCH-main' ); ?></strong>
                 </label>
                 <p style="margin-left: 24px; margin-top: 4px; color: #6b7280; font-size: 13px;">
-                    <?php esc_html_e( 'Valider automatiquement les commandes côté BIHR sans intervention manuelle.', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Valider automatiquement les commandes côté BIHR sans intervention manuelle.', 'BIHR-SYNCH-main' ); ?>
                 </p>
             </div>
 
@@ -57,74 +57,74 @@ if ( ! defined( 'ABSPATH' ) ) {
                            name="bihrwi_weekly_free_shipping" 
                            value="1" 
                            <?php checked( $weekly_free_shipping, 1 ); ?>>
-                    <strong><?php esc_html_e( 'Livraison gratuite hebdomadaire', 'bihr-woocommerce-importer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Livraison gratuite hebdomadaire', 'BIHR-SYNCH-main' ); ?></strong>
                 </label>
                 <p style="margin-left: 24px; margin-top: 4px; color: #6b7280; font-size: 13px;">
-                    <?php esc_html_e( 'Bénéficiez de la livraison gratuite hebdomadaire selon les conditions BIHR.', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Bénéficiez de la livraison gratuite hebdomadaire selon les conditions BIHR.', 'BIHR-SYNCH-main' ); ?>
                 </p>
             </div>
 
             <div class="form-group">
                 <label for="bihrwi_delivery_mode">
-                    <strong><?php esc_html_e( 'Mode de livraison', 'bihr-woocommerce-importer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Mode de livraison', 'BIHR-SYNCH-main' ); ?></strong>
                 </label>
                 <select id="bihrwi_delivery_mode" name="bihrwi_delivery_mode">
                     <option value="Default" <?php selected( $delivery_mode, 'Default' ); ?>>
-                        <?php esc_html_e( 'Par défaut (Default)', 'bihr-woocommerce-importer' ); ?>
+                        <?php esc_html_e( 'Par défaut (Default)', 'BIHR-SYNCH-main' ); ?>
                     </option>
                     <option value="Express" <?php selected( $delivery_mode, 'Express' ); ?>>
-                        <?php esc_html_e( 'Express', 'bihr-woocommerce-importer' ); ?>
+                        <?php esc_html_e( 'Express', 'BIHR-SYNCH-main' ); ?>
                     </option>
                     <option value="Standard" <?php selected( $delivery_mode, 'Standard' ); ?>>
-                        <?php esc_html_e( 'Standard', 'bihr-woocommerce-importer' ); ?>
+                        <?php esc_html_e( 'Standard', 'BIHR-SYNCH-main' ); ?>
                     </option>
                 </select>
                 <p style="color: #6b7280; font-size: 13px; margin-top: 4px;">
-                    <?php esc_html_e( 'Sélectionnez le mode de livraison par défaut pour toutes les commandes.', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Sélectionnez le mode de livraison par défaut pour toutes les commandes.', 'BIHR-SYNCH-main' ); ?>
                 </p>
             </div>
 
             <p class="submit">
                 <button type="submit" name="bihrwi_save_order_settings" class="button button-primary large">
-                    💾 <?php esc_html_e( 'Enregistrer les paramètres', 'bihr-woocommerce-importer' ); ?>
+                    💾 <?php esc_html_e( 'Enregistrer les paramètres', 'BIHR-SYNCH-main' ); ?>
                 </button>
             </p>
         </form>
     </div>
 
     <div class="bihr-section">
-        <h2><?php esc_html_e( 'Order/Data (BIHR)', 'bihr-woocommerce-importer' ); ?></h2>
+        <h2><?php esc_html_e( 'Order/Data (BIHR)', 'BIHR-SYNCH-main' ); ?></h2>
         <p>
-            <?php esc_html_e( 'Saisissez un ID de commande WooCommerce pour récupérer les informations BIHR via GET /api/v2.1/Order/Data (TicketId provenant de la commande).', 'bihr-woocommerce-importer' ); ?>
+            <?php esc_html_e( 'Saisissez un ID de commande WooCommerce pour récupérer les informations BIHR via GET /api/v2.1/Order/Data (TicketId provenant de la commande).', 'BIHR-SYNCH-main' ); ?>
         </p>
         <p style="margin: 0 0 10px;">
             <label for="bihrwi_order_data_order_id" style="display:inline-block; min-width: 160px;">
-                <?php esc_html_e( 'ID commande WooCommerce', 'bihr-woocommerce-importer' ); ?>
+                <?php esc_html_e( 'ID commande WooCommerce', 'BIHR-SYNCH-main' ); ?>
             </label>
             <input type="number" id="bihrwi_order_data_order_id" min="1" style="width: 140px;" />
             <button type="button" class="button" id="bihrwi_order_data_fetch_btn">
-                <?php esc_html_e( 'Récupérer', 'bihr-woocommerce-importer' ); ?>
+                <?php esc_html_e( 'Récupérer', 'BIHR-SYNCH-main' ); ?>
             </button>
         </p>
         <div id="bihrwi_order_data_manual_status" style="margin: 8px 0; color:#666;"></div>
         <pre id="bihrwi_order_data_manual_pre" style="margin:0; max-height: 380px; overflow:auto; white-space: pre-wrap; word-break: break-word; background:#f6f7f7; padding:10px; border:1px solid #dcdcde; border-radius:4px;"><?php
-            echo esc_html__( 'Renseignez un ID de commande et cliquez sur “Récupérer”.', 'bihr-woocommerce-importer' );
+            echo esc_html__( 'Renseignez un ID de commande et cliquez sur “Récupérer”.', 'BIHR-SYNCH-main' );
         ?></pre>
     </div>
 
     <div class="bihr-section">
-        <h2><?php esc_html_e( 'Informations de Synchronisation', 'bihr-woocommerce-importer' ); ?></h2>
+        <h2><?php esc_html_e( 'Informations de Synchronisation', 'BIHR-SYNCH-main' ); ?></h2>
         
-        <h3><?php esc_html_e( 'Comment ça fonctionne ?', 'bihr-woocommerce-importer' ); ?></h3>
+        <h3><?php esc_html_e( 'Comment ça fonctionne ?', 'BIHR-SYNCH-main' ); ?></h3>
         <ol>
-            <li><?php esc_html_e( 'Un client passe une commande sur votre boutique WooCommerce', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'Le plugin vérifie si la commande contient des produits BIHR (avec un code produit BIHR)', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'La commande est automatiquement envoyée à l\'API BIHR avec les informations de livraison', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'Une note est ajoutée à la commande WooCommerce avec l\'ID de commande BIHR', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'Les logs détaillés sont disponibles dans la page "Logs"', 'bihr-woocommerce-importer' ); ?></li>
+            <li><?php esc_html_e( 'Un client passe une commande sur votre boutique WooCommerce', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Le plugin vérifie si la commande contient des produits BIHR (avec un code produit BIHR)', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'La commande est automatiquement envoyée à l\'API BIHR avec les informations de livraison', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Une note est ajoutée à la commande WooCommerce avec l\'ID de commande BIHR', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Les logs détaillés sont disponibles dans la page "Logs"', 'BIHR-SYNCH-main' ); ?></li>
         </ol>
 
-        <h3><?php esc_html_e( 'Format de la commande envoyée à BIHR', 'bihr-woocommerce-importer' ); ?></h3>
+        <h3><?php esc_html_e( 'Format de la commande envoyée à BIHR', 'BIHR-SYNCH-main' ); ?></h3>
         <pre style="background: #f0f0f1; padding: 15px; border: 1px solid #c3c4c7; border-radius: 4px; overflow-x: auto;">
 {
   "Order": {
@@ -154,49 +154,49 @@ if ( ! defined( 'ABSPATH' ) ) {
   }
 }</pre>
 
-        <h3><?php esc_html_e( 'Données stockées dans WooCommerce', 'bihr-woocommerce-importer' ); ?></h3>
+        <h3><?php esc_html_e( 'Données stockées dans WooCommerce', 'BIHR-SYNCH-main' ); ?></h3>
         <table class="widefat">
             <thead>
                 <tr>
-                    <th><?php esc_html_e( 'Meta Key', 'bihr-woocommerce-importer' ); ?></th>
-                    <th><?php esc_html_e( 'Description', 'bihr-woocommerce-importer' ); ?></th>
+                    <th><?php esc_html_e( 'Meta Key', 'BIHR-SYNCH-main' ); ?></th>
+                    <th><?php esc_html_e( 'Description', 'BIHR-SYNCH-main' ); ?></th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td><code>_bihr_sync_ticket_id</code></td>
-                    <td><?php esc_html_e( 'Ticket ID unique pour tracer toutes les étapes', 'bihr-woocommerce-importer' ); ?></td>
+                    <td><?php esc_html_e( 'Ticket ID unique pour tracer toutes les étapes', 'BIHR-SYNCH-main' ); ?></td>
                 </tr>
                 <tr>
                     <td><code>_bihr_order_synced</code></td>
-                    <td><?php esc_html_e( 'Indique si la commande a été synchronisée avec succès', 'bihr-woocommerce-importer' ); ?></td>
+                    <td><?php esc_html_e( 'Indique si la commande a été synchronisée avec succès', 'BIHR-SYNCH-main' ); ?></td>
                 </tr>
                 <tr>
                     <td><code>_bihr_order_id</code></td>
-                    <td><?php esc_html_e( 'ID de la commande côté BIHR', 'bihr-woocommerce-importer' ); ?></td>
+                    <td><?php esc_html_e( 'ID de la commande côté BIHR', 'BIHR-SYNCH-main' ); ?></td>
                 </tr>
                 <tr>
                     <td><code>_bihr_sync_date</code></td>
-                    <td><?php esc_html_e( 'Date et heure de synchronisation', 'bihr-woocommerce-importer' ); ?></td>
+                    <td><?php esc_html_e( 'Date et heure de synchronisation', 'BIHR-SYNCH-main' ); ?></td>
                 </tr>
                 <tr>
                     <td><code>_bihr_order_sync_failed</code></td>
-                    <td><?php esc_html_e( 'Indique si la synchronisation a échoué', 'bihr-woocommerce-importer' ); ?></td>
+                    <td><?php esc_html_e( 'Indique si la synchronisation a échoué', 'BIHR-SYNCH-main' ); ?></td>
                 </tr>
                 <tr>
                     <td><code>_bihr_sync_error</code></td>
-                    <td><?php esc_html_e( 'Message d\'erreur en cas d\'échec', 'bihr-woocommerce-importer' ); ?></td>
+                    <td><?php esc_html_e( 'Message d\'erreur en cas d\'échec', 'BIHR-SYNCH-main' ); ?></td>
                 </tr>
             </tbody>
         </table>
 
-        <h3 style="margin-top: 20px;"><?php esc_html_e( 'Notes importantes', 'bihr-woocommerce-importer' ); ?></h3>
+        <h3 style="margin-top: 20px;"><?php esc_html_e( 'Notes importantes', 'BIHR-SYNCH-main' ); ?></h3>
         <ul>
-            <li><?php esc_html_e( 'Seuls les produits avec un code produit BIHR (meta _bihr_product_code) seront synchronisés', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'Les commandes sont envoyées au moment de la création (hook: woocommerce_checkout_order_processed)', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'Les numéros de téléphone français sont automatiquement formatés au format international (+33)', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'Les adresses de livraison sont utilisées en priorité, sinon les adresses de facturation', 'bihr-woocommerce-importer' ); ?></li>
-            <li><?php esc_html_e( 'Toutes les opérations sont loguées dans la page "Logs"', 'bihr-woocommerce-importer' ); ?></li>
+            <li><?php esc_html_e( 'Seuls les produits avec un code produit BIHR (meta _bihr_product_code) seront synchronisés', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Les commandes sont envoyées au moment de la création (hook: woocommerce_checkout_order_processed)', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Les numéros de téléphone français sont automatiquement formatés au format international (+33)', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Les adresses de livraison sont utilisées en priorité, sinon les adresses de facturation', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Toutes les opérations sont loguées dans la page "Logs"', 'BIHR-SYNCH-main' ); ?></li>
         </ul>
     </div>
 
@@ -214,18 +214,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     if ( ! empty( $recent_orders ) ) :
     ?>
         <div class="bihr-section">
-            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'bihr-woocommerce-importer' ); ?></h2>
+            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'BIHR-SYNCH-main' ); ?></h2>
             <table class="widefat">
                 <thead>
                     <tr>
-                        <th><?php esc_html_e( 'Ticket WC', 'bihr-woocommerce-importer' ); ?></th>
-                        <th><?php esc_html_e( 'Ticket BIHR API', 'bihr-woocommerce-importer' ); ?></th>
-                        <th><?php esc_html_e( 'Commande WC', 'bihr-woocommerce-importer' ); ?></th>
-                        <th><?php esc_html_e( 'Client', 'bihr-woocommerce-importer' ); ?></th>
-                        <th><?php esc_html_e( 'ID BIHR', 'bihr-woocommerce-importer' ); ?></th>
-                        <th><?php esc_html_e( 'Date Sync', 'bihr-woocommerce-importer' ); ?></th>
-                        <th><?php esc_html_e( 'Statut', 'bihr-woocommerce-importer' ); ?></th>
-                        <th><?php esc_html_e( 'Order/Data', 'bihr-woocommerce-importer' ); ?></th>
+                        <th><?php esc_html_e( 'Ticket WC', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'Ticket BIHR API', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'Commande WC', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'Client', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'ID BIHR', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'Date Sync', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'Statut', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'Order/Data', 'BIHR-SYNCH-main' ); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -259,9 +259,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                             <td><?php echo esc_html( $sync_date ?: 'N/A' ); ?></td>
                             <td>
                                 <?php if ( $sync_failed ) : ?>
-                                    <span style="color: red;">❌ <?php esc_html_e( 'Échec', 'bihr-woocommerce-importer' ); ?></span>
+                                    <span style="color: red;">❌ <?php esc_html_e( 'Échec', 'BIHR-SYNCH-main' ); ?></span>
                                 <?php else : ?>
-                                    <span style="color: green;">✅ <?php esc_html_e( 'Synchronisé', 'bihr-woocommerce-importer' ); ?></span>
+                                    <span style="color: green;">✅ <?php esc_html_e( 'Synchronisé', 'BIHR-SYNCH-main' ); ?></span>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -271,12 +271,14 @@ if ( ! defined( 'ABSPATH' ) ) {
                                         class="button bihrwi-order-data-btn"
                                         data-order-id="<?php echo esc_attr( $post->ID ); ?>"
                                     >
-                                        <?php esc_html_e( 'Voir', 'bihr-woocommerce-importer' ); ?>
+                                        <?php esc_html_e( 'Voir', 'BIHR-SYNCH-main' ); ?>
                                     </button>
 
                                     <?php if ( ! empty( $cached_order_data_at ) ) : ?>
                                         <div style="margin-top: 6px; font-size: 11px; color: #666;">
-                                            <?php echo esc_html( sprintf( __( 'Cache: %s', 'bihr-woocommerce-importer' ), $cached_order_data_at ) ); ?>
+                                            <?php
+                                            /* translators: %s: Date et heure du cache */
+                                            echo esc_html( sprintf( __( 'Cache: %s', 'BIHR-SYNCH-main' ), $cached_order_data_at ) ); ?>
                                         </div>
                                     <?php endif; ?>
                                 <?php else : ?>
@@ -298,7 +300,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                                                 echo esc_html( $cached_order_data_json );
                                             }
                                         } else {
-                                            echo esc_html__( 'Cliquez sur “Voir” pour récupérer les données via l’API BIHR (Order/Data).', 'bihr-woocommerce-importer' );
+                                            echo esc_html__( 'Cliquez sur “Voir” pour récupérer les données via l’API BIHR (Order/Data).', 'BIHR-SYNCH-main' );
                                         }
                                     ?></pre>
                                     <div style="margin-top: 8px;">
@@ -319,9 +321,9 @@ if ( ! defined( 'ABSPATH' ) ) {
         </div>
     <?php else : ?>
         <div class="bihr-section">
-            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'bihr-woocommerce-importer' ); ?></h2>
+            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'BIHR-SYNCH-main' ); ?></h2>
             <p style="margin:0; color:#666;">
-                <?php esc_html_e( 'Aucune commande synchronisée BIHR n’a été trouvée pour le moment. La section Order/Data ci-dessus reste disponible si vous connaissez l’ID de commande WooCommerce.', 'bihr-woocommerce-importer' ); ?>
+                <?php esc_html_e( 'Aucune commande synchronisée BIHR n’a été trouvée pour le moment. La section Order/Data ci-dessus reste disponible si vous connaissez l’ID de commande WooCommerce.', 'BIHR-SYNCH-main' ); ?>
             </p>
         </div>
     <?php endif; ?>

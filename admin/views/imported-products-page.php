@@ -45,13 +45,13 @@ $total_pages = $results->max_num_pages;
 ?>
 
 <div class="wrap">
-    <h1><?php echo esc_html__( 'Produits Importés de BIHR', 'bihr-woocommerce-importer' ); ?></h1>
+    <h1><?php echo esc_html__( 'Produits Importés de BIHR', 'BIHR-SYNCH-main' ); ?></h1>
     
     <!-- Section de configuration de synchronisation automatique des stocks -->
     <div class="bihrwi-stock-sync-config" style="background: #fff; padding: 20px; margin: 20px 0; border: 1px solid #0073aa; border-radius: 4px;">
         <h2 style="margin-top: 0; display: flex; align-items: center; gap: 10px;">
             <span class="dashicons dashicons-update-alt" style="color: #0073aa;"></span>
-            <?php esc_html_e( 'Synchronisation Automatique des Stocks', 'bihr-woocommerce-importer' ); ?>
+            <?php esc_html_e( 'Synchronisation Automatique des Stocks', 'BIHR-SYNCH-main' ); ?>
         </h2>
         
         <?php
@@ -76,7 +76,7 @@ $total_pages = $results->max_num_pages;
             <table class="form-table">
                 <tr>
                     <th scope="row">
-                        <label for="sync_enabled"><?php esc_html_e( 'Activer la synchronisation automatique', 'bihr-woocommerce-importer' ); ?></label>
+                        <label for="sync_enabled"><?php esc_html_e( 'Activer la synchronisation automatique', 'BIHR-SYNCH-main' ); ?></label>
                     </th>
                     <td>
                         <label for="sync_enabled">
@@ -85,42 +85,42 @@ $total_pages = $results->max_num_pages;
                                    name="sync_enabled" 
                                    value="1" 
                                    <?php checked( $sync_settings['enabled'], true ); ?>>
-                            <?php esc_html_e( 'Mettre à jour automatiquement les stocks depuis l\'API BIHR', 'bihr-woocommerce-importer' ); ?>
+                            <?php esc_html_e( 'Mettre à jour automatiquement les stocks depuis l\'API BIHR', 'BIHR-SYNCH-main' ); ?>
                         </label>
                         <p class="description">
-                            <?php esc_html_e( 'Les stocks de tous les produits importés seront synchronisés selon la fréquence choisie.', 'bihr-woocommerce-importer' ); ?>
+                            <?php esc_html_e( 'Les stocks de tous les produits importés seront synchronisés selon la fréquence choisie.', 'BIHR-SYNCH-main' ); ?>
                         </p>
                     </td>
                 </tr>
                 
                 <tr id="frequency-row" style="<?php echo $sync_settings['enabled'] ? '' : 'display:none;'; ?>">
                     <th scope="row">
-                        <label for="sync_frequency"><?php esc_html_e( 'Fréquence de synchronisation', 'bihr-woocommerce-importer' ); ?></label>
+                        <label for="sync_frequency"><?php esc_html_e( 'Fréquence de synchronisation', 'BIHR-SYNCH-main' ); ?></label>
                     </th>
                     <td>
                         <select id="sync_frequency" name="sync_frequency" style="min-width: 250px;">
                             <option value="hourly" <?php selected( $sync_settings['frequency'], 'hourly' ); ?>>
-                                <?php esc_html_e( 'Toutes les heures', 'bihr-woocommerce-importer' ); ?>
+                                <?php esc_html_e( 'Toutes les heures', 'BIHR-SYNCH-main' ); ?>
                             </option>
                             <option value="twicedaily" <?php selected( $sync_settings['frequency'], 'twicedaily' ); ?>>
-                                <?php esc_html_e( 'Deux fois par jour (matin et soir)', 'bihr-woocommerce-importer' ); ?>
+                                <?php esc_html_e( 'Deux fois par jour (matin et soir)', 'BIHR-SYNCH-main' ); ?>
                             </option>
                             <option value="daily" <?php selected( $sync_settings['frequency'], 'daily' ); ?>>
-                                <?php esc_html_e( 'Une fois par jour', 'bihr-woocommerce-importer' ); ?>
+                                <?php esc_html_e( 'Une fois par jour', 'BIHR-SYNCH-main' ); ?>
                             </option>
                             <option value="weekly" <?php selected( $sync_settings['frequency'], 'weekly' ); ?>>
-                                <?php esc_html_e( 'Une fois par semaine', 'bihr-woocommerce-importer' ); ?>
+                                <?php esc_html_e( 'Une fois par semaine', 'BIHR-SYNCH-main' ); ?>
                             </option>
                         </select>
                         <p class="description">
-                            <?php esc_html_e( 'Choisissez la fréquence de mise à jour automatique des stocks.', 'bihr-woocommerce-importer' ); ?>
+                            <?php esc_html_e( 'Choisissez la fréquence de mise à jour automatique des stocks.', 'BIHR-SYNCH-main' ); ?>
                         </p>
                     </td>
                 </tr>
                 
                 <tr id="time-row" style="<?php echo ( $sync_settings['enabled'] && in_array( $sync_settings['frequency'], array( 'daily', 'weekly' ) ) ) ? '' : 'display:none;'; ?>">
                     <th scope="row">
-                        <label for="sync_time"><?php esc_html_e( 'Heure de synchronisation', 'bihr-woocommerce-importer' ); ?></label>
+                        <label for="sync_time"><?php esc_html_e( 'Heure de synchronisation', 'BIHR-SYNCH-main' ); ?></label>
                     </th>
                     <td>
                         <input type="time" 
@@ -129,14 +129,14 @@ $total_pages = $results->max_num_pages;
                                value="<?php echo esc_attr( $sync_settings['time'] ); ?>" 
                                style="min-width: 150px;">
                         <p class="description">
-                            <?php esc_html_e( 'Heure à laquelle la synchronisation quotidienne/hebdomadaire doit s\'exécuter (format 24h).', 'bihr-woocommerce-importer' ); ?>
+                            <?php esc_html_e( 'Heure à laquelle la synchronisation quotidienne/hebdomadaire doit s\'exécuter (format 24h).', 'BIHR-SYNCH-main' ); ?>
                         </p>
                     </td>
                 </tr>
                 
                 <?php if ( ! empty( $sync_settings['last_sync'] ) ) : ?>
                 <tr>
-                    <th scope="row"><?php esc_html_e( 'Dernière synchronisation', 'bihr-woocommerce-importer' ); ?></th>
+                    <th scope="row"><?php esc_html_e( 'Dernière synchronisation', 'BIHR-SYNCH-main' ); ?></th>
                     <td>
                         <strong><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $sync_settings['last_sync'] ) ); ?></strong>
                         <?php
@@ -144,7 +144,8 @@ $total_pages = $results->max_num_pages;
                         if ( ! empty( $last_sync_log ) ) {
                             echo '<p class="description">';
                             printf(
-                                esc_html__( 'Produits synchronisés: %d | Réussis: %d | Échoués: %d | Durée: %s', 'bihr-woocommerce-importer' ),
+                                /* translators: %1$d: total produits, %2$d: réussis, %3$d: échoués, %4$s: durée */
+                                esc_html__( 'Produits synchronisés: %1$d | Réussis: %2$d | Échoués: %3$d | Durée: %4$s', 'BIHR-SYNCH-main' ),
                                 intval( $last_sync_log['total'] ?? 0 ),
                                 intval( $last_sync_log['success'] ?? 0 ),
                                 intval( $last_sync_log['failed'] ?? 0 ),
@@ -159,14 +160,14 @@ $total_pages = $results->max_num_pages;
                 
                 <?php if ( ! empty( $sync_settings['next_sync'] ) ) : ?>
                 <tr>
-                    <th scope="row"><?php esc_html_e( 'Prochaine synchronisation', 'bihr-woocommerce-importer' ); ?></th>
+                    <th scope="row"><?php esc_html_e( 'Prochaine synchronisation', 'BIHR-SYNCH-main' ); ?></th>
                     <td>
                         <strong><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $sync_settings['next_sync'] ) ); ?></strong>
                         <p class="description">
                             <?php
                             $time_until = human_time_diff( current_time( 'timestamp' ), $sync_settings['next_sync'] );
                             /* translators: %s: temps restant */
-                            printf( esc_html__( 'Dans %s', 'bihr-woocommerce-importer' ), esc_html( $time_until ) );
+                            printf( esc_html__( 'Dans %s', 'BIHR-SYNCH-main' ), esc_html( $time_until ) );
                             ?>
                         </p>
                     </td>
@@ -177,12 +178,12 @@ $total_pages = $results->max_num_pages;
             <p class="submit">
                 <button type="submit" class="button button-primary">
                     <span class="dashicons dashicons-saved" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Enregistrer les paramètres', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Enregistrer les paramètres', 'BIHR-SYNCH-main' ); ?>
                 </button>
                 
                 <button type="button" id="manual-sync-now" class="button button-secondary" style="margin-left: 10px;">
                     <span class="dashicons dashicons-update" style="margin-top: 3px;"></span>
-                    <?php esc_html_e( 'Synchroniser maintenant', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Synchroniser maintenant', 'BIHR-SYNCH-main' ); ?>
                 </button>
             </p>
         </form>
@@ -205,17 +206,17 @@ $total_pages = $results->max_num_pages;
             
             <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                 <div>
-                    <label for="search-input"><?php esc_html_e( 'Recherche', 'bihr-woocommerce-importer' ); ?></label>
+                    <label for="search-input"><?php esc_html_e( 'Recherche', 'BIHR-SYNCH-main' ); ?></label>
                     <input type="text" 
                            id="search-input" 
                            name="s" 
                            value="<?php echo esc_attr( $search ); ?>" 
-                           placeholder="<?php esc_attr_e( 'Nom ou code produit...', 'bihr-woocommerce-importer' ); ?>"
+                           placeholder="<?php esc_attr_e( 'Nom ou code produit...', 'BIHR-SYNCH-main' ); ?>"
                            style="width: 250px;">
                 </div>
                 
                 <div>
-                    <label for="stock-filter"><?php esc_html_e( 'Stock', 'bihr-woocommerce-importer' ); ?></label>
+                    <label for="stock-filter"><?php esc_html_e( 'Stock', 'BIHR-SYNCH-main' ); ?></label>
                     <select id="stock-filter" name="stock_status">
                         <option value=""><?php esc_html_e( 'Tous', 'bihr-woocommerce-importer' ); ?></option>
                         <option value="instock" <?php selected( $stock_filter, 'instock' ); ?>><?php esc_html_e( 'En stock', 'bihr-woocommerce-importer' ); ?></option>

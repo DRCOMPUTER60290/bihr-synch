@@ -33,7 +33,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 
     <!-- Header avec toggle mode -->
     <div class="bihr-header">
-        <h1>🚀 <?php esc_html_e( 'BIHR WooCommerce Importer', 'bihr-woocommerce-importer' ); ?></h1>
+        <h1>🚀 <?php esc_html_e( 'BIHR WooCommerce Importer', 'BIHR-SYNCH-main' ); ?></h1>
         
         <div class="bihr-mode-toggle">
             <label>
@@ -74,27 +74,27 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
         <div class="status-card <?php echo $is_authenticated ? 'status-ok' : 'status-warning'; ?>">
             <div class="status-icon"><?php echo $is_authenticated ? '✅' : '⚠️'; ?></div>
             <div class="status-content">
-                <h3><?php esc_html_e( 'Authentification', 'bihr-woocommerce-importer' ); ?></h3>
+                <h3><?php esc_html_e( 'Authentification', 'BIHR-SYNCH-main' ); ?></h3>
                 <p>
                     <?php 
                     if ( $is_authenticated ) {
-                        esc_html_e( 'Connecté à l\'API BIHR', 'bihr-woocommerce-importer' );
+                        esc_html_e( 'Connecté à l\'API BIHR', 'BIHR-SYNCH-main' );
                     } else {
-                        esc_html_e( 'Non connecté', 'bihr-woocommerce-importer' );
+                        esc_html_e( 'Non connecté', 'BIHR-SYNCH-main' );
                     }
                     ?>
                 </p>
             </div>
             <?php if ( $is_authenticated ) : ?>
             <div class="status-actions">
-                <a class="status-action button-success" aria-disabled="true">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></a>
+                <a class="status-action button-success" aria-disabled="true">✅ <?php esc_html_e( 'Connecté', 'BIHR-SYNCH-main' ); ?></a>
                 <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action-link">
-                    <?php esc_html_e( 'Modifier', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'Modifier', 'BIHR-SYNCH-main' ); ?>
                 </a>
             </div>
             <?php else : ?>
             <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="status-action button-primary">
-                <?php esc_html_e( 'Se connecter', 'bihr-woocommerce-importer' ); ?>
+                <?php esc_html_e( 'Se connecter', 'BIHR-SYNCH-main' ); ?>
             </a>
             <?php endif; ?>
         </div>
@@ -103,14 +103,14 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
         <div class="status-card status-info">
             <div class="status-icon">📦</div>
             <div class="status-content">
-                <h3><?php esc_html_e( 'Produits', 'bihr-woocommerce-importer' ); ?></h3>
+                <h3><?php esc_html_e( 'Produits', 'BIHR-SYNCH-main' ); ?></h3>
                 <p>
                     <strong><?php echo intval( $synced_products ); ?></strong> / <?php echo intval( $products_count ); ?> 
-                    <?php esc_html_e( 'produits BIHR', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'produits BIHR', 'BIHR-SYNCH-main' ); ?>
                 </p>
             </div>
             <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-products', admin_url( 'admin.php' ) ) ); ?>" class="status-action">
-                <?php esc_html_e( 'Gérer', 'bihr-woocommerce-importer' ); ?>
+                <?php esc_html_e( 'Gérer', 'BIHR-SYNCH-main' ); ?>
             </a>
         </div>
 
@@ -118,14 +118,14 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
         <div class="status-card status-info">
             <div class="status-icon">🛒</div>
             <div class="status-content">
-                <h3><?php esc_html_e( 'Commandes', 'bihr-woocommerce-importer' ); ?></h3>
+                <h3><?php esc_html_e( 'Commandes', 'BIHR-SYNCH-main' ); ?></h3>
                 <p>
                     <strong><?php echo intval( $orders_count ); ?></strong> 
-                    <?php esc_html_e( 'commandes actives', 'bihr-woocommerce-importer' ); ?>
+                    <?php esc_html_e( 'commandes actives', 'BIHR-SYNCH-main' ); ?>
                 </p>
             </div>
             <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders', admin_url( 'admin.php' ) ) ); ?>" class="status-action">
-                <?php esc_html_e( 'Voir', 'bihr-woocommerce-importer' ); ?>
+                <?php esc_html_e( 'Voir', 'BIHR-SYNCH-main' ); ?>
             </a>
         </div>
     </div>
@@ -139,14 +139,14 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
             <div class="step-card step-1 <?php echo $is_authenticated ? 'step-completed' : 'step-active'; ?>">
                 <div class="step-number">1</div>
                 <div class="step-content">
-                    <h3><?php esc_html_e( 'Se connecter à BIHR', 'bihr-woocommerce-importer' ); ?></h3>
-                    <p><?php esc_html_e( 'Authentifiez-vous avec vos identifiants BIHR pour accéder à vos produits.', 'bihr-woocommerce-importer' ); ?></p>
+                    <h3><?php esc_html_e( 'Se connecter à BIHR', 'BIHR-SYNCH-main' ); ?></h3>
+                    <p><?php esc_html_e( 'Authentifiez-vous avec vos identifiants BIHR pour accéder à vos produits.', 'BIHR-SYNCH-main' ); ?></p>
                     <?php if ( ! $is_authenticated ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="button button-primary">
-                        🔐 <?php esc_html_e( 'Se connecter', 'bihr-woocommerce-importer' ); ?>
+                        🔐 <?php esc_html_e( 'Se connecter', 'BIHR-SYNCH-main' ); ?>
                     </a>
                     <?php else : ?>
-                    <a class="button button-success" aria-disabled="true">✅ <?php esc_html_e( 'Connecté', 'bihr-woocommerce-importer' ); ?></a>
+                    <a class="button button-success" aria-disabled="true">✅ <?php esc_html_e( 'Connecté', 'BIHR-SYNCH-main' ); ?></a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -155,10 +155,10 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
             <div class="step-card step-2 <?php echo $is_authenticated ? 'step-active' : ''; ?>">
                 <div class="step-number">2</div>
                 <div class="step-content">
-                    <h3><?php esc_html_e( 'Importer les produits', 'bihr-woocommerce-importer' ); ?></h3>
-                    <p><?php esc_html_e( 'Téléchargez le catalogue BIHR dans WooCommerce en quelques clics.', 'bihr-woocommerce-importer' ); ?></p>
+                    <h3><?php esc_html_e( 'Importer les produits', 'BIHR-SYNCH-main' ); ?></h3>
+                    <p><?php esc_html_e( 'Téléchargez le catalogue BIHR dans WooCommerce en quelques clics.', 'BIHR-SYNCH-main' ); ?></p>
                     <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-products', admin_url( 'admin.php' ) ) ); ?>" class="button button-secondary" <?php echo ! $is_authenticated ? 'disabled' : ''; ?>>
-                        📥 <?php esc_html_e( 'Importer', 'bihr-woocommerce-importer' ); ?>
+                        📥 <?php esc_html_e( 'Importer', 'BIHR-SYNCH-main' ); ?>
                     </a>
                 </div>
             </div>
@@ -167,7 +167,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
             <div class="step-card step-3">
                 <div class="step-number">3</div>
                 <div class="step-content">
-                    <h3><?php esc_html_e( 'Configurer les synchronisations', 'bihr-woocommerce-importer' ); ?></h3>
+                    <h3><?php esc_html_e( 'Configurer les synchronisations', 'BIHR-SYNCH-main' ); ?></h3>
                     <p><?php esc_html_e( 'Activez la synchronisation automatique des stocks et commandes.', 'bihr-woocommerce-importer' ); ?></p>
                     <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders', admin_url( 'admin.php' ) ) ); ?>" class="button button-secondary">
                         ⚙️ <?php esc_html_e( 'Configurer', 'bihr-woocommerce-importer' ); ?>
