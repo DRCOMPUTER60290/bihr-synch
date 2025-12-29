@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: BIHR Synchronisation Plugin
+ * Plugin Name: BIHR Synchronisation
  * Description: Import des catalogues Bihr (Prix, Images, Attributs, Stocks) et création de produits dans votre boutique en ligne.
  * Author: DrComputer60290 - Albert Benjamin
  * Author URI: https://drcomputer60290.fr
