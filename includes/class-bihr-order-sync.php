@@ -337,7 +337,7 @@ class BihrWI_Order_Sync {
         $customer_reference = sprintf(
             'WC Order #%d - %s',
             $order->get_id(),
-            $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
+            esc_html( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() )
         );
         
         $this->logger->log( "[{$ticket_id}]    📝 Référence client: {$customer_reference}" );

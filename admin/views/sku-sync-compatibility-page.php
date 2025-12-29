@@ -323,7 +323,7 @@ $sync_url = add_query_arg(
             echo '<td>' . esc_html( (string) ( $row['new_part_number'] ?? '' ) ) . '</td>';
             echo '<td><strong>' . esc_html( $part_number ?: '-' ) . '</strong></td>';
             echo '<td>' . esc_html( $current_sku ?: '-' ) . '</td>';
-            echo '<td>' . $status . '</td>';
+            echo '<td>' . wp_kses_post( $status ) . '</td>';
             echo '</tr>';
         }
 

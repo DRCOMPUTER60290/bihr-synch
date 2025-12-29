@@ -204,7 +204,7 @@ set_time_limit(0);
                 
                 // Vérif finale
                 $final_sku = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value != ''");
-                echo '<p class="success">✅ Total SKU synchronisés : ' . number_format($final_sku) . '</p>';
+                echo '<p class="success">✅ Total SKU synchronisés : ' . esc_html( number_format($final_sku) ) . '</p>';
             }
             
         } else {
@@ -215,10 +215,10 @@ set_time_limit(0);
             $missing = $wc_with_bihr - $wc_sku_count;
             
             echo '<div class="stats">';
-            echo '<div class="stat-box"><strong>' . number_format($wc_with_bihr) . '</strong> Produits WC avec code BIHR</div>';
-            echo '<div class="stat-box"><strong>' . number_format($wc_products) . '</strong> Total produits WooCommerce</div>';
-            echo '<div class="stat-box"><strong class="success">' . number_format($wc_sku_count) . '</strong> SKU actuels</div>';
-            echo '<div class="stat-box"><strong class="error">' . number_format($missing) . '</strong> SKU manquants</div>';
+            echo '<div class="stat-box"><strong>' . esc_html( number_format($wc_with_bihr) ) . '</strong> Produits WC avec code BIHR</div>';
+            echo '<div class="stat-box"><strong>' . esc_html( number_format($wc_products) ) . '</strong> Total produits WooCommerce</div>';
+            echo '<div class="stat-box"><strong class="success">' . esc_html( number_format($wc_sku_count) ) . '</strong> SKU actuels</div>';
+            echo '<div class="stat-box"><strong class="error">' . esc_html( number_format($missing) ) . '</strong> SKU manquants</div>';
             echo '</div>';
             
             if ($missing > 0 || $wc_sku_count == 0) {
@@ -227,7 +227,7 @@ set_time_limit(0);
                 echo '<p>Ce script va lier les produits BIHR aux produits WooCommerce via leur nom, puis synchroniser les SKU.</p>';
                 echo '</div>';
                 
-                echo '<button onclick="if(confirm(\'Lancer la synchronisation de ' . number_format($wc_with_bihr) . ' produits WooCommerce ?\')) window.location.href=\'?action=sync\'">🚀 LANCER LA SYNCHRONISATION</button>';
+                echo '<button onclick="if(confirm(\'Lancer la synchronisation de ' . esc_js( number_format($wc_with_bihr) ) . ' produits WooCommerce ?\')) window.location.href=\'?action=sync\'">🚀 LANCER LA SYNCHRONISATION</button>';
             } else {
                 echo '<div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0;">';
                 echo '<h3 class="success">✅ Tous les SKU sont synchronisés !</h3>';
