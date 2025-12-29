@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: Bihr WooCommerce Importer
- * Description: Import des catalogues Bihr (Prices, Images, Attributes, Stocks) et création de produits WooCommerce.
+ * Plugin Name: BIHR Synchronisation Plugin
+ * Description: Import des catalogues Bihr (Prix, Images, Attributs, Stocks) et création de produits dans votre boutique en ligne.
  * Author: DrComputer60290 - Albert Benjamin
  * Author URI: https://drcomputer60290.fr
  * Version: 1.4.0
