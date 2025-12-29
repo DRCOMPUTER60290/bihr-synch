@@ -268,7 +268,7 @@ $sync_url = add_query_arg(
 
         <p>
             <a class="button button-primary" href="<?php echo esc_url( $sync_url ); ?>" onclick="return confirm('<?php echo esc_js( sprintf( __( 'Lancer la synchronisation de %s produits ?', 'BIHR-SYNCH-main' ), number_format_i18n( $wc_with_compatibility ) ) ); ?>');">
-                🚀 <?php esc_html_e( 'LANCER LA SYNCHRONISATION', 'bihr-woocommerce-importer' ); ?>
+                🚀 <?php esc_html_e( 'LANCER LA SYNCHRONISATION', 'BIHR-SYNCH-main' ); ?>
             </a>
         </p>
 

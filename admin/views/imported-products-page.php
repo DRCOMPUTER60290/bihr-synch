@@ -316,7 +316,7 @@ $total_pages = $results->max_num_pages;
                         </td>
                         <td>
                             <code style="background: #f0f0f1; padding: 3px 6px; border-radius: 3px; font-size: 12px;">
-                                <?php echo esc_html( $product_code ? $product_code : __( 'N/A', 'bihr-woocommerce-importer' ) ); ?>
+                                <?php echo esc_html( $product_code ? $product_code : __( 'N/A', 'BIHR-SYNCH-main' ) ); ?>
                             </code>
                         </td>
                         <td>
@@ -330,7 +330,7 @@ $total_pages = $results->max_num_pages;
                                         if ( $stock_quantity !== null ) {
                                             echo '<strong>' . esc_html( $stock_quantity ) . '</strong>';
                                         } else {
-                                            echo '<strong>' . esc_html__( 'N/A', 'bihr-woocommerce-importer' ) . '</strong>';
+                                            echo '<strong>' . esc_html__( 'N/A', 'BIHR-SYNCH-main' ) . '</strong>';
                                         }
                                         ?>
                                     </div>
@@ -338,13 +338,13 @@ $total_pages = $results->max_num_pages;
                                         <?php
                                         switch ( $stock_status ) {
                                             case 'instock':
-                                                esc_html_e( 'En stock', 'bihr-woocommerce-importer' );
+                                                esc_html_e( 'En stock', 'BIHR-SYNCH-main' );
                                                 break;
                                             case 'outofstock':
-                                                esc_html_e( 'Rupture', 'bihr-woocommerce-importer' );
+                                                esc_html_e( 'Rupture', 'BIHR-SYNCH-main' );
                                                 break;
                                             case 'onbackorder':
-                                                esc_html_e( 'Sur commande', 'bihr-woocommerce-importer' );
+                                                esc_html_e( 'Sur commande', 'BIHR-SYNCH-main' );
                                                 break;
                                         }
                                         ?>
@@ -352,7 +352,7 @@ $total_pages = $results->max_num_pages;
                                 </div>
                                 <button type="button" 
                                         class="refresh-stock button button-small" 
-                                        title="<?php esc_attr_e( 'Rafraîchir le stock', 'bihr-woocommerce-importer' ); ?>"
+                                        title="<?php esc_attr_e( 'Rafraîchir le stock', 'BIHR-SYNCH-main' ); ?>"
                                         style="padding: 4px 8px;">
                                     <span class="dashicons dashicons-update" style="font-size: 16px;"></span>
                                 </button>
@@ -362,10 +362,10 @@ $total_pages = $results->max_num_pages;
                             <?php
                             $status = $product->get_status();
                             $status_labels = array(
-                                'publish' => __( 'Publié', 'bihr-woocommerce-importer' ),
-                                'draft'   => __( 'Brouillon', 'bihr-woocommerce-importer' ),
-                                'pending' => __( 'En attente', 'bihr-woocommerce-importer' ),
-                                'private' => __( 'Privé', 'bihr-woocommerce-importer' ),
+                                'publish' => __( 'Publié', 'BIHR-SYNCH-main' ),
+                                'draft'   => __( 'Brouillon', 'BIHR-SYNCH-main' ),
+                                'pending' => __( 'En attente', 'BIHR-SYNCH-main' ),
+                                'private' => __( 'Privé', 'BIHR-SYNCH-main' ),
                             );
                             echo '<span class="status-' . esc_attr( $status ) . '">';
                             echo esc_html( $status_labels[ $status ] ?? $status );
@@ -374,10 +374,10 @@ $total_pages = $results->max_num_pages;
                         </td>
                         <td>
                             <a href="<?php echo esc_url( get_edit_post_link( $product->get_id() ) ); ?>" class="button button-small">
-                                <?php esc_html_e( 'Modifier', 'bihr-woocommerce-importer' ); ?>
+                                <?php esc_html_e( 'Modifier', 'BIHR-SYNCH-main' ); ?>
                             </a>
                             <a href="<?php echo esc_url( get_permalink( $product->get_id() ) ); ?>" class="button button-small" target="_blank">
-                                <?php esc_html_e( 'Voir', 'bihr-woocommerce-importer' ); ?>
+                                <?php esc_html_e( 'Voir', 'BIHR-SYNCH-main' ); ?>
                             </a>
                         </td>
                     </tr>
@@ -392,8 +392,8 @@ $total_pages = $results->max_num_pages;
                     $page_links = paginate_links( array(
                         'base'      => add_query_arg( 'paged', '%#%' ),
                         'format'    => '',
-                        'prev_text' => __( '&laquo;', 'bihr-woocommerce-importer' ),
-                        'next_text' => __( '&raquo;', 'bihr-woocommerce-importer' ),
+                        'prev_text' => __( '&laquo;', 'BIHR-SYNCH-main' ),
+                        'next_text' => __( '&raquo;', 'BIHR-SYNCH-main' ),
                         'total'     => $total_pages,
                         'current'   => $paged,
                     ) );
