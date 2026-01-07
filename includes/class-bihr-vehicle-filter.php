@@ -156,10 +156,12 @@ class BihrWI_Vehicle_Filter {
         global $wpdb;
 
         $manufacturers = $wpdb->get_results(
-            "SELECT DISTINCT manufacturer_code, manufacturer_name 
-             FROM {$this->vehicles_table} 
-             WHERE manufacturer_name IS NOT NULL AND manufacturer_name != ''
-             ORDER BY manufacturer_name ASC",
+            $wpdb->prepare(
+                "SELECT DISTINCT manufacturer_code, manufacturer_name 
+                 FROM {$this->vehicles_table} 
+                 WHERE manufacturer_name IS NOT NULL AND manufacturer_name != ''
+                 ORDER BY manufacturer_name ASC"
+            ),
             ARRAY_A
         );
 

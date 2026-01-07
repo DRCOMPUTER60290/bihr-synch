@@ -5,7 +5,7 @@
  * Author: DrComputer60290 - Albert Benjamin
  * Author URI: https://drcomputer60290.fr
  * Version: 1.4.0
- * Text Domain: BIHR-SYNCH-main
+ * Text Domain: bihr-synch
  * Domain Path: /languages
  * License: GPLv2 or later
  * 
@@ -71,6 +71,9 @@ define( 'BIHRWI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BIHRWI_LOG_FILE', WP_CONTENT_DIR . '/uploads/bihr-import/bihr-import.log' );
 define( 'BIHRWI_IMAGE_BASE_URL', 'https://api.mybihr.com' );
 
+// Load plugin text domain
+load_plugin_textdomain( 'bihr-synch', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+
 // Autochargement simple de nos classes
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-logger.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-api-client.php';
@@ -133,7 +136,7 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['five_minutes'] ) ) {
         $schedules['five_minutes'] = array(
             'interval' => 300,
-            'display'  => __( 'Every 5 Minutes', 'BIHR-SYNCH-main' ),
+            'display'  => __( 'Every 5 Minutes', 'bihr-synch' ),
         );
     }
 
@@ -141,14 +144,14 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['weekly'] ) ) {
         $schedules['weekly'] = array(
             'interval' => 604800, // 7 jours
-            'display'  => __( 'Every Week', 'BIHR-SYNCH-main' ),
+            'display'  => __( 'Every Week', 'bihr-synch' ),
         );
     }
 
     if ( ! isset( $schedules['biweekly'] ) ) {
         $schedules['biweekly'] = array(
             'interval' => 1209600, // 14 jours
-            'display'  => __( 'Every 2 Weeks', 'BIHR-SYNCH-main' ),
+            'display'  => __( 'Every 2 Weeks', 'bihr-synch' ),
         );
     }
     return $schedules;

@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Restreindre l'accès à l'admin
 if ( ! current_user_can( 'manage_options' ) ) {
-    wp_die( esc_html__( 'Vous n\'avez pas la permission d\'accéder à ce script.', 'BIHR-SYNCH-main' ) );
+    wp_die( esc_html__( 'Vous n\'avez pas la permission d\'accéder à ce script.', 'bihr-synch' ) );
 }
 
 global $wpdb;

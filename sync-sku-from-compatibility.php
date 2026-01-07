@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Vérifier les permissions
 if ( ! current_user_can( 'manage_options' ) ) {
-    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'BIHR-SYNCH-main' ) );
+    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'bihr-synch' ) );
 }
 
 $action       = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
@@ -32,10 +32,6 @@ if ( 'sync' === $action ) {
 
 global $wpdb;
 set_time_limit(0);
-
-// Expression SQL de la clé de correspondance vers la compatibilité
-// Priorité : NewPartNumber (meta) -> SKU actuel -> Code BIHR
-$compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)';
 
 ?>
 <!DOCTYPE html>
@@ -235,24 +231,32 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             
         } else {
             // PAGE D'ACCUEIL
-            $wc_with_compatibility = $wpdb->get_var("
-                SELECT COUNT(DISTINCT pm_code.post_id)
-                FROM {$wpdb->postmeta} pm_code
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
-                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
-                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                WHERE pm_code.meta_key = '_bihr_product_code'
-                AND pm_code.meta_value IS NOT NULL
-                AND pm_code.meta_value != ''
-                AND p.post_type = 'product'
-                AND EXISTS (
-                    SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
-                    WHERE vc.part_number = {$compat_lookup_expr}
+            $wc_with_compatibility = $wpdb->get_var(
+                $wpdb->prepare(
+                    "
+                    SELECT COUNT(DISTINCT pm_code.post_id)
+                    FROM {$wpdb->postmeta} pm_code
+                    INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                    LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = %s
+                    LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = %s
+                    WHERE pm_code.meta_key = %s
+                    AND pm_code.meta_value IS NOT NULL
+                    AND pm_code.meta_value != ''
+                    AND p.post_type = %s
+                    AND EXISTS (
+                        SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
+                        WHERE vc.part_number = COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)
+                    )
+                    ",
+                    '_bihr_new_part_number',
+                    '_sku',
+                    '_bihr_product_code',
+                    'product'
                 )
-            ");
+            );
             
-            $wc_products = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'");
-            $wc_sku_count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value != ''");
+            $wc_products = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = %s AND post_status = %s", 'product', 'publish' ) );
+            $wc_sku_count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value != ''", '_sku' ) );
             
             echo '<div class="stats">';
             echo '<div class="stat-box"><strong>' . number_format($wc_with_compatibility) . '</strong> Produits WC avec compatibilité</div>';
@@ -271,26 +275,35 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             
             // Exemples
             echo '<h3>📊 Aperçu (10 premiers produits)</h3>';
-            $samples = $wpdb->get_results("
-                SELECT 
-                    pm_code.post_id as wc_id,
-                    p.post_title as name,
-                    pm_code.meta_value as product_code,
-                    pm_new.meta_value as new_part_number,
-                    pm_sku.meta_value as current_sku,
-                    vc.part_number
-                FROM {$wpdb->postmeta} pm_code
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
-                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
-                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                LEFT JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = {$compat_lookup_expr}
-                WHERE pm_code.meta_key = '_bihr_product_code'
-                AND pm_code.meta_value IS NOT NULL
-                AND pm_code.meta_value != ''
-                AND p.post_type = 'product'
-                GROUP BY pm_code.post_id
-                LIMIT 10
-            ", ARRAY_A);
+            $samples = $wpdb->get_results(
+                $wpdb->prepare(
+                    "
+                    SELECT 
+                        pm_code.post_id as wc_id,
+                        p.post_title as name,
+                        pm_code.meta_value as product_code,
+                        pm_new.meta_value as new_part_number,
+                        pm_sku.meta_value as current_sku,
+                        vc.part_number
+                    FROM {$wpdb->postmeta} pm_code
+                    INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                    LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = %s
+                    LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = %s
+                    LEFT JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)
+                    WHERE pm_code.meta_key = %s
+                    AND pm_code.meta_value IS NOT NULL
+                    AND pm_code.meta_value != ''
+                    AND p.post_type = %s
+                    GROUP BY pm_code.post_id
+                    LIMIT 10
+                    ",
+                    '_bihr_new_part_number',
+                    '_sku',
+                    '_bihr_product_code',
+                    'product'
+                ),
+                ARRAY_A
+            );
             
             echo '<table>';
             echo '<tr><th>WC ID</th><th>Nom Produit</th><th>Code BIHR</th><th>NewPartNumber</th><th>Part Number</th><th>SKU Actuel</th><th>Statut</th></tr>';
@@ -314,7 +327,7 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
                 echo '<td>' . ( ! empty( $row['new_part_number'] ) ? esc_html( $row['new_part_number'] ) : '-' ) . '</td>';
                 echo '<td><strong>' . ( ! empty( $part_number ) ? esc_html( $part_number ) : '-' ) . '</strong></td>';
                 echo '<td>' . ( ! empty( $current_sku ) ? esc_html( $current_sku ) : '-' ) . '</td>';
-                echo '<td>' . $status . '</td>';
+                echo '<td>' . wp_kses_post( $status ) . '</td>';
                 echo '</tr>';
             }
             echo '</table>';

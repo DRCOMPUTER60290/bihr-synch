@@ -83,7 +83,7 @@ class BihrWI_Product_Sync {
             WHERE category IS NOT NULL AND TRIM(REPLACE(category, CHAR(160), ' ')) != ''
             ORDER BY category ASC";
         
-        return $wpdb->get_col( $sql );
+        return $wpdb->get_col( $wpdb->prepare( $sql ) );
     }
     /**
      * Retourne une page de produits depuis wp_bihr_products avec filtres
