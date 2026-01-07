@@ -83,7 +83,7 @@ class BihrWI_Product_Sync {
             WHERE category IS NOT NULL AND TRIM(REPLACE(category, CHAR(160), ' ')) != ''
             ORDER BY category ASC";
         
-        return $wpdb->get_col( $wpdb->prepare( $sql ) );
+        return $wpdb->get_col( $sql );
     }
     /**
      * Retourne une page de produits depuis wp_bihr_products avec filtres
@@ -97,6 +97,9 @@ class BihrWI_Product_Sync {
         $where_conditions = array();
         $where_values = array();
         
+        $search       = sanitize_text_field( $search );
+        $category_filter = sanitize_text_field( $category_filter );
+
         // Filtre de recherche (code produit, NewPartNumber, nom, description)
         if ( ! empty( $search ) ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
@@ -136,45 +139,28 @@ class BihrWI_Product_Sync {
 
         $where_clause = ! empty( $where_conditions ) ? implode( ' AND ', $where_conditions ) : '1=1';
 
-        // Gestion du tri
-        $order_clause = 'ORDER BY id ASC'; // Par défaut
-        switch ( $sort_by ) {
-            case 'price_asc':
-                $order_clause = 'ORDER BY dealer_price_ht ASC';
-                break;
-            case 'price_desc':
-                $order_clause = 'ORDER BY dealer_price_ht DESC';
-                break;
-            case 'name_asc':
-                $order_clause = 'ORDER BY name ASC';
-                break;
-            case 'name_desc':
-                $order_clause = 'ORDER BY name DESC';
-                break;
-            case 'stock_asc':
-                $order_clause = 'ORDER BY stock_level ASC';
-                break;
-            case 'stock_desc':
-                $order_clause = 'ORDER BY stock_level DESC';
-                break;
-            default:
-                $order_clause = 'ORDER BY id ASC';
-                break;
-        }
+        // Gestion du tri via whitelist (aucune valeur user directe)
+        $allowed_sorts = array(
+            'price_asc'  => array( 'dealer_price_ht', 'ASC' ),
+            'price_desc' => array( 'dealer_price_ht', 'DESC' ),
+            'name_asc'   => array( 'name', 'ASC' ),
+            'name_desc'  => array( 'name', 'DESC' ),
+            'stock_asc'  => array( 'stock_level', 'ASC' ),
+            'stock_desc' => array( 'stock_level', 'DESC' ),
+        );
+
+        $order_tuple  = isset( $allowed_sorts[ $sort_by ] ) ? $allowed_sorts[ $sort_by ] : array( 'id', 'ASC' );
+        $order_column = $order_tuple[0];
+        $order_dir    = $order_tuple[1];
+        $order_clause = "ORDER BY {$order_column} {$order_dir}";
 
         // Construction de la requête finale - appliquer prepare correctement
-        // L'ordre des placeholders dans le SQL doit correspondre à l'ordre des valeurs
         $sql = "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT %d OFFSET %d";
-        
+
         // Ajouter les limites aux valeurs
-        $all_values = array_merge( $where_values, array( $per_page, $offset ) );
-        
-        // Appliquer la préparation avec dépaquetage correct
-        if ( ! empty( $all_values ) ) {
-            $query = call_user_func_array( array( $wpdb, 'prepare' ), array_merge( array( $sql ), $all_values ) );
-        } else {
-            $query = $sql;
-        }
+        $all_values = array_merge( $where_values, array( (int) $per_page, (int) $offset ) );
+
+        $query = call_user_func_array( array( $wpdb, 'prepare' ), array_merge( array( $sql ), $all_values ) );
 
         return $wpdb->get_results( $query );
     }
@@ -191,7 +177,7 @@ class BihrWI_Product_Sync {
         
         // Filtre de recherche
         if ( ! empty( $search ) ) {
-            $search_like = '%' . $wpdb->esc_like( $search ) . '%';
+            $search_like = '%' . $wpdb->esc_like( sanitize_text_field( $search ) ) . '%';
             $where_conditions[] = '(product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
             $where_values[] = $search_like;
             $where_values[] = $search_like;
@@ -219,7 +205,7 @@ class BihrWI_Product_Sync {
         // Filtre de catégorie
         if ( ! empty( $category_filter ) ) {
             // Normaliser côté PHP + SQL (trim + NBSP) pour matcher les valeurs en base
-            $normalized_category = str_replace( "\xc2\xa0", ' ', (string) $category_filter );
+            $normalized_category = str_replace( "\xc2\xa0", ' ', sanitize_text_field( (string) $category_filter ) );
             $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
 
             $where_conditions[] = "REPLACE(TRIM(category), CHAR(160), ' ') = %s";
