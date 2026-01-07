@@ -93,7 +93,10 @@ function bihrwi_activate_plugin() {
         wp_mkdir_p( $log_dir );
     }
     if ( ! file_exists( BIHRWI_LOG_FILE ) ) {
-        file_put_contents( BIHRWI_LOG_FILE, '' );
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        WP_Filesystem();
+        global $wp_filesystem;
+        $wp_filesystem->put_contents( BIHRWI_LOG_FILE, '' );
     }
 
     // Table wp_bihr_products

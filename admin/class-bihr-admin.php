@@ -423,7 +423,7 @@ class BihrWI_Admin {
             return;
         }
         // Traitement du formulaire de sauvegarde
-        if ( isset( $_POST['bihrwi_margins_nonce'] ) && wp_verify_nonce( $_POST['bihrwi_margins_nonce'], 'bihrwi_save_margins' ) ) {
+        if ( isset( $_POST['bihrwi_margins_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bihrwi_margins_nonce'] ) ), 'bihrwi_save_margins' ) && current_user_can( 'manage_woocommerce' ) ) {
             $this->save_margin_settings();
             wp_redirect( add_query_arg( 'margin_saved', '1', admin_url( 'admin.php?page=bihrwi_margins' ) ) );
             exit;

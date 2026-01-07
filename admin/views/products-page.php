@@ -203,7 +203,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             Téléchargement terminé ! 
             <?php 
             $catalogs = isset( $_GET['bihrwi_catalogs_count'] ) ? intval( $_GET['bihrwi_catalogs_count'] ) : 0;
-            $files = intval( $_GET['bihrwi_files_count'] );
+            $files = isset( $_GET['bihrwi_files_count'] ) ? intval( $_GET['bihrwi_files_count'] ) : 0;
             echo $catalogs > 0 ? esc_html( $catalogs ) . ' catalogue(s) téléchargé(s), ' : '';
             echo esc_html( $files ) . ' fichier(s) CSV extrait(s) dans le dossier d\'import.';
             ?>
@@ -213,7 +213,10 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <?php if ( isset( $_GET['bihrwi_download_error'] ) ) : ?>
         <div class="notice notice-error"><p>
             Erreur lors du téléchargement des catalogues :
-            <?php echo esc_html( wp_unslash( $_GET['bihrwi_msg'] ) ); ?>
+            <?php 
+            $error_msg = isset( $_GET['bihrwi_msg'] ) ? sanitize_text_field( wp_unslash( $_GET['bihrwi_msg'] ) ) : '';
+            echo esc_html( $error_msg ); 
+            ?>
         </p></div>
     <?php endif; ?>
 

@@ -225,15 +225,19 @@ class BihrWI_API_Client {
             return false;
         }
 
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        WP_Filesystem();
+        global $wp_filesystem;
+
         $upload_dir = dirname( BIHRWI_LOG_FILE );
-        if ( ! file_exists( $upload_dir ) ) {
+        if ( ! $wp_filesystem->exists( $upload_dir ) ) {
             wp_mkdir_p( $upload_dir );
         }
 
         $filename = $prefix . '-' . gmdate( 'Ymd-His' ) . '.zip';
         $filepath = trailingslashit( $upload_dir ) . $filename;
 
-        file_put_contents( $filepath, $body );
+        $wp_filesystem->put_contents( $filepath, $body );
 
         return $filepath;
     }

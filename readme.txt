@@ -1,4 +1,4 @@
-=== BIHR Synchronisation ===
+=== BIHR WooCommerce Importer ===
 Contributors: drcomputer60290
 Tags: woocommerce, bihr, synchronization, products, inventory, vehicle-compatibility
 Requires at least: 5.6
@@ -9,7 +9,7 @@ License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Description ==
-BIHR Synchronisation enables automatic synchronization of products, prices, inventory, and vehicle-product compatibility between the Bihr platform and WooCommerce. The plugin automates catalog imports and provides advanced inventory management features for motorcycle and powersports e-commerce stores.
+BIHR WooCommerce Importer enables automatic synchronization of products, prices, inventory, and vehicle-product compatibility between the Bihr platform and WooCommerce. The plugin automates catalog imports and provides advanced inventory management features for motorcycle and powersports e-commerce stores.
 
 **Key Features:**
 * Automated Bihr catalog import (products, prices, stock, images, attributes)
@@ -20,8 +20,8 @@ BIHR Synchronisation enables automatic synchronization of products, prices, inve
 * WooCommerce integration and order synchronization
 
 == Installation ==
-1. Upload the plugin files to `/wp-content/plugins/bihr-synchronisation/`
-2. Activate the plugin through WordPress admin panel
+1. Upload the plugin files to `/wp-content/plugins/bihr-woocommerce-importer/`
+2. Activate the plugin through the WordPress admin panel
 3. Navigate to BIHR Dashboard and configure your Bihr API credentials
 4. Set up product catalogs, vehicle compatibility, and synchronization schedules
 
