@@ -176,6 +176,7 @@ class BihrWI_Vehicle_Compatibility {
 
         $count = 0;
         $errors = 0;
+        $vehicle_format = array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d' );
 
         foreach ( $lines as $line ) {
             if ( trim( $line ) === '' ) {
@@ -188,20 +189,20 @@ class BihrWI_Vehicle_Compatibility {
             }
 
             $vehicle_data = array(
-                'vehicle_code'           => $row[0],
-                'version_code'           => $row[1],
-                'commercial_model_code'  => $row[2],
-                'manufacturer_code'      => $row[3],
-                'vehicle_year'           => $row[4],
-                'version_name'           => $row[5],
-                'commercial_model_name'  => $row[6],
-                'manufacturer_name'      => $row[7],
-                'universe_name'          => $row[8],
-                'category_name'          => $row[9],
-                'displacement_cm3'       => intval( $row[10] ),
+                'vehicle_code'           => sanitize_text_field( $row[0] ?? '' ),
+                'version_code'           => sanitize_text_field( $row[1] ?? '' ),
+                'commercial_model_code'  => sanitize_text_field( $row[2] ?? '' ),
+                'manufacturer_code'      => sanitize_text_field( $row[3] ?? '' ),
+                'vehicle_year'           => absint( $row[4] ?? 0 ),
+                'version_name'           => sanitize_text_field( $row[5] ?? '' ),
+                'commercial_model_name'  => sanitize_text_field( $row[6] ?? '' ),
+                'manufacturer_name'      => sanitize_text_field( $row[7] ?? '' ),
+                'universe_name'          => sanitize_text_field( $row[8] ?? '' ),
+                'category_name'          => sanitize_text_field( $row[9] ?? '' ),
+                'displacement_cm3'       => absint( $row[10] ?? 0 ),
             );
 
-            $result = $wpdb->insert( $this->vehicles_table, $vehicle_data );
+            $result = $wpdb->insert( $this->vehicles_table, $vehicle_data, $vehicle_format );
             
             if ( $result ) {
                 $count++;
@@ -283,7 +284,8 @@ class BihrWI_Vehicle_Compatibility {
      * @return array Résultat avec progression
      */
     public function import_brand_compatibility( $brand_name, $file_path = null, $batch_start = 0 ) {
-        $file_path = $file_path ?: $this->import_dir . '[' . $brand_name . '].csv';
+        $brand_name = sanitize_text_field( (string) $brand_name );
+        $file_path  = $file_path ?: $this->import_dir . '[' . $brand_name . '].csv';
         
         if ( ! file_exists( $file_path ) ) {
             return array(
@@ -372,13 +374,13 @@ class BihrWI_Vehicle_Compatibility {
                 continue;
             }
             $batch[] = array(
-                'vehicle_code'              => trim( $row[0] ?? '' ),
-                'part_number'               => trim( $row[1] ?? '' ),
-                'barcode'                   => trim( $row[2] ?? '' ),
-                'manufacturer_part_number'  => trim( $row[3] ?? '' ),
-                'position_id'               => trim( $row[4] ?? '' ),
-                'position_value'            => trim( $row[5] ?? '' ),
-                'attributes'                => trim( $row[6] ?? '' ),
+                'vehicle_code'              => sanitize_text_field( trim( $row[0] ?? '' ) ),
+                'part_number'               => sanitize_text_field( trim( $row[1] ?? '' ) ),
+                'barcode'                   => sanitize_text_field( trim( $row[2] ?? '' ) ),
+                'manufacturer_part_number'  => sanitize_text_field( trim( $row[3] ?? '' ) ),
+                'position_id'               => sanitize_text_field( trim( $row[4] ?? '' ) ),
+                'position_value'            => sanitize_text_field( trim( $row[5] ?? '' ) ),
+                'attributes'                => sanitize_textarea_field( trim( $row[6] ?? '' ) ),
                 'source_brand'              => $brand_name,
             );
             $current_line++;

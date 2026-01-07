@@ -91,55 +91,52 @@ class BihrWI_Product_Sync {
     public function get_products( $page = 1, $per_page = 20, $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $sort_by = '' ) {
         global $wpdb;
 
-        $offset = ( max( 1, (int) $page ) - 1 ) * max( 1, (int) $per_page );
+        $page     = max( 1, (int) $page );
+        $per_page = max( 1, (int) $per_page );
+        $offset   = ( $page - 1 ) * $per_page;
 
-        // Construction de la requête avec filtres - utiliser une approche plus robuste
-        $where_conditions = array();
-        $where_values = array();
-        
-        $search       = sanitize_text_field( $search );
-        $category_filter = sanitize_text_field( $category_filter );
+        $where = array();
+        $args  = array();
 
-        // Filtre de recherche (code produit, NewPartNumber, nom, description)
-        if ( ! empty( $search ) ) {
+        $search          = sanitize_text_field( (string) $search );
+        $stock_filter    = sanitize_text_field( (string) $stock_filter );
+        $category_filter = sanitize_text_field( (string) $category_filter );
+        $sort_by         = sanitize_key( (string) $sort_by );
+
+        if ( $search !== '' ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where_conditions[] = '(product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
-            $where_values[] = $search_like;
-            $where_values[] = $search_like;
-            $where_values[] = $search_like;
-            $where_values[] = $search_like;
+            $where[]     = '(product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $args[]      = $search_like;
+            $args[]      = $search_like;
+            $args[]      = $search_like;
+            $args[]      = $search_like;
         }
 
-        // Filtre de stock
         if ( $stock_filter === 'in_stock' ) {
-            $where_conditions[] = 'stock_level > 0';
+            $where[] = 'stock_level > 0';
         } elseif ( $stock_filter === 'out_of_stock' ) {
-            $where_conditions[] = '(stock_level = 0 OR stock_level IS NULL)';
+            $where[] = '(stock_level = 0 OR stock_level IS NULL)';
         }
 
-        // Filtre de plage de prix
-        if ( ! empty( $price_min ) && is_numeric( $price_min ) ) {
-            $where_conditions[] = 'dealer_price_ht >= %f';
-            $where_values[] = floatval( $price_min );
-        }
-        if ( ! empty( $price_max ) && is_numeric( $price_max ) ) {
-            $where_conditions[] = 'dealer_price_ht <= %f';
-            $where_values[] = floatval( $price_max );
+        if ( $price_min !== '' && is_numeric( $price_min ) ) {
+            $where[] = 'dealer_price_ht >= %f';
+            $args[]  = (float) $price_min;
         }
 
-        // Filtre de catégorie
-        if ( ! empty( $category_filter ) ) {
-            // Normaliser côté PHP + SQL (trim + NBSP) pour matcher les valeurs en base
-            $normalized_category = str_replace( "\xc2\xa0", ' ', (string) $category_filter );
+        if ( $price_max !== '' && is_numeric( $price_max ) ) {
+            $where[] = 'dealer_price_ht <= %f';
+            $args[]  = (float) $price_max;
+        }
+
+        if ( $category_filter !== '' ) {
+            $normalized_category = str_replace( "\xc2\xa0", ' ', $category_filter );
             $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
-
-            $where_conditions[] = "REPLACE(TRIM(category), CHAR(160), ' ') = %s";
-            $where_values[] = $normalized_category;
+            $where[]             = "REPLACE(TRIM(category), CHAR(160), ' ') = %s";
+            $args[]              = $normalized_category;
         }
 
-        $where_clause = ! empty( $where_conditions ) ? implode( ' AND ', $where_conditions ) : '1=1';
+        $where_sql = ! empty( $where ) ? implode( ' AND ', $where ) : '1=1';
 
-        // Gestion du tri via whitelist (aucune valeur user directe)
         $allowed_sorts = array(
             'price_asc'  => array( 'dealer_price_ht', 'ASC' ),
             'price_desc' => array( 'dealer_price_ht', 'DESC' ),
@@ -152,17 +149,12 @@ class BihrWI_Product_Sync {
         $order_tuple  = isset( $allowed_sorts[ $sort_by ] ) ? $allowed_sorts[ $sort_by ] : array( 'id', 'ASC' );
         $order_column = $order_tuple[0];
         $order_dir    = $order_tuple[1];
-        $order_clause = "ORDER BY {$order_column} {$order_dir}";
 
-        // Construction de la requête finale - appliquer prepare correctement
-        $sql = "SELECT * FROM {$this->table_name} WHERE {$where_clause} {$order_clause} LIMIT %d OFFSET %d";
+        $sql = "SELECT * FROM {$this->table_name} WHERE {$where_sql} ORDER BY {$order_column} {$order_dir} LIMIT %d OFFSET %d";
 
-        // Ajouter les limites aux valeurs
-        $all_values = array_merge( $where_values, array( (int) $per_page, (int) $offset ) );
+        $prepared = $wpdb->prepare( $sql, array_merge( $args, array( $per_page, $offset ) ) );
 
-        $query = call_user_func_array( array( $wpdb, 'prepare' ), array_merge( array( $sql ), $all_values ) );
-
-        return $wpdb->get_results( $query );
+        return $wpdb->get_results( $prepared );
     }
 
     /**
@@ -171,59 +163,52 @@ class BihrWI_Product_Sync {
     public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '' ) {
         global $wpdb;
 
-        // Construction de la requête avec filtres - utiliser une approche robuste
-        $where_conditions = array();
-        $where_values = array();
-        
-        // Filtre de recherche
-        if ( ! empty( $search ) ) {
-            $search_like = '%' . $wpdb->esc_like( sanitize_text_field( $search ) ) . '%';
-            $where_conditions[] = '(product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
-            $where_values[] = $search_like;
-            $where_values[] = $search_like;
-            $where_values[] = $search_like;
-            $where_values[] = $search_like;
+        $where = array();
+        $args  = array();
+
+        $search          = sanitize_text_field( (string) $search );
+        $stock_filter    = sanitize_text_field( (string) $stock_filter );
+        $category_filter = sanitize_text_field( (string) $category_filter );
+
+        if ( $search !== '' ) {
+            $search_like = '%' . $wpdb->esc_like( $search ) . '%';
+            $where[]     = '(product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $args[]      = $search_like;
+            $args[]      = $search_like;
+            $args[]      = $search_like;
+            $args[]      = $search_like;
         }
 
-        // Filtre de stock
         if ( $stock_filter === 'in_stock' ) {
-            $where_conditions[] = 'stock_level > 0';
+            $where[] = 'stock_level > 0';
         } elseif ( $stock_filter === 'out_of_stock' ) {
-            $where_conditions[] = '(stock_level = 0 OR stock_level IS NULL)';
+            $where[] = '(stock_level = 0 OR stock_level IS NULL)';
         }
 
-        // Filtre de plage de prix
-        if ( ! empty( $price_min ) && is_numeric( $price_min ) ) {
-            $where_conditions[] = 'dealer_price_ht >= %f';
-            $where_values[] = floatval( $price_min );
-        }
-        if ( ! empty( $price_max ) && is_numeric( $price_max ) ) {
-            $where_conditions[] = 'dealer_price_ht <= %f';
-            $where_values[] = floatval( $price_max );
+        if ( $price_min !== '' && is_numeric( $price_min ) ) {
+            $where[] = 'dealer_price_ht >= %f';
+            $args[]  = (float) $price_min;
         }
 
-        // Filtre de catégorie
-        if ( ! empty( $category_filter ) ) {
-            // Normaliser côté PHP + SQL (trim + NBSP) pour matcher les valeurs en base
-            $normalized_category = str_replace( "\xc2\xa0", ' ', sanitize_text_field( (string) $category_filter ) );
+        if ( $price_max !== '' && is_numeric( $price_max ) ) {
+            $where[] = 'dealer_price_ht <= %f';
+            $args[]  = (float) $price_max;
+        }
+
+        if ( $category_filter !== '' ) {
+            $normalized_category = str_replace( "\xc2\xa0", ' ', $category_filter );
             $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
-
-            $where_conditions[] = "REPLACE(TRIM(category), CHAR(160), ' ') = %s";
-            $where_values[] = $normalized_category;
+            $where[]             = "REPLACE(TRIM(category), CHAR(160), ' ') = %s";
+            $args[]              = $normalized_category;
         }
 
-        $where_clause = ! empty( $where_conditions ) ? implode( ' AND ', $where_conditions ) : '1=1';
+        $where_sql = ! empty( $where ) ? implode( ' AND ', $where ) : '1=1';
 
-        // Préparation correcte de la requête de comptage
-        $sql = "SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_clause}";
-        
-        if ( ! empty( $where_values ) ) {
-            $query = call_user_func_array( array( $wpdb, 'prepare' ), array_merge( array( $sql ), $where_values ) );
-        } else {
-            $query = $sql;
-        }
+        $sql = "SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_sql}";
 
-        return (int) $wpdb->get_var( $query );
+        $prepared = ! empty( $args ) ? $wpdb->prepare( $sql, $args ) : $sql;
+
+        return (int) $wpdb->get_var( $prepared );
     }
 
     /* =========================================================
