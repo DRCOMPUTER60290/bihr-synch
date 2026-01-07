@@ -37,15 +37,12 @@ if ( ! function_exists( 'bwi_fs' ) ) {
                 'slug'                => 'bihr-importer',
                 'type'                => 'plugin',
                 'public_key'          => 'pk_9339663c54962dd345ba8f2dfd5bd',
-                'is_premium'          => true,
+                'is_premium'          => false,
                 'premium_suffix'      => 'Professional',
-                // If your plugin is a serviceware, set this option to false.
                 'has_premium_version' => true,
                 'has_addons'          => false,
                 'has_paid_plans'      => true,
-                // Automatically removed in the free version. If you're not using the
-                // auto-generated free version, delete this line before uploading to wp.org.
-                'wp_org_gatekeeper'   => 'OA7#BoRiBNqdf52FvzEf!!074aRLPs8fspif$7K1#4u4Csys1fQlCecVcUTOs2mcpeVHi#C2j9d09fOTvbC0HloPT7fFee5WdS3G',
+                'is_org_compliant'    => true,
                 'trial'               => array(
                     'days'               => 7,
                     'is_require_payment' => false,
@@ -132,7 +129,7 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['five_minutes'] ) ) {
         $schedules['five_minutes'] = array(
             'interval' => 300,
-            'display'  => __( 'Every 5 Minutes', 'bihr-importer' ),
+            'display'  => __( 'Every 5 Minutes', 'bihr-synchronisation' ),
         );
     }
 
@@ -140,14 +137,14 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['weekly'] ) ) {
         $schedules['weekly'] = array(
             'interval' => 604800, // 7 jours
-            'display'  => __( 'Every Week', 'bihr-importer' ),
+            'display'  => __( 'Every Week', 'bihr-synchronisation' ),
         );
     }
 
     if ( ! isset( $schedules['biweekly'] ) ) {
         $schedules['biweekly'] = array(
             'interval' => 1209600, // 14 jours
-            'display'  => __( 'Every 2 Weeks', 'bihr-importer' ),
+            'display'  => __( 'Every 2 Weeks', 'bihr-synchronisation' ),
         );
     }
     return $schedules;

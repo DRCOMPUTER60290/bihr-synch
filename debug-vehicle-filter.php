@@ -4,8 +4,21 @@
  * À placer à la racine du plugin et exécuter via URL
  */
 
-// Charger WordPress
-require_once( '../../../wp-load.php' );
+// Charger WordPress si nécessaire
+if ( ! defined( 'ABSPATH' ) ) {
+    $wp_load_path = dirname( __FILE__, 3 ) . '/wp-load.php';
+
+    if ( ! file_exists( $wp_load_path ) ) {
+        exit( 'wp-load.php introuvable.' );
+    }
+
+    require_once $wp_load_path;
+}
+
+// Restreindre l'accès à l'admin
+if ( ! current_user_can( 'manage_options' ) ) {
+    wp_die( esc_html__( 'Vous n\'avez pas la permission d\'accéder à ce script.', 'bihr-synchronisation' ) );
+}
 
 global $wpdb;
 

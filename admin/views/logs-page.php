@@ -19,6 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     $h = wp_date( 'H' );
     $i = wp_date( 'i' );
     $s = wp_date( 's' );
+    $bihrwi_cleared = filter_input( INPUT_GET, 'bihrwi_cleared', FILTER_SANITIZE_NUMBER_INT );
+    $bihrwi_cron_spawned = filter_input( INPUT_GET, 'bihrwi_cron_spawned', FILTER_SANITIZE_NUMBER_INT );
     ?>
 
     <div style="margin:10px 0; padding:8px 12px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; display:inline-block;">
@@ -29,7 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
         <span style="color:#6b7280; margin-left:6px;">(<?php echo esc_html( $tz_string ); ?>)</span>
     </div>
 
-    <?php if ( isset( $_GET['bihrwi_cleared'] ) ) : ?>
+    <?php if ( ! empty( $bihrwi_cleared ) ) : ?>
         <div class="notice notice-success"><p>Les logs ont été effacés.</p></div>
     <?php endif; ?>
 
@@ -45,9 +47,9 @@ if ( ! defined( 'ABSPATH' ) ) {
         <?php submit_button( '⚙️ Exécuter WP‑Cron maintenant', 'secondary' ); ?>
     </form>
 
-    <?php if ( isset( $_GET['bihrwi_cron_spawned'] ) ) : ?>
-        <div class="notice <?php echo $_GET['bihrwi_cron_spawned'] ? 'notice-success' : 'notice-error'; ?>"><p>
-            <?php echo $_GET['bihrwi_cron_spawned'] ? 'WP‑Cron déclenché.' : 'Échec du déclenchement WP‑Cron.'; ?>
+    <?php if ( null !== $bihrwi_cron_spawned ) : ?>
+        <div class="notice <?php echo $bihrwi_cron_spawned ? 'notice-success' : 'notice-error'; ?>"><p>
+            <?php echo $bihrwi_cron_spawned ? 'WP‑Cron déclenché.' : 'Échec du déclenchement WP‑Cron.'; ?>
         </p></div>
     <?php endif; ?>
 

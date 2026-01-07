@@ -7,8 +7,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Page d'administration pour la compatibilité véhicule
  */
 
-$logger        = new BihrWI_Logger();
-$compatibility = new BihrWI_Vehicle_Compatibility( $logger );
+$logger                = new BihrWI_Logger();
+$compatibility         = new BihrWI_Vehicle_Compatibility( $logger );
+$tables_created        = filter_input( INPUT_GET, 'tables_created', FILTER_SANITIZE_NUMBER_INT );
+$vehicles_imported     = filter_input( INPUT_GET, 'vehicles_imported', FILTER_SANITIZE_NUMBER_INT );
+$compatibility_imported = filter_input( INPUT_GET, 'compatibility_imported', FILTER_SANITIZE_NUMBER_INT );
+$brand_param           = filter_input( INPUT_GET, 'brand', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
+$error_param           = filter_input( INPUT_GET, 'error', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
 
 // Statistiques
 $stats = $compatibility->get_statistics();
@@ -26,28 +31,28 @@ $stats = $compatibility->get_statistics();
 
     <?php
     // Notifications
-    if ( isset( $_GET['tables_created'] ) ) : ?>
+    if ( ! empty( $tables_created ) ) : ?>
         <div class="notice notice-success"><p>
             ✅ <strong>Tables créées avec succès !</strong>
         </p></div>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['vehicles_imported'] ) ) : ?>
+    <?php if ( ! empty( $vehicles_imported ) ) : ?>
         <div class="notice notice-success"><p>
-            ✅ <strong><?php echo intval( $_GET['vehicles_imported'] ); ?> véhicules</strong> importés avec succès !
+            ✅ <strong><?php echo intval( $vehicles_imported ); ?> véhicules</strong> importés avec succès !
         </p></div>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['compatibility_imported'] ) ) : ?>
+    <?php if ( ! empty( $compatibility_imported ) ) : ?>
         <div class="notice notice-success"><p>
-            ✅ <strong><?php echo intval( $_GET['compatibility_imported'] ); ?> compatibilités</strong> importées avec succès !
-            (Marque: <?php echo esc_html( $_GET['brand'] ?? 'N/A' ); ?>)
+            ✅ <strong><?php echo intval( $compatibility_imported ); ?> compatibilités</strong> importées avec succès !
+            (Marque: <?php echo esc_html( $brand_param ?? 'N/A' ); ?>)
         </p></div>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['error'] ) ) : ?>
+    <?php if ( ! empty( $error_param ) ) : ?>
         <div class="notice notice-error"><p>
-            ❌ Erreur: <?php echo esc_html( urldecode( $_GET['error'] ) ); ?>
+            ❌ Erreur: <?php echo esc_html( urldecode( $error_param ) ); ?>
         </p></div>
     <?php endif; ?>
 

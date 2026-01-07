@@ -195,8 +195,8 @@ if ( ! defined( 'ABSPATH' ) ) {
             <li><?php esc_html_e( 'Seuls les produits avec un code produit BIHR (meta _bihr_product_code) seront synchronisés', 'bihr-synchronisation' ); ?></li>
             <li><?php esc_html_e( 'Les commandes sont envoyées au moment de la création (hook: woocommerce_checkout_order_processed)', 'bihr-synchronisation' ); ?></li>
             <li><?php esc_html_e( 'Les numéros de téléphone français sont automatiquement formatés au format international (+33)', 'bihr-synchronisation' ); ?></li>
-            <li><?php esc_html_e( 'Les adresses de livraison sont utilisées en priorité, sinon les adresses de facturation', 'BIHR-SYNCH-main' ); ?></li>
-            <li><?php esc_html_e( 'Toutes les opérations sont loguées dans la page "Logs"', 'BIHR-SYNCH-main' ); ?></li>
+            <li><?php esc_html_e( 'Les adresses de livraison sont utilisées en priorité, sinon les adresses de facturation', 'bihr-synchronisation' ); ?></li>
+            <li><?php esc_html_e( 'Toutes les opérations sont loguées dans la page "Logs"', 'bihr-synchronisation' ); ?></li>
         </ul>
     </div>
 
@@ -214,18 +214,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     if ( ! empty( $recent_orders ) ) :
     ?>
         <div class="bihr-section">
-            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'BIHR-SYNCH-main' ); ?></h2>
+            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'bihr-synchronisation' ); ?></h2>
             <table class="widefat">
                 <thead>
                     <tr>
-                        <th><?php esc_html_e( 'Ticket WC', 'BIHR-SYNCH-main' ); ?></th>
-                        <th><?php esc_html_e( 'Ticket BIHR API', 'BIHR-SYNCH-main' ); ?></th>
-                        <th><?php esc_html_e( 'Commande WC', 'BIHR-SYNCH-main' ); ?></th>
-                        <th><?php esc_html_e( 'Client', 'BIHR-SYNCH-main' ); ?></th>
-                        <th><?php esc_html_e( 'ID BIHR', 'BIHR-SYNCH-main' ); ?></th>
-                        <th><?php esc_html_e( 'Date Sync', 'BIHR-SYNCH-main' ); ?></th>
-                        <th><?php esc_html_e( 'Statut', 'BIHR-SYNCH-main' ); ?></th>
-                        <th><?php esc_html_e( 'Order/Data', 'BIHR-SYNCH-main' ); ?></th>
+                        <th><?php esc_html_e( 'Ticket WC', 'bihr-synchronisation' ); ?></th>
+                        <th><?php esc_html_e( 'Ticket BIHR API', 'bihr-synchronisation' ); ?></th>
+                        <th><?php esc_html_e( 'Commande WC', 'bihr-synchronisation' ); ?></th>
+                        <th><?php esc_html_e( 'Client', 'bihr-synchronisation' ); ?></th>
+                        <th><?php esc_html_e( 'ID BIHR', 'bihr-synchronisation' ); ?></th>
+                        <th><?php esc_html_e( 'Date Sync', 'bihr-synchronisation' ); ?></th>
+                        <th><?php esc_html_e( 'Statut', 'bihr-synchronisation' ); ?></th>
+                        <th><?php esc_html_e( 'Order/Data', 'bihr-synchronisation' ); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -259,9 +259,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                             <td><?php echo esc_html( $sync_date ?: 'N/A' ); ?></td>
                             <td>
                                 <?php if ( $sync_failed ) : ?>
-                                    <span style="color: red;">❌ <?php esc_html_e( 'Échec', 'BIHR-SYNCH-main' ); ?></span>
+                                    <span style="color: red;">❌ <?php esc_html_e( 'Échec', 'bihr-synchronisation' ); ?></span>
                                 <?php else : ?>
-                                    <span style="color: green;">✅ <?php esc_html_e( 'Synchronisé', 'BIHR-SYNCH-main' ); ?></span>
+                                    <span style="color: green;">✅ <?php esc_html_e( 'Synchronisé', 'bihr-synchronisation' ); ?></span>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -271,14 +271,14 @@ if ( ! defined( 'ABSPATH' ) ) {
                                         class="button bihrwi-order-data-btn"
                                         data-order-id="<?php echo esc_attr( $post->ID ); ?>"
                                     >
-                                        <?php esc_html_e( 'Voir', 'BIHR-SYNCH-main' ); ?>
+                                        <?php esc_html_e( 'Voir', 'bihr-synchronisation' ); ?>
                                     </button>
 
                                     <?php if ( ! empty( $cached_order_data_at ) ) : ?>
                                         <div style="margin-top: 6px; font-size: 11px; color: #666;">
                                             <?php
                                             /* translators: %s: Date et heure du cache */
-                                            echo esc_html( sprintf( __( 'Cache: %s', 'BIHR-SYNCH-main' ), $cached_order_data_at ) ); ?>
+                                            echo esc_html( sprintf( __( 'Cache: %s', 'bihr-synchronisation' ), $cached_order_data_at ) ); ?>
                                         </div>
                                     <?php endif; ?>
                                 <?php else : ?>
@@ -300,7 +300,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                                                 echo esc_html( $cached_order_data_json );
                                             }
                                         } else {
-                                            echo esc_html__( 'Cliquez sur “Voir” pour récupérer les données via l’API BIHR (Order/Data).', 'BIHR-SYNCH-main' );
+                                            echo esc_html__( 'Cliquez sur “Voir” pour récupérer les données via l’API BIHR (Order/Data).', 'bihr-synchronisation' );
                                         }
                                     ?></pre>
                                     <div style="margin-top: 8px;">
@@ -309,7 +309,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                                             class="button button-secondary bihrwi-order-data-refresh-btn"
                                             data-order-id="<?php echo esc_attr( $post->ID ); ?>"
                                         >
-                                            <?php esc_html_e( 'Actualiser', 'BIHR-SYNCH-main' ); ?>
+                                            <?php esc_html_e( 'Actualiser', 'bihr-synchronisation' ); ?>
                                         </button>
                                     </div>
                                 </div>
@@ -321,9 +321,9 @@ if ( ! defined( 'ABSPATH' ) ) {
         </div>
     <?php else : ?>
         <div class="bihr-section">
-            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'BIHR-SYNCH-main' ); ?></h2>
+            <h2><?php esc_html_e( 'Dernières Commandes Synchronisées', 'bihr-synchronisation' ); ?></h2>
             <p style="margin:0; color:#666;">
-                <?php esc_html_e( 'Aucune commande synchronisée BIHR n’a été trouvée pour le moment. La section Order/Data ci-dessus reste disponible si vous connaissez l’ID de commande WooCommerce.', 'BIHR-SYNCH-main' ); ?>
+                <?php esc_html_e( 'Aucune commande synchronisée BIHR n’a été trouvée pour le moment. La section Order/Data ci-dessus reste disponible si vous connaissez l’ID de commande WooCommerce.', 'bihr-synchronisation' ); ?>
             </p>
         </div>
     <?php endif; ?>

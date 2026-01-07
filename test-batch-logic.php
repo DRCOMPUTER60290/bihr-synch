@@ -4,6 +4,10 @@
  * À exécuter dans l'admin WordPress pour tester
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 // Simuler un petit CSV de test
 $test_csv_content = "vehicle_code,part_number,barcode,manufacturer_part_number,position_id,position_value,attributes\n";
 for ($i = 1; $i <= 250; $i++) {

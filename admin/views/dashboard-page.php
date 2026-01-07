@@ -183,8 +183,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
         <div class="actions-grid">
             <div class="action-card">
                 <div class="action-icon">🔐</div>
-                <h3><?php esc_html_e( 'Authentification', 'BIHR-SYNCH-main' ); ?></h3>
-                <p><?php esc_html_e( 'Gérer votre connexion BIHR', 'BIHR-SYNCH-main' ); ?></p>
+                <h3><?php esc_html_e( 'Authentification', 'bihr-synchronisation' ); ?></h3>
+                <p><?php esc_html_e( 'Gérer votre connexion BIHR', 'bihr-synchronisation' ); ?></p>
                 <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-auth', admin_url( 'admin.php' ) ) ); ?>" class="button">
                     <?php esc_html_e( 'Ouvrir', 'bihr-synchronisation' ); ?>
                 </a>
@@ -192,8 +192,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 
             <div class="action-card">
                 <div class="action-icon">📥</div>
-                <h3><?php esc_html_e( 'Importer Produits', 'BIHR-SYNCH-main' ); ?></h3>
-                <p><?php esc_html_e( 'Importer le catalogue BIHR', 'BIHR-SYNCH-main' ); ?></p>
+                <h3><?php esc_html_e( 'Importer Produits', 'bihr-synchronisation' ); ?></h3>
+                <p><?php esc_html_e( 'Importer le catalogue BIHR', 'bihr-synchronisation' ); ?></p>
                 <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-products', admin_url( 'admin.php' ) ) ); ?>" class="button button-primary">
                     <?php esc_html_e( 'Importer', 'bihr-synchronisation' ); ?>
                 </a>
@@ -201,8 +201,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 
             <div class="action-card">
                 <div class="action-icon">🚗</div>
-                <h3><?php esc_html_e( 'Compatibilités Véhicules', 'BIHR-SYNCH-main' ); ?></h3>
-                <p><?php esc_html_e( 'Gérer les filtres par véhicule', 'BIHR-SYNCH-main' ); ?></p>
+                <h3><?php esc_html_e( 'Compatibilités Véhicules', 'bihr-synchronisation' ); ?></h3>
+                <p><?php esc_html_e( 'Gérer les filtres par véhicule', 'bihr-synchronisation' ); ?></p>
                 <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-compatibility', admin_url( 'admin.php' ) ) ); ?>" class="button">
                     <?php esc_html_e( 'Gérer', 'bihr-synchronisation' ); ?>
                 </a>
@@ -210,8 +210,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 
             <div class="action-card">
                 <div class="action-icon">🛒</div>
-                <h3><?php esc_html_e( 'Synchroniser Commandes', 'BIHR-SYNCH-main' ); ?></h3>
-                <p><?php esc_html_e( 'Configurer la synchro BIHR', 'BIHR-SYNCH-main' ); ?></p>
+                <h3><?php esc_html_e( 'Synchroniser Commandes', 'bihr-synchronisation' ); ?></h3>
+                <p><?php esc_html_e( 'Configurer la synchro BIHR', 'bihr-synchronisation' ); ?></p>
                 <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-orders', admin_url( 'admin.php' ) ) ); ?>" class="button">
                     <?php esc_html_e( 'Configurer', 'bihr-synchronisation' ); ?>
                 </a>
@@ -219,8 +219,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 
             <div class="action-card">
                 <div class="action-icon">📊</div>
-                <h3><?php esc_html_e( 'Logs & Monitoring', 'BIHR-SYNCH-main' ); ?></h3>
-                <p><?php esc_html_e( 'Voir l\'historique des opérations', 'BIHR-SYNCH-main' ); ?></p>
+                <h3><?php esc_html_e( 'Logs & Monitoring', 'bihr-synchronisation' ); ?></h3>
+                <p><?php esc_html_e( 'Voir l\'historique des opérations', 'bihr-synchronisation' ); ?></p>
                 <a href="<?php echo esc_url( add_query_arg( 'page', 'bihr-logs', admin_url( 'admin.php' ) ) ); ?>" class="button">
                     <?php esc_html_e( 'Voir Logs', 'bihr-synchronisation' ); ?>
                 </a>
@@ -228,8 +228,8 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
 
             <div class="action-card">
                 <div class="action-icon">❓</div>
-                <h3><?php esc_html_e( 'Aide & Support', 'BIHR-SYNCH-main' ); ?></h3>
-                <p><?php esc_html_e( 'Accéder à la documentation', 'BIHR-SYNCH-main' ); ?></p>
+                <h3><?php esc_html_e( 'Aide & Support', 'bihr-synchronisation' ); ?></h3>
+                <p><?php esc_html_e( 'Accéder à la documentation', 'bihr-synchronisation' ); ?></p>
                 <a href="#" class="button" id="bihr-open-help">
                     <?php esc_html_e( 'Ouvrir', 'bihr-synchronisation' ); ?>
                 </a>
@@ -240,7 +240,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
     <!-- Section expert (cachée par défaut) -->
     <div class="bihr-expert-section" <?php echo $is_beginner_mode ? 'style="display:none;"' : ''; ?>>
         <h2>⚙️ Panel Expert</h2>
-        <p><?php esc_html_e( 'Toutes les pages du plugin sont accessibles via le menu de gauche.', 'BIHR-SYNCH-main' ); ?></p>
+        <p><?php esc_html_e( 'Toutes les pages du plugin sont accessibles via le menu de gauche.', 'bihr-synchronisation' ); ?></p>
     </div>
 
     <!-- Tips & Tricks -->
@@ -248,20 +248,20 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
         <h3>💡 Conseils Utiles</h3>
         <ul class="tips-list">
             <li>
-                <strong><?php esc_html_e( 'Première synchronisation :', 'BIHR-SYNCH-main' ); ?></strong>
-                <?php esc_html_e( 'Elle peut prendre quelques minutes selon le nombre de produits.', 'BIHR-SYNCH-main' ); ?>
+                <strong><?php esc_html_e( 'Première synchronisation :', 'bihr-synchronisation' ); ?></strong>
+                <?php esc_html_e( 'Elle peut prendre quelques minutes selon le nombre de produits.', 'bihr-synchronisation' ); ?>
             </li>
             <li>
-                <strong><?php esc_html_e( 'Stocks en temps réel :', 'BIHR-SYNCH-main' ); ?></strong>
-                <?php esc_html_e( 'Activez la synchronisation automatique dans les paramètres.', 'BIHR-SYNCH-main' ); ?>
+                <strong><?php esc_html_e( 'Stocks en temps réel :', 'bihr-synchronisation' ); ?></strong>
+                <?php esc_html_e( 'Activez la synchronisation automatique dans les paramètres.', 'bihr-synchronisation' ); ?>
             </li>
             <li>
-                <strong><?php esc_html_e( 'Problèmes ? :', 'BIHR-SYNCH-main' ); ?></strong>
-                <?php esc_html_e( 'Consultez les logs pour diagnostiquer les erreurs.', 'BIHR-SYNCH-main' ); ?>
+                <strong><?php esc_html_e( 'Problèmes ? :', 'bihr-synchronisation' ); ?></strong>
+                <?php esc_html_e( 'Consultez les logs pour diagnostiquer les erreurs.', 'bihr-synchronisation' ); ?>
             </li>
             <li>
-                <strong><?php esc_html_e( 'Documentation :', 'BIHR-SYNCH-main' ); ?></strong>
-                <?php esc_html_e( 'Lisez nos guides complets pour bien démarrer.', 'BIHR-SYNCH-main' ); ?>
+                <strong><?php esc_html_e( 'Documentation :', 'bihr-synchronisation' ); ?></strong>
+                <?php esc_html_e( 'Lisez nos guides complets pour bien démarrer.', 'bihr-synchronisation' ); ?>
             </li>
         </ul>
     </div>

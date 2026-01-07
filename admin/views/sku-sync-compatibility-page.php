@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! current_user_can( 'manage_woocommerce' ) ) {
-    wp_die( esc_html__( 'Accès refusé.', 'BIHR-SYNCH-main' ) );
+    wp_die( esc_html__( 'Accès refusé.', 'bihr-synchronisation' ) );
 }
 
 global $wpdb;
@@ -35,14 +35,14 @@ $sync_url = add_query_arg(
 
 ?>
 <div class="wrap">
-    <h1><?php esc_html_e( 'Synchronisation SKU depuis Compatibilité Véhicules', 'BIHR-SYNCH-main' ); ?></h1>
+    <h1><?php esc_html_e( 'Synchronisation SKU depuis Compatibilité Véhicules', 'bihr-synchronisation' ); ?></h1>
 
     <?php
     if ( $action === 'sync' ) {
         if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), $nonce_action ) ) {
-              echo '<div class="notice notice-error"><p>' . esc_html__( 'Nonce invalide. Rechargez la page et réessayez.', 'BIHR-SYNCH-main' ) . '</p></div>';
+              echo '<div class="notice notice-error"><p>' . esc_html__( 'Nonce invalide. Rechargez la page et réessayez.', 'bihr-synchronisation' ) . '</p></div>';
         } else {
-            echo '<h2>' . esc_html__( 'Synchronisation en cours…', 'BIHR-SYNCH-main' ) . '</h2>';
+            echo '<h2>' . esc_html__( 'Synchronisation en cours…', 'bihr-synchronisation' ) . '</h2>';
 
             // Total produits WooCommerce avec compatibilité
             // SECURITE : $compat_lookup_expr est une expression SQL définie en dur, sans entrée utilisateur.
@@ -70,15 +70,15 @@ $sync_url = add_query_arg(
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin:20px 0;">
                 <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                     <strong style="display:block;font-size:24px;color:#2271b1;"><?php echo esc_html( number_format_i18n( $total ) ); ?></strong>
-                    <?php esc_html_e( 'Produits avec compatibilité', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Produits avec compatibilité', 'bihr-synchronisation' ); ?>
                 </div>
                 <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                     <strong style="display:block;font-size:24px;color:#2271b1;"><?php echo esc_html( number_format_i18n( $already ) ); ?></strong>
-                    <?php esc_html_e( 'Déjà traités', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Déjà traités', 'bihr-synchronisation' ); ?>
                 </div>
                 <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                     <strong style="display:block;font-size:24px;color:#2271b1;"><?php echo esc_html( number_format_i18n( $remaining ) ); ?></strong>
-                    <?php esc_html_e( 'Restants', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Restants', 'bihr-synchronisation' ); ?>
                 </div>
             </div>
 
@@ -191,15 +191,15 @@ $sync_url = add_query_arg(
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin:20px 0;">
                 <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                     <strong style="display:block;font-size:24px;color:#00a32a;"><?php echo esc_html( number_format_i18n( $sku_inserted ) ); ?></strong>
-                    <?php esc_html_e( 'SKU créés', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'SKU créés', 'bihr-synchronisation' ); ?>
                 </div>
                 <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                     <strong style="display:block;font-size:24px;color:#dba617;"><?php echo esc_html( number_format_i18n( $sku_updated ) ); ?></strong>
-                    <?php esc_html_e( 'SKU mis à jour', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'SKU mis à jour', 'bihr-synchronisation' ); ?>
                 </div>
                 <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                     <strong style="display:block;font-size:24px;color:#d63638;"><?php echo esc_html( number_format_i18n( $errors ) ); ?></strong>
-                    <?php esc_html_e( 'Erreurs', 'BIHR-SYNCH-main' ); ?>
+                    <?php esc_html_e( 'Erreurs', 'bihr-synchronisation' ); ?>
                 </div>
             </div>
 
@@ -216,12 +216,12 @@ $sync_url = add_query_arg(
                 );
 
                 echo '<script>setTimeout(function(){ window.location.href = ' . wp_json_encode( $continue_url ) . '; }, 1000);</script>';
-                echo '<p class="notice notice-warning" style="display:inline-block;padding:8px 12px;">' . esc_html__( 'Rechargement automatique dans 1 seconde…', 'BIHR-SYNCH-main' ) . '</p>';
+                echo '<p class="notice notice-warning" style="display:inline-block;padding:8px 12px;">' . esc_html__( 'Rechargement automatique dans 1 seconde…', 'bihr-synchronisation' ) . '</p>';
             } else {
                 $final_sku = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value != ''" );
-                echo '<h2 style="color:#00a32a;">' . esc_html__( 'Synchronisation terminée !', 'BIHR-SYNCH-main' ) . '</h2>';
-                echo '<p style="color:#00a32a;">' . esc_html__( 'Total SKU synchronisés :', 'BIHR-SYNCH-main' ) . ' ' . esc_html( number_format_i18n( $final_sku ) ) . '</p>';
-                echo '<a class="button" href="' . esc_url( $base_url ) . '">' . esc_html__( 'Retour', 'BIHR-SYNCH-main' ) . '</a>';
+                echo '<h2 style="color:#00a32a;">' . esc_html__( 'Synchronisation terminée !', 'bihr-synchronisation' ) . '</h2>';
+                echo '<p style="color:#00a32a;">' . esc_html__( 'Total SKU synchronisés :', 'bihr-synchronisation' ) . ' ' . esc_html( number_format_i18n( $final_sku ) ) . '</p>';
+                echo '<a class="button" href="' . esc_url( $base_url ) . '">' . esc_html__( 'Retour', 'bihr-synchronisation' ) . '</a>';
             }
         }
     } else {
@@ -248,31 +248,31 @@ $sync_url = add_query_arg(
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin:20px 0;">
             <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                 <strong style="display:block;font-size:24px;color:#2271b1;"><?php echo esc_html( number_format_i18n( $wc_with_compatibility ) ); ?></strong>
-                <?php esc_html_e( 'Produits WC avec compatibilité', 'BIHR-SYNCH-main' ); ?>
+                <?php esc_html_e( 'Produits WC avec compatibilité', 'bihr-synchronisation' ); ?>
             </div>
             <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                 <strong style="display:block;font-size:24px;color:#2271b1;"><?php echo esc_html( number_format_i18n( $wc_products ) ); ?></strong>
-                <?php esc_html_e( 'Total produits WooCommerce', 'BIHR-SYNCH-main' ); ?>
+                <?php esc_html_e( 'Total produits WooCommerce', 'bihr-synchronisation' ); ?>
             </div>
             <div style="background:#f0f6fc;padding:15px;border-radius:5px;border-left:4px solid #2271b1;">
                 <strong style="display:block;font-size:24px;color:#00a32a;"><?php echo esc_html( number_format_i18n( $wc_sku_count ) ); ?></strong>
-                <?php esc_html_e( 'SKU actuels', 'BIHR-SYNCH-main' ); ?>
+                <?php esc_html_e( 'SKU actuels', 'bihr-synchronisation' ); ?>
             </div>
         </div>
 
         <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:15px;margin:20px 0;">
-            <h3 style="margin-top:0;">⚠️ <?php esc_html_e( 'Important', 'BIHR-SYNCH-main' ); ?></h3>
-            <p><?php esc_html_e( 'Cette page synchronise les SKU en utilisant le part_number de la table de compatibilité véhicules, pas le product_code BIHR.', 'BIHR-SYNCH-main' ); ?></p>
-                <p><?php esc_html_e( "Le match se fait dans l'ordre : NewPartNumber → SKU actuel → Code BIHR.", 'BIHR-SYNCH-main' ); ?></p>
+            <h3 style="margin-top:0;">⚠️ <?php esc_html_e( 'Important', 'bihr-synchronisation' ); ?></h3>
+            <p><?php esc_html_e( 'Cette page synchronise les SKU en utilisant le part_number de la table de compatibilité véhicules, pas le product_code BIHR.', 'bihr-synchronisation' ); ?></p>
+                <p><?php esc_html_e( "Le match se fait dans l'ordre : NewPartNumber → SKU actuel → Code BIHR.", 'bihr-synchronisation' ); ?></p>
         </div>
 
         <p>
-            <a class="button button-primary" href="<?php echo esc_url( $sync_url ); ?>" onclick="return confirm('<?php echo esc_js( sprintf( __( 'Lancer la synchronisation de %s produits ?', 'BIHR-SYNCH-main' ), number_format_i18n( $wc_with_compatibility ) ) ); ?>');">
-                🚀 <?php esc_html_e( 'LANCER LA SYNCHRONISATION', 'BIHR-SYNCH-main' ); ?>
+            <a class="button button-primary" href="<?php echo esc_url( $sync_url ); ?>" onclick="return confirm('<?php echo esc_js( sprintf( __( 'Lancer la synchronisation de %s produits ?', 'bihr-synchronisation' ), number_format_i18n( $wc_with_compatibility ) ) ); ?>');">
+                🚀 <?php esc_html_e( 'LANCER LA SYNCHRONISATION', 'bihr-synchronisation' ); ?>
             </a>
         </p>
 
-        <h3>📊 <?php esc_html_e( 'Aperçu (10 premiers produits)', 'BIHR-SYNCH-main' ); ?></h3>
+        <h3>📊 <?php esc_html_e( 'Aperçu (10 premiers produits)', 'bihr-synchronisation' ); ?></h3>
         <?php
         $samples = $wpdb->get_results("
             SELECT 
@@ -309,11 +309,11 @@ $sync_url = add_query_arg(
             }
 
             if ( $part_number === '' ) {
-                $status = '<span style="color:#d63638;">❌ ' . esc_html__( 'Pas de part_number', 'BIHR-SYNCH-main' ) . '</span>';
+                $status = '<span style="color:#d63638;">❌ ' . esc_html__( 'Pas de part_number', 'bihr-synchronisation' ) . '</span>';
             } elseif ( $current_sku === $part_number ) {
-                $status = '<span style="color:#00a32a;">✅ ' . esc_html__( 'OK', 'BIHR-SYNCH-main' ) . '</span>';
+                $status = '<span style="color:#00a32a;">✅ ' . esc_html__( 'OK', 'bihr-synchronisation' ) . '</span>';
             } else {
-                $status = '<span style="color:#dba617;">⚠️ ' . esc_html__( 'SKU différent', 'BIHR-SYNCH-main' ) . '</span>';
+                $status = '<span style="color:#dba617;">⚠️ ' . esc_html__( 'SKU différent', 'bihr-synchronisation' ) . '</span>';
             }
 
             echo '<tr>';

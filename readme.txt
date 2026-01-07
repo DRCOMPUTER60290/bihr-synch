@@ -2,7 +2,7 @@
 Contributors: drcomputer
 Tags: woocommerce, bihr, synchronisation, produits, stocks, compatibilité, premium
 Requires at least: 5.6
-Tested up to: 6.4
+Tested up to: 6.9
 Stable tag: trunk
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,9 @@ Ce plugin permet de synchroniser les produits, les prix, les stocks et la compat
 == Notes ==
 - Certaines fonctionnalités sont réservées à la version Pro.
 - Consultez la documentation incluse pour plus de détails.
+
+== External Services ==
+- OpenAI API: utilisé pour l'enrichissement automatique de contenu produit et des descriptifs. Les données de produit peuvent être envoyées à l'API lors de l'enrichissement.
 
 == Changelog ==
 Voir le fichier CHANGELOG.md pour l'historique détaillé des modifications.

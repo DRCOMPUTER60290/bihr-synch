@@ -6,17 +6,28 @@
  * au lieu de product_code de wp_bihr_products
  */
 
-// Charger WordPress
-$wp_load_path = dirname(dirname(dirname(dirname(__FILE__)))) . '/wp-load.php';
-if (file_exists($wp_load_path)) {
-    require_once($wp_load_path);
-} else {
-    die('❌ Impossible de charger WordPress');
+// Charger WordPress si nécessaire
+if ( ! defined( 'ABSPATH' ) ) {
+    $wp_load_path = dirname( __FILE__, 4 ) . '/wp-load.php';
+
+    if ( file_exists( $wp_load_path ) ) {
+        require_once $wp_load_path;
+    } else {
+        exit( '❌ Impossible de charger WordPress' );
+    }
 }
 
 // Vérifier les permissions
-if (!current_user_can('manage_options')) {
-    die('❌ Accès refusé. Vous devez être administrateur.');
+if ( ! current_user_can( 'manage_options' ) ) {
+    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'bihr-synchronisation' ) );
+}
+
+$action       = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
+$offset       = isset( $_GET['offset'] ) ? max( 0, intval( wp_unslash( $_GET['offset'] ) ) ) : 0;
+$nonce_action = 'bihr_sync_sku_from_compatibility';
+
+if ( 'sync' === $action ) {
+    check_admin_referer( $nonce_action );
 }
 
 global $wpdb;
@@ -59,14 +70,11 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
         <h1>🔄 Synchronisation SKU depuis Compatibilité Véhicules</h1>
         
         <?php
-        $action = isset($_GET['action']) ? $_GET['action'] : '';
-        
-        if ($action == 'sync') {
+        if ($action === 'sync') {
             // SYNCHRONISATION
             echo '<h2>⚙️ Synchronisation en cours...</h2>';
             
             $batch_size = 500;
-            $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
             
             // Compter les produits WC avec compatibilité véhicule
             $total = $wpdb->get_var("
@@ -194,9 +202,19 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             
             if ($new_offset < $total) {
                 // Continuer
+                $continue_url = wp_nonce_url(
+                    add_query_arg(
+                        array(
+                            'action' => 'sync',
+                            'offset' => $new_offset,
+                        )
+                    ),
+                    $nonce_action
+                );
+
                 echo '<script>
                     setTimeout(function() {
-                        window.location.href = "?action=sync&offset=' . esc_js( $new_offset ) . '";
+                        window.location.href = ' . wp_json_encode( $continue_url ) . ';
                     }, 1000);
                 </script>';
                 echo '<p class="warning">⏳ Rechargement dans 1 seconde...</p>';
@@ -243,7 +261,8 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             echo '<p>Cela permet au filtre véhicule de fonctionner correctement car il cherche : <code>WHERE _sku = part_number</code></p>';
             echo '</div>';
             
-            echo '<button onclick="if(confirm(\'Lancer la synchronisation de ' . number_format($wc_with_compatibility) . ' produits ?\')) window.location.href=\'?action=sync\'">🚀 LANCER LA SYNCHRONISATION</button>';
+            $sync_url = wp_nonce_url( add_query_arg( 'action', 'sync' ), $nonce_action );
+            echo '<button onclick="if(confirm(\'Lancer la synchronisation de ' . esc_js( number_format( $wc_with_compatibility ) ) . ' produits ?\')) window.location.href=' . wp_json_encode( $sync_url ) . '">🚀 LANCER LA SYNCHRONISATION</button>';
             
             // Exemples
             echo '<h3>📊 Aperçu (10 premiers produits)</h3>';

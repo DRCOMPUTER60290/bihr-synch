@@ -39,8 +39,22 @@ if ( ! isset( $sort_by ) ) {
     $sort_by = '';
 }
 
-$status_data = get_option( 'bihrwi_prices_generation', array() );
-$prices_schedule = get_option( 'bihrwi_prices_schedule', array( 'enabled' => false, 'weekday' => 'monday', 'interval' => 'weekly', 'time' => '02:00' ) );
+$bihrwi_merge_success      = filter_input( INPUT_GET, 'bihrwi_merge_success', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_merge_count        = filter_input( INPUT_GET, 'bihrwi_merge_count', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_merge_error        = filter_input( INPUT_GET, 'bihrwi_merge_error', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_import_success     = filter_input( INPUT_GET, 'bihrwi_import_success', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_import_error       = filter_input( INPUT_GET, 'bihrwi_import_error', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_imported_id        = filter_input( INPUT_GET, 'imported_id', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_msg                = filter_input( INPUT_GET, 'bihrwi_msg', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
+$bihrwi_check_status       = filter_input( INPUT_GET, 'bihrwi_check_status', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
+$bihrwi_prices_started     = filter_input( INPUT_GET, 'bihrwi_prices_started', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_prices_error       = filter_input( INPUT_GET, 'bihrwi_prices_error', FILTER_SANITIZE_NUMBER_INT );
+$bihrwi_prices_schedule_saved = filter_input( INPUT_GET, 'bihrwi_prices_schedule_saved', FILTER_SANITIZE_NUMBER_INT );
+$merge_error               = filter_input( INPUT_GET, 'merge_error', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
+$total_products_param      = filter_input( INPUT_GET, 'total_products', FILTER_SANITIZE_NUMBER_INT );
+
+$status_data      = get_option( 'bihrwi_prices_generation', array() );
+$prices_schedule  = get_option( 'bihrwi_prices_schedule', array( 'enabled' => false, 'weekday' => 'monday', 'interval' => 'weekly', 'time' => '02:00' ) );
 $next_prices_cron = wp_next_scheduled( 'bihrwi_auto_prices_generation' );
 $wp_cron_disabled = ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON );
 $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
@@ -87,92 +101,92 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
      * ======================= */
 
     // Fusion catalogues
-    if ( isset( $_GET['bihrwi_merge_success'] ) ) : ?>
+    if ( ! empty( $bihrwi_merge_success ) ) : ?>
         <div class="notice notice-success"><p>
-            Fusion des catalogues terminée. <?php echo intval( $_GET['bihrwi_merge_count'] ); ?> produits fusionnés.
+            Fusion des catalogues terminée. <?php echo intval( $bihrwi_merge_count ); ?> produits fusionnés.
         </p></div>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['bihrwi_merge_error'] ) ) : ?>
+    <?php if ( ! empty( $bihrwi_merge_error ) ) : ?>
         <div class="notice notice-error"><p>
             Erreur lors de la fusion des catalogues :
-            <?php echo esc_html( wp_unslash( $_GET['bihrwi_msg'] ) ); ?>
+            <?php echo esc_html( (string) $bihrwi_msg ); ?>
         </p></div>
     <?php endif; ?>
 
     <!-- Import produit -->
-    <?php if ( isset( $_GET['bihrwi_import_success'] ) ) : ?>
+    <?php if ( ! empty( $bihrwi_import_success ) ) : ?>
         <div class="notice notice-success"><p>
-            Produit importé dans WooCommerce (ID : <?php echo intval( $_GET['imported_id'] ); ?>).
+            Produit importé dans WooCommerce (ID : <?php echo intval( $bihrwi_imported_id ); ?>).
         </p></div>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['bihrwi_import_error'] ) ) : ?>
+    <?php if ( ! empty( $bihrwi_import_error ) ) : ?>
         <div class="notice notice-error"><p>
             Erreur lors de l’import du produit :
-            <?php echo esc_html( wp_unslash( $_GET['bihrwi_msg'] ) ); ?>
+            <?php echo esc_html( (string) $bihrwi_msg ); ?>
         </p></div>
     <?php endif; ?>
 
     <!-- Statut vérification manuelle du catalog Prices -->
-    <?php if ( isset( $_GET['bihrwi_check_status'] ) ) : ?>
-        <?php if ( $_GET['bihrwi_check_status'] === 'processing' ) : ?>
+    <?php if ( ! empty( $bihrwi_check_status ) ) : ?>
+        <?php if ( 'processing' === $bihrwi_check_status ) : ?>
             <div class="notice notice-warning"><p>
                 Le fichier Prices est toujours en cours de génération (PROCESSING).
             </p></div>
-        <?php elseif ( $_GET['bihrwi_check_status'] === 'done_and_merged' ) : ?>
+        <?php elseif ( 'done_and_merged' === $bihrwi_check_status ) : ?>
             <div class="notice notice-success"><p>
                 <strong>✓ Succès complet !</strong><br>
                 Le catalogue Prices a été téléchargé et automatiquement fusionné avec les autres catalogues.<br>
-                <strong><?php echo isset( $_GET['total_products'] ) ? intval( $_GET['total_products'] ) : 0; ?> produits</strong> sont maintenant disponibles.
+                <strong><?php echo intval( $total_products_param ); ?> produits</strong> sont maintenant disponibles.
             </p></div>
-        <?php elseif ( $_GET['bihrwi_check_status'] === 'done_merge_failed' ) : ?>
+        <?php elseif ( 'done_merge_failed' === $bihrwi_check_status ) : ?>
             <div class="notice notice-warning"><p>
                 Le catalogue Prices a été téléchargé, mais la fusion automatique a échoué.<br>
                 Vous pouvez essayer de lancer la fusion manuellement ci-dessous.
             </p></div>
-        <?php elseif ( $_GET['bihrwi_check_status'] === 'done' ) : ?>
+        <?php elseif ( 'done' === $bihrwi_check_status ) : ?>
             <div class="notice notice-success"><p>
                 Le fichier Prices est prêt et a été téléchargé.
-                <?php if ( isset( $_GET['merge_error'] ) ) : ?>
-                    <br><strong>Note:</strong> La fusion automatique a rencontré une erreur : <?php echo esc_html( wp_unslash( $_GET['merge_error'] ) ); ?>
+                <?php if ( ! empty( $merge_error ) ) : ?>
+                    <br><strong>Note:</strong> La fusion automatique a rencontré une erreur : <?php echo esc_html( (string) $merge_error ); ?>
                 <?php endif; ?>
             </p></div>
-        <?php elseif ( $_GET['bihrwi_check_status'] === 'error' ) : ?>
+        <?php elseif ( 'error' === $bihrwi_check_status ) : ?>
             <div class="notice notice-error"><p>
                 Erreur lors de la génération du fichier Prices :
-                <?php echo esc_html( wp_unslash( $_GET['bihrwi_msg'] ) ); ?>
+                <?php echo esc_html( (string) $bihrwi_msg ); ?>
             </p></div>
-        <?php elseif ( $_GET['bihrwi_check_status'] === 'downloadfail' ) : ?>
+        <?php elseif ( 'downloadfail' === $bihrwi_check_status ) : ?>
             <div class="notice notice-error"><p>
                 Le fichier Prices est marqué comme prêt, mais le téléchargement a échoué.
             </p></div>
-        <?php elseif ( $_GET['bihrwi_check_status'] === 'exception' ) : ?>
+        <?php elseif ( 'exception' === $bihrwi_check_status ) : ?>
             <div class="notice notice-error"><p>
                 Erreur inattendue lors de la vérification du catalog Prices :
-                <?php echo esc_html( wp_unslash( $_GET['bihrwi_msg'] ) ); ?>
+                <?php echo esc_html( (string) $bihrwi_msg ); ?>
             </p></div>
-        <?php elseif ( $_GET['bihrwi_check_status'] === 'noticket' ) : ?>
+        <?php elseif ( 'noticket' === $bihrwi_check_status ) : ?>
             <div class="notice notice-error"><p>
                 Aucun TicketID en cours. Lance d’abord la génération du catalog Prices.
             </p></div>
         <?php endif; ?>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['bihrwi_prices_started'] ) ) : ?>
+    <?php if ( ! empty( $bihrwi_prices_started ) ) : ?>
         <div class="notice notice-success"><p>
             Génération du catalog Prices démarrée. Le statut sera vérifié automatiquement par WP-Cron.
         </p></div>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['bihrwi_prices_error'] ) ) : ?>
+    <?php if ( ! empty( $bihrwi_prices_error ) ) : ?>
         <div class="notice notice-error"><p>
             Erreur lors du démarrage du catalog Prices :
-            <?php echo esc_html( wp_unslash( $_GET['bihrwi_msg'] ) ); ?>
+            <?php echo esc_html( (string) $bihrwi_msg ); ?>
         </p></div>
     <?php endif; ?>
 
-    <?php if ( isset( $_GET['bihrwi_prices_schedule_saved'] ) ) : ?>
+    <?php if ( ! empty( $bihrwi_prices_schedule_saved ) ) : ?>
         <div class="notice notice-success"><p>
             Planning du catalog Prices enregistré.
         </p></div>
