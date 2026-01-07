@@ -27,6 +27,16 @@ class BihrWI_Vehicle_Compatibility {
     }
 
     /**
+     * Initialise WP_Filesystem pour les opérations de fichiers
+     */
+    protected function get_wp_filesystem() {
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        WP_Filesystem();
+        global $wp_filesystem;
+        return $wp_filesystem;
+    }
+
+    /**
      * S'assure que le dossier d'import existe
      */
     protected function ensure_import_dir_exists() {
@@ -120,88 +130,15 @@ class BihrWI_Vehicle_Compatibility {
      * Importe la liste des véhicules depuis VehiclesList.csv
      */
     public function import_vehicles_list( $file_path = null ) {
+        global $wpdb;
         $this->logger->log( '=== IMPORT LISTE VÉHICULES ===' );
 
         $file_path = $file_path ?: $this->import_dir . 'VehiclesList.csv';
         $this->logger->log( "Fichier: {$file_path}" );
 
-
-            global $wp_filesystem;
-            if ( ! function_exists( 'WP_Filesystem' ) ) {
-                require_once ABSPATH . 'wp-admin/includes/file.php';
-            }
-            WP_Filesystem();
-            if ( ! $wp_filesystem->exists( $file_path ) ) {
-                $this->logger->log( 'Erreur: Impossible d\'ouvrir le fichier' );
-                return array(
-                    'success' => false,
-                    'message' => 'Impossible d\'ouvrir le fichier',
-                    'imported' => 0,
-                    'errors' => 0
-                );
-            }
-            $content = $wp_filesystem->get_contents( $file_path );
-            if ( false === $content ) {
-                $this->logger->log( 'Erreur: Impossible de lire le fichier' );
-                return array(
-                    'success' => false,
-                    'message' => 'Impossible de lire le fichier',
-                    'imported' => 0,
-                    'errors' => 0
-                );
-            }
-            $lines = explode( "\n", $content );
-            $header = str_getcsv( array_shift( $lines ), ',' );
-            if ( ! $header ) {
-                return array(
-                    'success' => false,
-                    'message' => 'Fichier CSV invalide (header manquant)',
-                    'imported' => 0,
-                    'errors' => 0
-                );
-            }
-            $count = 0;
-            $errors = 0;
-            foreach ( $lines as $line ) {
-                if ( trim( $line ) === '' ) continue;
-                $row = str_getcsv( $line, ',' );
-                if ( count( $row ) < 11 ) {
-                    continue;
-                }
-                $vehicle_data = array(
-                    'vehicle_code'           => $row[0],
-                    'version_code'           => $row[1],
-                    'commercial_model_code'  => $row[2],
-                    'manufacturer_code'      => $row[3],
-                    'vehicle_year'           => $row[4],
-                    'version_name'           => $row[5],
-                    'commercial_model_name'  => $row[6],
-                    'manufacturer_name'      => $row[7],
-                    'universe_name'          => $row[8],
-                    'category_name'          => $row[9],
-                    'displacement_cm3'       => intval( $row[10] ),
-                );
-                $result = $wpdb->insert( $this->vehicles_table, $vehicle_data );
-                if ( $result ) {
-                    $count++;
-                } else {
-                    $errors++;
-                }
-            }
-            $this->logger->log( "✓ Import terminé: {$count} véhicules importés, {$errors} erreurs" );
-            return array(
-                'success' => true,
-                'imported' => $count,
-                'errors' => $errors
-            );
-        global $wpdb;
-
-        // Vider la table avant import
-        $wpdb->query( "TRUNCATE TABLE {$this->vehicles_table}" );
-        $this->logger->log( 'Table véhicules vidée' );
-
-        $handle = fopen( $file_path, 'r' );
-        if ( ! $handle ) {
+        $wp_filesystem = $this->get_wp_filesystem();
+        
+        if ( ! $wp_filesystem->exists( $file_path ) ) {
             $this->logger->log( 'Erreur: Impossible d\'ouvrir le fichier' );
             return array(
                 'success' => false,
@@ -211,10 +148,20 @@ class BihrWI_Vehicle_Compatibility {
             );
         }
 
-        // Lire le header
-        $header = fgetcsv( $handle, 10000, ',' );
+        $content = $wp_filesystem->get_contents( $file_path );
+        if ( false === $content ) {
+            $this->logger->log( 'Erreur: Impossible de lire le fichier' );
+            return array(
+                'success' => false,
+                'message' => 'Impossible de lire le fichier',
+                'imported' => 0,
+                'errors' => 0
+            );
+        }
+
+        $lines = explode( "\n", $content );
+        $header = str_getcsv( array_shift( $lines ), ',' );
         if ( ! $header ) {
-            fclose( $handle );
             return array(
                 'success' => false,
                 'message' => 'Fichier CSV invalide (header manquant)',
@@ -223,10 +170,19 @@ class BihrWI_Vehicle_Compatibility {
             );
         }
 
+        // Vider la table avant import
+        $wpdb->query( "TRUNCATE TABLE {$this->vehicles_table}" );
+        $this->logger->log( 'Table véhicules vidée' );
+
         $count = 0;
         $errors = 0;
 
-        while ( ( $row = fgetcsv( $handle, 10000, ',' ) ) !== false ) {
+        foreach ( $lines as $line ) {
+            if ( trim( $line ) === '' ) {
+                continue;
+            }
+
+            $row = str_getcsv( $line, ',' );
             if ( count( $row ) < 11 ) {
                 continue;
             }
@@ -253,8 +209,6 @@ class BihrWI_Vehicle_Compatibility {
                 $errors++;
             }
         }
-
-        fclose( $handle );
 
         $this->logger->log( "✓ Import terminé: {$count} véhicules importés, {$errors} erreurs" );
         $this->logger->log( '==============================' );

@@ -15,6 +15,22 @@ class BihrWI_Product_Sync {
     }
 
     /**
+     * Initialise et retourne l'instance WP_Filesystem
+     */
+    protected function get_wp_filesystem() {
+        global $wp_filesystem;
+        
+        if ( ! isset( $wp_filesystem ) ) {
+            if ( ! function_exists( 'WP_Filesystem' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+            }
+            WP_Filesystem();
+        }
+        
+        return $wp_filesystem;
+    }
+
+    /**
      * Retrouve un produit WooCommerce existant via le SKU ou le code BIHR (meta).
      */
     protected function find_existing_product( $sku, $product_code ) {
@@ -788,24 +804,28 @@ class BihrWI_Product_Sync {
      */
     protected function read_csv_assoc( $file_path ) {
         $rows = array();
+        $wp_filesystem = $this->get_wp_filesystem();
 
-        if ( ! file_exists( $file_path ) ) {
+        if ( ! $wp_filesystem->exists( $file_path ) ) {
             return $rows;
         }
 
-        $handle = fopen( $file_path, 'r' );
-        if ( ! $handle ) {
+        $content = $wp_filesystem->get_contents( $file_path );
+        if ( false === $content ) {
+            return $rows;
+        }
+
+        $lines = explode( "\n", $content );
+        if ( empty( $lines ) ) {
             return $rows;
         }
 
         // Détection du séparateur ; ou ,
-        $first_line = fgets( $handle );
-        rewind( $handle );
+        $first_line = $lines[0];
         $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
 
-        $header = fgetcsv( $handle, 0, $delimiter );
+        $header = str_getcsv( $first_line, $delimiter );
         if ( ! $header ) {
-            fclose( $handle );
             return $rows;
         }
 
@@ -816,20 +836,24 @@ class BihrWI_Product_Sync {
             $header
         );
 
-        while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+        for ( $i = 1; $i < count( $lines ); $i++ ) {
+            $line = trim( $lines[ $i ] );
+            if ( empty( $line ) ) {
+                continue;
+            }
+
+            $data = str_getcsv( $line, $delimiter );
             if ( count( $data ) !== count( $header ) ) {
                 continue;
             }
 
             $row = array();
-            foreach ( $header as $i => $key ) {
-                $row[ $key ] = isset( $data[ $i ] ) ? $data[ $i ] : '';
+            foreach ( $header as $j => $key ) {
+                $row[ $key ] = isset( $data[ $j ] ) ? $data[ $j ] : '';
             }
 
             $rows[] = $row;
         }
-
-        fclose( $handle );
 
         return $rows;
     }
@@ -839,23 +863,28 @@ class BihrWI_Product_Sync {
      * Retourne le nombre de lignes lues.
      */
     protected function iterate_csv_rows( $file_path, callable $callback ) {
-        if ( ! file_exists( $file_path ) ) {
+        $wp_filesystem = $this->get_wp_filesystem();
+
+        if ( ! $wp_filesystem->exists( $file_path ) ) {
             return 0;
         }
 
-        $handle = fopen( $file_path, 'r' );
-        if ( ! $handle ) {
+        $content = $wp_filesystem->get_contents( $file_path );
+        if ( false === $content ) {
+            return 0;
+        }
+
+        $lines = explode( "\n", $content );
+        if ( empty( $lines ) ) {
             return 0;
         }
 
         // Détection du séparateur ; ou ,
-        $first_line = fgets( $handle );
-        rewind( $handle );
+        $first_line = $lines[0];
         $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
 
-        $header = fgetcsv( $handle, 0, $delimiter );
+        $header = str_getcsv( $first_line, $delimiter );
         if ( ! $header ) {
-            fclose( $handle );
             return 0;
         }
 
@@ -868,21 +897,26 @@ class BihrWI_Product_Sync {
 
         $count = 0;
 
-        while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+        for ( $i = 1; $i < count( $lines ); $i++ ) {
+            $line = trim( $lines[ $i ] );
+            if ( empty( $line ) ) {
+                continue;
+            }
+
+            $data = str_getcsv( $line, $delimiter );
             if ( count( $data ) !== count( $header ) ) {
                 continue;
             }
 
             $row = array();
-            foreach ( $header as $i => $key ) {
-                $row[ $key ] = isset( $data[ $i ] ) ? $data[ $i ] : '';
+            foreach ( $header as $j => $key ) {
+                $row[ $key ] = isset( $data[ $j ] ) ? $data[ $j ] : '';
             }
 
             $callback( $row, $count );
             $count++;
         }
 
-        fclose( $handle );
         return $count;
     }
 

@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Vérifier les permissions
 if ( ! current_user_can( 'manage_options' ) ) {
-    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'bihr-synchronisation' ) );
+    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'BIHR-SYNCH-main' ) );
 }
 
 $action       = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
@@ -77,8 +77,8 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             $batch_size = 500;
             
             // Compter les produits WC avec compatibilité véhicule
-            $total = $wpdb->get_var("
-                SELECT COUNT(DISTINCT pm_code.post_id)
+            $total = $wpdb->get_var(
+                "SELECT COUNT(DISTINCT pm_code.post_id)
                 FROM {$wpdb->postmeta} pm_code
                 INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
                 LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
@@ -89,9 +89,9 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
                 AND p.post_type = 'product'
                 AND EXISTS (
                     SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
-                    WHERE vc.part_number = {$compat_lookup_expr}
-                )
-            ");
+                    WHERE vc.part_number = COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)
+                )"
+            );
             
             echo '<div class="stats">';
             echo '<div class="stat-box"><strong>' . number_format($total) . '</strong> Produits avec compatibilité</div>';
@@ -105,26 +105,31 @@ $compat_lookup_expr = 'COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.me
             echo '</div>';
             
             // Récupérer un batch de produits avec leur part_number
-            $products = $wpdb->get_results($wpdb->prepare("
-                SELECT DISTINCT
-                    pm_code.post_id as wc_product_id,
-                    pm_code.meta_value as product_code,
-                    pm_new.meta_value as new_part_number,
-                    pm_sku.meta_value as current_sku,
-                    vc.part_number,
-                    p.post_title as name
-                FROM {$wpdb->postmeta} pm_code
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
-                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
-                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                INNER JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = {$compat_lookup_expr}
-                WHERE pm_code.meta_key = '_bihr_product_code'
-                AND pm_code.meta_value IS NOT NULL
-                AND pm_code.meta_value != ''
-                AND p.post_type = 'product'
-                GROUP BY pm_code.post_id
-                LIMIT %d OFFSET %d
-            ", $batch_size, $offset), ARRAY_A);
+            $products = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT DISTINCT
+                        pm_code.post_id as wc_product_id,
+                        pm_code.meta_value as product_code,
+                        pm_new.meta_value as new_part_number,
+                        pm_sku.meta_value as current_sku,
+                        vc.part_number,
+                        p.post_title as name
+                    FROM {$wpdb->postmeta} pm_code
+                    INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                    LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
+                    LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
+                    INNER JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)
+                    WHERE pm_code.meta_key = '_bihr_product_code'
+                    AND pm_code.meta_value IS NOT NULL
+                    AND pm_code.meta_value != ''
+                    AND p.post_type = 'product'
+                    GROUP BY pm_code.post_id
+                    LIMIT %d OFFSET %d",
+                    $batch_size,
+                    $offset
+                ),
+                ARRAY_A
+            );
             
             echo '<div class="log">';
             $sku_inserted = 0;

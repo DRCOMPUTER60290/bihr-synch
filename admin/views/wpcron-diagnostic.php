@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
             <tr style="background:#fff;">
                 <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>WP‑Cron</strong></td>
                 <td style="padding:8px; border-bottom:1px solid #ddd;">
-                    <?php echo $wp_cron_disabled ? '❌ Désactivé (DISABLE_WP_CRON=true)' : '✅ Actif'; ?>
+                    <?php echo esc_html( $wp_cron_disabled ? '❌ Désactivé (DISABLE_WP_CRON=true)' : '✅ Actif' ); ?>
                 </td>
             </tr>
             <tr style="background:#fff;">
@@ -80,7 +80,7 @@ if ( ! defined( 'ABSPATH' ) ) {
             </thead>
             <tbody>
                 <?php foreach ( $bihr_events as $event ) : ?>
-                    <tr style="background-color: <?php echo $event['overdue'] ? '#fecaca' : '#dcfce7'; ?>;">
+                    <tr style="background-color: <?php echo esc_attr( $event['overdue'] ? '#fecaca' : '#dcfce7' ); ?>;">
                         <td><code><?php echo esc_html( $event['hook'] ); ?></code></td>
                         <td><?php echo esc_html( $event['next'] ); ?></td>
                         <td>

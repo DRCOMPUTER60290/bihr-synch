@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Vérifier les permissions
 if ( ! current_user_can( 'manage_options' ) ) {
-    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'bihr-synchronisation' ) );
+    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'BIHR-SYNCH-main' ) );
 }
 
 $action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
@@ -77,15 +77,15 @@ set_time_limit(0);
             $batch_size = 500;
             
             // Compter le total de produits WC avec code BIHR
-            $total = $wpdb->get_var("
-                SELECT COUNT(DISTINCT pm.post_id)
+            $total = $wpdb->get_var(
+                "SELECT COUNT(DISTINCT pm.post_id)
                 FROM {$wpdb->postmeta} pm
                 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
                 WHERE pm.meta_key = '_bihr_product_code'
                 AND pm.meta_value IS NOT NULL
                 AND pm.meta_value != ''
-                AND p.post_type = 'product'
-            ");
+                AND p.post_type = 'product'"
+            );
             
             echo '<div class="stats">';
             echo '<div class="stat-box"><strong>' . number_format($total) . '</strong> Produits à traiter</div>';
@@ -99,21 +99,26 @@ set_time_limit(0);
             echo '</div>';
             
             // Récupérer un batch de produits WC avec leur code BIHR
-            $products = $wpdb->get_results($wpdb->prepare("
-                SELECT 
-                    pm.post_id as wc_product_id,
-                    pm.meta_value as product_code,
-                    bp.id as bihr_id,
-                    p.post_title as name
-                FROM {$wpdb->postmeta} pm
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
-                LEFT JOIN {$wpdb->prefix}bihr_products bp ON bp.product_code = pm.meta_value
-                WHERE pm.meta_key = '_bihr_product_code'
-                AND pm.meta_value IS NOT NULL
-                AND pm.meta_value != ''
-                AND p.post_type = 'product'
-                LIMIT %d OFFSET %d
-            ", $batch_size, $offset), ARRAY_A);
+            $products = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT 
+                        pm.post_id as wc_product_id,
+                        pm.meta_value as product_code,
+                        bp.id as bihr_id,
+                        p.post_title as name
+                    FROM {$wpdb->postmeta} pm
+                    INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                    LEFT JOIN {$wpdb->prefix}bihr_products bp ON bp.product_code = pm.meta_value
+                    WHERE pm.meta_key = '_bihr_product_code'
+                    AND pm.meta_value IS NOT NULL
+                    AND pm.meta_value != ''
+                    AND p.post_type = 'product'
+                    LIMIT %d OFFSET %d",
+                    $batch_size,
+                    $offset
+                ),
+                ARRAY_A
+            );
             
             echo '<div class="log">';
             $linked = 0;
@@ -227,9 +232,22 @@ set_time_limit(0);
             
         } else {
             // PAGE D'ACCUEIL
-            $wc_with_bihr = $wpdb->get_var("SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_product_code' AND meta_value IS NOT NULL AND meta_value != ''");
-            $wc_products = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'");
-            $wc_sku_count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value != ''");
+            $wc_with_bihr = $wpdb->get_var(
+                "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} 
+                WHERE meta_key = '_bihr_product_code' 
+                AND meta_value IS NOT NULL 
+                AND meta_value != ''"
+            );
+            $wc_products = $wpdb->get_var(
+                "SELECT COUNT(*) FROM {$wpdb->posts} 
+                WHERE post_type = 'product' 
+                AND post_status = 'publish'"
+            );
+            $wc_sku_count = $wpdb->get_var(
+                "SELECT COUNT(*) FROM {$wpdb->postmeta} 
+                WHERE meta_key = '_sku' 
+                AND meta_value != ''"
+            );
             $missing = $wc_with_bihr - $wc_sku_count;
             
             echo '<div class="stats">';
@@ -294,7 +312,7 @@ set_time_limit(0);
                 echo '<td><strong>' . esc_html( $row['product_code'] ) . '</strong></td>';
                 echo '<td>' . ( ! empty( $row['current_sku'] ) ? esc_html( $row['current_sku'] ) : '-' ) . '</td>';
                 echo '<td>' . ( ! empty( $row['bihr_id'] ) ? esc_html( $row['bihr_id'] ) : '-' ) . '</td>';
-                echo '<td>' . $status . '</td>';
+                echo '<td>' . wp_kses_post( $status ) . '</td>';
                 echo '</tr>';
             }
             echo '</table>';

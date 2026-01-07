@@ -48,8 +48,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     </form>
 
     <?php if ( null !== $bihrwi_cron_spawned ) : ?>
-        <div class="notice <?php echo $bihrwi_cron_spawned ? 'notice-success' : 'notice-error'; ?>"><p>
-            <?php echo $bihrwi_cron_spawned ? 'WP‑Cron déclenché.' : 'Échec du déclenchement WP‑Cron.'; ?>
+        <div class="notice <?php echo esc_attr( $bihrwi_cron_spawned ? 'notice-success' : 'notice-error' ); ?>"><p>
+            <?php echo esc_html( $bihrwi_cron_spawned ? 'WP‑Cron déclenché.' : 'Échec du déclenchement WP‑Cron.' ); ?>
         </p></div>
     <?php endif; ?>
 

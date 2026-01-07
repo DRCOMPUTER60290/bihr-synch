@@ -411,10 +411,10 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             <?php endif; ?>
         </p>
 
-        <div class="notice <?php echo $wp_cron_disabled ? 'notice-warning' : 'notice-success'; ?>" style="padding:8px;">
+        <div class="notice <?php echo esc_attr( $wp_cron_disabled ? 'notice-warning' : 'notice-success' ); ?>" style="padding:8px;">
             <p style="margin:0;">
                 <strong>WP‑Cron :</strong>
-                <?php echo $wp_cron_disabled ? 'désactivé (DISABLE_WP_CRON) — utilisez un cron serveur' : 'actif'; ?>
+                <?php echo esc_html( $wp_cron_disabled ? 'désactivé (DISABLE_WP_CRON) — utilisez un cron serveur' : 'actif' ); ?>
                 <?php if ( ! empty( $prices_last_run ) ) : ?>
                     — Dernière exécution Prices : <em><?php echo esc_html( $prices_last_run ); ?></em>
                 <?php endif; ?>
