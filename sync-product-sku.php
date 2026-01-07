@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Vérifier les permissions
 if ( ! current_user_can( 'manage_options' ) ) {
-    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'bihr-synch' ) );
+    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'BIHR-SYNCH-main' ) );
 }
 
 $action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';

@@ -5,7 +5,7 @@
  * Author: DrComputer60290 - Albert Benjamin
  * Author URI: https://drcomputer60290.fr
  * Version: 1.4.0
- * Text Domain: bihr-synch
+ * Text Domain: BIHR-SYNCH-main
  * Domain Path: /languages
  * License: GPLv2 or later
  * 
@@ -133,7 +133,7 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['five_minutes'] ) ) {
         $schedules['five_minutes'] = array(
             'interval' => 300,
-            'display'  => __( 'Every 5 Minutes', 'bihr-synch' ),
+            'display'  => __( 'Every 5 Minutes', 'BIHR-SYNCH-main' ),
         );
     }
 
@@ -141,14 +141,14 @@ add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['weekly'] ) ) {
         $schedules['weekly'] = array(
             'interval' => 604800, // 7 jours
-            'display'  => __( 'Every Week', 'bihr-synch' ),
+            'display'  => __( 'Every Week', 'BIHR-SYNCH-main' ),
         );
     }
 
     if ( ! isset( $schedules['biweekly'] ) ) {
         $schedules['biweekly'] = array(
             'interval' => 1209600, // 14 jours
-            'display'  => __( 'Every 2 Weeks', 'bihr-synch' ),
+            'display'  => __( 'Every 2 Weeks', 'BIHR-SYNCH-main' ),
         );
     }
     return $schedules;
