@@ -1,36 +1,47 @@
-=== BIHR Synchronisation Plugin ===
-Contributors: drcomputer
-Tags: woocommerce, bihr, synchronisation, produits, stocks, compatibilité, premium
+=== BIHR Synchronisation ===
+Contributors: drcomputer60290
+Tags: woocommerce, bihr, synchronization, products, inventory, vehicle-compatibility
 Requires at least: 5.6
 Tested up to: 6.9
-Stable tag: trunk
+Stable tag: 1.4.0
+Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Description ==
-Ce plugin permet de synchroniser les produits, les prix, les stocks et la compatibilité véhicule-produit entre la plateforme Bihr et WooCommerce. Il propose des fonctionnalités avancées pour les utilisateurs Pro.
+BIHR Synchronisation enables automatic synchronization of products, prices, inventory, and vehicle-product compatibility between the Bihr platform and WooCommerce. The plugin automates catalog imports and provides advanced inventory management features for motorcycle and powersports e-commerce stores.
 
-== Fonctionnalités ==
-* Import automatique des catalogues Bihr (produits, prix, stocks, images, attributs)
-* Planification automatique de la génération des prix (Pro)
-* Import et gestion de la compatibilité véhicule-produit (Pro)
-* Interface d'administration intuitive
-* Logs détaillés et outils de diagnostic
+**Key Features:**
+* Automated Bihr catalog import (products, prices, stock, images, attributes)
+* Scheduled price generation and updates
+* Vehicle-to-product compatibility management
+* Real-time inventory synchronization
+* Detailed logging and diagnostic tools
+* WooCommerce integration and order synchronization
 
 == Installation ==
-1. Téléchargez et installez le plugin dans votre dossier `/wp-content/plugins/`.
-2. Activez-le via le menu Extensions de WordPress.
-3. Configurez vos identifiants Bihr dans la page d'administration du plugin.
+1. Upload the plugin files to `/wp-content/plugins/bihr-synchronisation/`
+2. Activate the plugin through WordPress admin panel
+3. Navigate to BIHR Dashboard and configure your Bihr API credentials
+4. Set up product catalogs, vehicle compatibility, and synchronization schedules
 
-== Notes ==
-- Certaines fonctionnalités sont réservées à la version Pro.
-- Consultez la documentation incluse pour plus de détails.
+== Frequently Asked Questions ==
 
-== External Services ==
-- OpenAI API: utilisé pour l'enrichissement automatique de contenu produit et des descriptifs. Les données de produit peuvent être envoyées à l'API lors de l'enrichissement.
+= Which external services does this plugin use? =
+The plugin integrates with the Bihr API (https://api.mybihr.com) for catalog synchronization. Optionally, it uses the OpenAI API for automatic product description enrichment.
+
+= Is the plugin compatible with my WooCommerce version? =
+The plugin requires WooCommerce and is tested up to WordPress 6.9.
+
+= What Bihr API endpoints does it use? =
+The plugin uses Bihr API v2.1 endpoints for catalog management, order synchronization, and vehicle compatibility data.
 
 == Changelog ==
-Voir le fichier CHANGELOG.md pour l'historique détaillé des modifications.
 
-== Support ==
-Pour toute question ou demande de support, contactez l'auteur ou ouvrez un ticket sur GitHub.
+= 1.4.0 =
+* Improved database query security and prepared statements
+* Enhanced i18n support with translator comments
+* Vehicle compatibility import with batch processing
+* Order synchronization with Bihr API
+* Real-time inventory syncing
+* Added WP-Cron scheduling for automated updates

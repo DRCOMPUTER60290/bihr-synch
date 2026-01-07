@@ -6,6 +6,7 @@
  * Author URI: https://drcomputer60290.fr
  * Version: 1.4.0
  * Text Domain: bihr-synchronisation
+ * Domain Path: /languages
  * License: GPLv2 or later
  * 
  * Développé par: DrComputer60290

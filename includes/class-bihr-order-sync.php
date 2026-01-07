@@ -251,9 +251,10 @@ class BihrWI_Order_Sync {
                 update_post_meta( $order_id, '_bihr_sync_error', $error_message );
 
                 // Ajouter une note d'erreur
+                /* translators: %1$s: newline, %2$s: BIHR ticket ID, %3$s: newline, %4$s: error message */
                 $order->add_order_note( 
                     sprintf( 
-                        __( '❌ Échec synchronisation BIHR%sTicket: %s%sErreur: %s', 'bihr-synchronisation' ),
+                        __( '❌ Échec synchronisation BIHR%1$sTicket: %2$s%3$sErreur: %4$s', 'bihr-synchronisation' ),
                         "\n",
                         $ticket_id,
                         "\n",
@@ -277,7 +278,8 @@ class BihrWI_Order_Sync {
             
             $order->add_order_note( 
                 sprintf( 
-                    __( '💥 Exception lors de la synchronisation BIHR%sTicket: %s%sErreur: %s', 'bihr-synchronisation' ),
+                    /* translators: %1$s: newline, %2$s: BIHR ticket ID, %3$s: newline, %4$s: exception message */
+                    __( '💥 Exception lors de la synchronisation BIHR%1$sTicket: %2$s%3$sErreur: %4$s', 'bihr-synchronisation' ),
                     "\n",
                     $ticket_id,
                     "\n",

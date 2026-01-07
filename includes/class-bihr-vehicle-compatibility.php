@@ -430,34 +430,29 @@ class BihrWI_Vehicle_Compatibility {
             $current_line++;
         }
 
-        // Insérer le batch en masse (optimisé)
+        // Insérer le batch en masse (optimisé via $wpdb->insert)
         if ( ! empty( $batch ) ) {
-            $values = array();
-            $placeholders = array();
-            
             foreach ( $batch as $data ) {
-                $placeholders[] = "(%s, %s, %s, %s, %s, %s, %s, %s)";
-                $values[] = $data['vehicle_code'];
-                $values[] = $data['part_number'];
-                $values[] = $data['barcode'];
-                $values[] = $data['manufacturer_part_number'];
-                $values[] = $data['position_id'];
-                $values[] = $data['position_value'];
-                $values[] = $data['attributes'];
-                $values[] = $data['source_brand'];
-            }
-            
-            $sql = "INSERT IGNORE INTO {$this->compatibility_table} 
-                    (vehicle_code, part_number, barcode, manufacturer_part_number, 
-                     position_id, position_value, attributes, source_brand) 
-                    VALUES " . implode( ', ', $placeholders );
-            
-            $result = $wpdb->query( $wpdb->prepare( $sql, $values ) );
-            
-            if ( $result ) {
-                $count = count( $batch );
-            } else {
-                $errors = count( $batch );
+                $result = $wpdb->insert(
+                    $this->compatibility_table,
+                    array(
+                        'vehicle_code'              => $data['vehicle_code'],
+                        'part_number'               => $data['part_number'],
+                        'barcode'                   => $data['barcode'],
+                        'manufacturer_part_number'  => $data['manufacturer_part_number'],
+                        'position_id'               => $data['position_id'],
+                        'position_value'            => $data['position_value'],
+                        'attributes'                => $data['attributes'],
+                        'source_brand'              => $data['source_brand'],
+                    ),
+                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+                );
+                
+                if ( $result ) {
+                    $count++;
+                } else {
+                    $errors++;
+                }
             }
         }
 
