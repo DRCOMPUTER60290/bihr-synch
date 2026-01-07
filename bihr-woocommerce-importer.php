@@ -71,9 +71,6 @@ define( 'BIHRWI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BIHRWI_LOG_FILE', WP_CONTENT_DIR . '/uploads/bihr-import/bihr-import.log' );
 define( 'BIHRWI_IMAGE_BASE_URL', 'https://api.mybihr.com' );
 
-// Load plugin text domain
-load_plugin_textdomain( 'bihr-synch', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
-
 // Autochargement simple de nos classes
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-logger.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-api-client.php';
