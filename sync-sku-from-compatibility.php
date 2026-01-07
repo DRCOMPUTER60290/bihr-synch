@@ -74,19 +74,25 @@ set_time_limit(0);
             
             // Compter les produits WC avec compatibilité véhicule
             $total = $wpdb->get_var(
-                "SELECT COUNT(DISTINCT pm_code.post_id)
-                FROM {$wpdb->postmeta} pm_code
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
-                LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
-                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                WHERE pm_code.meta_key = '_bihr_product_code'
-                AND pm_code.meta_value IS NOT NULL
-                AND pm_code.meta_value != ''
-                AND p.post_type = 'product'
-                AND EXISTS (
-                    SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
-                    WHERE vc.part_number = COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)
-                )"
+                $wpdb->prepare(
+                    "SELECT COUNT(DISTINCT pm_code.post_id)
+                    FROM {$wpdb->postmeta} pm_code
+                    INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                    LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = %s
+                    LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = %s
+                    WHERE pm_code.meta_key = %s
+                    AND pm_code.meta_value IS NOT NULL
+                    AND pm_code.meta_value != ''
+                    AND p.post_type = %s
+                    AND EXISTS (
+                        SELECT 1 FROM {$wpdb->prefix}bihr_vehicle_compatibility vc
+                        WHERE vc.part_number = COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)
+                    )",
+                    '_bihr_new_part_number',
+                    '_sku',
+                    '_bihr_product_code',
+                    'product'
+                )
             );
             
             echo '<div class="stats">';
@@ -112,15 +118,19 @@ set_time_limit(0);
                         p.post_title as name
                     FROM {$wpdb->postmeta} pm_code
                     INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
-                    LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = '_bihr_new_part_number'
-                    LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
+                    LEFT JOIN {$wpdb->postmeta} pm_new ON pm_new.post_id = pm_code.post_id AND pm_new.meta_key = %s
+                    LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = %s
                     INNER JOIN {$wpdb->prefix}bihr_vehicle_compatibility vc ON vc.part_number = COALESCE(pm_new.meta_value, pm_sku.meta_value, pm_code.meta_value)
-                    WHERE pm_code.meta_key = '_bihr_product_code'
+                    WHERE pm_code.meta_key = %s
                     AND pm_code.meta_value IS NOT NULL
                     AND pm_code.meta_value != ''
-                    AND p.post_type = 'product'
+                    AND p.post_type = %s
                     GROUP BY pm_code.post_id
                     LIMIT %d OFFSET %d",
+                    '_bihr_new_part_number',
+                    '_sku',
+                    '_bihr_product_code',
+                    'product',
                     $batch_size,
                     $offset
                 ),
@@ -146,12 +156,14 @@ set_time_limit(0);
                 }
                 
                 // Synchroniser le SKU
-                $existing_sku = $wpdb->get_var($wpdb->prepare("
-                    SELECT meta_id 
+                $existing_sku = $wpdb->get_var($wpdb->prepare(
+                    "SELECT meta_id 
                     FROM {$wpdb->postmeta} 
                     WHERE post_id = %d 
-                    AND meta_key = '_sku'
-                ", $wc_product_id));
+                    AND meta_key = %s",
+                    $wc_product_id,
+                    '_sku'
+                ));
                 
                 if ($existing_sku) {
                     // UPDATE
@@ -225,7 +237,11 @@ set_time_limit(0);
                 echo '<a href="?"><button>🔙 Retour</button></a>';
                 
                 // Vérif finale
-                $final_sku = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value != ''");
+                $final_sku = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value != %s",
+                    '_sku',
+                    ''
+                ) );
                 echo '<p class="success">✅ Total SKU synchronisés : ' . number_format($final_sku) . '</p>';
             }
             

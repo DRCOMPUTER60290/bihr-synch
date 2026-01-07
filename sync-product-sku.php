@@ -226,7 +226,11 @@ set_time_limit(0);
                 echo '<a href="?"><button>🔙 Retour</button></a>';
                 
                 // Vérif finale
-                $final_sku = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value != ''");
+                $final_sku = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value != %s",
+                    '_sku',
+                    ''
+                ) );
                 echo '<p class="success">✅ Total SKU synchronisés : ' . esc_html( number_format($final_sku) ) . '</p>';
             }
             

@@ -29,10 +29,10 @@ echo "<h1>🔍 Debug Filtre Véhicule</h1>";
 
 // 1. Vérifier si les tables existent
 echo "<h2>1. Tables de base de données</h2>";
-$tables = $wpdb->get_results( "SHOW TABLES LIKE '{$vehicles_table}'" );
+$tables = $wpdb->get_results( $wpdb->prepare( "SHOW TABLES LIKE %s", $vehicles_table ) );
 echo '<p>Table véhicules (' . esc_html( $vehicles_table ) . '): ' . ( $tables ? '✅ Existe' : '❌ N\'existe pas' ) . '</p>';
 
-$tables2 = $wpdb->get_results( "SHOW TABLES LIKE '{$compatibility_table}'" );
+$tables2 = $wpdb->get_results( $wpdb->prepare( "SHOW TABLES LIKE %s", $compatibility_table ) );
 echo '<p>Table compatibilités (' . esc_html( $compatibility_table ) . '): ' . ( $tables2 ? '✅ Existe' : '❌ N\'existe pas' ) . '</p>';
 
 // 2. Compter les véhicules

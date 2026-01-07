@@ -131,7 +131,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
     </div>
 
     <!-- Section débutants -->
-    <div class="bihr-beginner-section" <?php echo ! $is_beginner_mode ? 'style="display:none;"' : ''; ?>>
+    <div class="bihr-beginner-section" <?php echo $is_beginner_mode ? '' : 'style="display:none;"'; ?>>
         <h2>🎯 Commencer en 3 étapes</h2>
         
         <div class="beginner-steps">
@@ -178,7 +178,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
     </div>
 
     <!-- Menu principal simplifié (mode débutant) -->
-    <div class="bihr-quick-actions" <?php echo ! $is_beginner_mode ? 'style="display:none;"' : ''; ?>>
+    <div class="bihr-quick-actions" <?php echo $is_beginner_mode ? '' : 'style="display:none;"'; ?>>
         <h2>📋 Actions Rapides</h2>
         <div class="actions-grid">
             <div class="action-card">

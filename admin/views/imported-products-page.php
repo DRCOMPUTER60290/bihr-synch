@@ -118,7 +118,7 @@ $total_pages = $results->max_num_pages;
                     </td>
                 </tr>
                 
-                <tr id="time-row" style="<?php echo ( $sync_settings['enabled'] && in_array( $sync_settings['frequency'], array( 'daily', 'weekly' ) ) ) ? '' : 'display:none;'; ?>">
+                <tr id="time-row" style="<?php echo ( $sync_settings['enabled'] && in_array( $sync_settings['frequency'], array( 'daily', 'weekly' ), true ) ) ? '' : 'display:none;'; ?>">
                     <th scope="row">
                         <label for="sync_time"><?php esc_html_e( 'Heure de synchronisation', 'bihr-synch' ); ?></label>
                     </th>
