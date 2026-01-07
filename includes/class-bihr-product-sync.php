@@ -83,7 +83,7 @@ class BihrWI_Product_Sync {
             WHERE category IS NOT NULL AND TRIM(REPLACE(category, CHAR(160), ' ')) != ''
             ORDER BY category ASC";
         
-        return $wpdb->get_col( $sql );
+        return $wpdb->get_col( $wpdb->prepare( $sql, array() ) );
     }
     /**
      * Retourne une page de produits depuis wp_bihr_products avec filtres
@@ -206,7 +206,11 @@ class BihrWI_Product_Sync {
 
         $sql = "SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_sql}";
 
-        $prepared = ! empty( $args ) ? $wpdb->prepare( $sql, $args ) : $sql;
+        if ( ! empty( $args ) ) {
+            $prepared = $wpdb->prepare( $sql, $args );
+        } else {
+            $prepared = $wpdb->prepare( $sql, array() );
+        }
 
         return (int) $wpdb->get_var( $prepared );
     }
