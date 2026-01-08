@@ -23,7 +23,6 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Freemius SDK Integration
 if ( ! function_exists( 'bwi_fs' ) ) {
     // Create a helper function for easy SDK access.
     function bwi_fs() {
@@ -31,29 +30,29 @@ if ( ! function_exists( 'bwi_fs' ) ) {
 
         if ( ! isset( $bwi_fs ) ) {
             // Include Freemius SDK.
-            require_once dirname( __FILE__ ) . '/freemius/start.php';
+            require_once dirname( __FILE__ ) . '/vendor/freemius/start.php';
 
             $bwi_fs = fs_dynamic_init( array(
                 'id'                  => '22615',
-                'slug'                => 'bihr-importer',
+                'slug'                => 'bihr-synch',
                 'type'                => 'plugin',
                 'public_key'          => 'pk_9339663c54962dd345ba8f2dfd5bd',
-                'is_premium'          => false,
+                'is_premium'          => true,
                 'premium_suffix'      => 'Professional',
+                // If your plugin is a serviceware, set this option to false.
                 'has_premium_version' => true,
                 'has_addons'          => false,
                 'has_paid_plans'      => true,
-                'is_org_compliant'    => true,
+                // Automatically removed in the free version. If you're not using the
+                // auto-generated free version, delete this line before uploading to wp.org.
+                'wp_org_gatekeeper'   => 'OA7#BoRiBNqdf52FvzEf!!074aRLPs8fspif$7K1#4u4Csys1fQlCecVcUTOs2mcpeVHi#C2j9d09fOTvbC0HloPT7fFee5WdS3G',
                 'trial'               => array(
                     'days'               => 7,
                     'is_require_payment' => false,
                 ),
                 'menu'                => array(
                     'slug'           => 'bihr-synch',
-                    'account'        => true,
-                    'contact'        => true,
-                    'support'        => true,
-                    'pricing'        => true,
+                    'support'        => false,
                 ),
             ) );
         }
@@ -66,7 +65,6 @@ if ( ! function_exists( 'bwi_fs' ) ) {
     // Signal that SDK was initiated.
     do_action( 'bwi_fs_loaded' );
 }
-
 // Constantes
 define( 'BIHRWI_VERSION', '1.4.0' );
 define( 'BIHRWI_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -290,3 +288,4 @@ add_action( 'plugins_loaded', function() {
         new BihrWI_Vehicle_Filter();
     }
 } );
+
