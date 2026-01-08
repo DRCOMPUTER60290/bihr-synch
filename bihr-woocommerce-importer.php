@@ -51,7 +51,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                     'is_require_payment' => false,
                 ),
                 'menu'                => array(
-                    'slug'           => 'bihr-synch',
+                    'slug'           => 'bihr-dashboard',
                     'support'        => true,
                 ),
             ) );
@@ -288,5 +288,6 @@ add_action( 'plugins_loaded', function() {
         new BihrWI_Vehicle_Filter();
     }
 } );
+
 
 
