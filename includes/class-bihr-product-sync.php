@@ -86,8 +86,10 @@ class BihrWI_Product_Sync {
             ORDER BY category ASC";
         
         // Utiliser $wpdb->prepare() même pour les requêtes sans placeholders (exigence Plugin Check)
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is escaped with esc_sql(), query has no user input
         $prepared = $wpdb->prepare( $sql );
         
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
         return $wpdb->get_col( $prepared );
     }
     /**
@@ -180,12 +182,15 @@ class BihrWI_Product_Sync {
         $offset   = absint( $offset );
 
         // Construire la requête SQL complète avec tous les placeholders dans la chaîne principale
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where_sql contains only placeholders and constant strings, all values are passed to prepare()
         $sql = "SELECT * FROM `{$table_name}` WHERE {$where_sql} ORDER BY `{$order_column}` {$order_dir} LIMIT %d OFFSET %d";
 
         // Préparer la requête avec tous les arguments (toujours utiliser prepare même si args est vide)
         $all_args = array_merge( $args, array( $per_page, $offset ) );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared with all placeholders
         $prepared = $wpdb->prepare( $sql, $all_args );
 
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Query is prepared above with all placeholders
         return $wpdb->get_results( $prepared, ARRAY_A );
     }
 
@@ -244,11 +249,14 @@ class BihrWI_Product_Sync {
 
         // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
         $table_name = esc_sql( $this->table_name );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where_sql contains only placeholders and constant strings, all values are passed to prepare()
         $sql = "SELECT COUNT(*) FROM `{$table_name}` WHERE {$where_sql}";
 
         // Préparer la requête avec tous les arguments (toujours utiliser prepare même si args est vide)
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared with all placeholders
         $prepared = $wpdb->prepare( $sql, $args );
 
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Query is prepared above with all placeholders
         return (int) $wpdb->get_var( $prepared );
     }
 
