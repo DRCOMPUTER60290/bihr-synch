@@ -49,7 +49,7 @@ if ( ! function_exists( 'bwi_fs' ) ) {
                     'is_require_payment' => false,
                 ),
                 'menu'                => array(
-                    'slug'           => 'bihr-dashboard',
+                    'slug'           => 'bihr-synch',
                     'support'        => false,
                 ),
             ) );
