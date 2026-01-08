@@ -315,13 +315,10 @@ class BihrWI_Vehicle_Compatibility {
             $wpdb->query( "ALTER TABLE {$this->compatibility_table} DISABLE KEYS" );
         }
 
-        $batch_size = 10000; // Traiter 10000 lignes par batch (optimisé pour très gros fichiers)
-        global $wp_filesystem;
-        if ( ! function_exists( 'WP_Filesystem' ) ) {
-            require_once ABSPATH . 'wp-admin/includes/file.php';
-        }
-        WP_Filesystem();
-        if ( ! $wp_filesystem->exists( $file_path ) ) {
+        $batch_size = 50000; // Traiter 50000 lignes par batch (optimisé pour fichiers très volumineux 400k+)
+        
+        // Utiliser un fichier stream au lieu de charger tout en mémoire (CRITIQUE pour 400k lignes)
+        if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
             return array(
                 'success'       => false,
                 'imported'      => 0,
@@ -332,8 +329,9 @@ class BihrWI_Vehicle_Compatibility {
                 'is_complete'   => false
             );
         }
-        $content = $wp_filesystem->get_contents( $file_path );
-        if ( false === $content ) {
+        
+        $handle = fopen( $file_path, 'r' );
+        if ( false === $handle ) {
             return array(
                 'success'       => false,
                 'imported'      => 0,
@@ -344,9 +342,11 @@ class BihrWI_Vehicle_Compatibility {
                 'is_complete'   => false
             );
         }
-        $lines = explode( "\n", $content );
-        $header = str_getcsv( array_shift( $lines ), ',' );
-        if ( ! $header ) {
+        
+        // Sauter le header
+        $header = fgetcsv( $handle, 0, ',' );
+        if ( false === $header ) {
+            fclose( $handle );
             delete_transient( $transient_key );
             return array(
                 'success'       => false,
@@ -358,21 +358,32 @@ class BihrWI_Vehicle_Compatibility {
                 'is_complete'   => false
             );
         }
-        // Sauter aux lignes précédentes si reprise
+        
+        // Sauter aux lignes précédentes si reprise (sans charger en mémoire)
         for ( $i = 0; $i < $batch_start; $i++ ) {
-            array_shift( $lines );
+            if ( false === fgetcsv( $handle, 0, ',' ) ) {
+                break; // Fin du fichier
+            }
         }
+        
         $count = 0;
         $errors = 0;
         $batch = array();
         $current_line = $batch_start;
-        foreach ( $lines as $line ) {
-            if ( trim( $line ) === '' || $current_line >= $batch_start + $batch_size ) continue;
-            $row = str_getcsv( $line, ',' );
-            if ( count( $row ) < 3 ) {
+        
+        // Lire ligne par ligne jusqu'à atteindre batch_size
+        while ( $current_line < $batch_start + $batch_size ) {
+            $row = fgetcsv( $handle, 0, ',' );
+            if ( false === $row ) {
+                break; // Fin du fichier
+            }
+            
+            // Ignorer les lignes vides ou invalides
+            if ( count( $row ) < 3 || empty( trim( $row[0] ?? '' ) ) ) {
                 $current_line++;
                 continue;
             }
+            
             $batch[] = array(
                 'vehicle_code'              => sanitize_text_field( trim( $row[0] ?? '' ) ),
                 'part_number'               => sanitize_text_field( trim( $row[1] ?? '' ) ),
@@ -385,44 +396,56 @@ class BihrWI_Vehicle_Compatibility {
             );
             $current_line++;
         }
+        
+        fclose( $handle );
 
-        // Insérer le batch en masse avec une seule requête SQL (ULTRA OPTIMISÉ)
+        // Insérer le batch en masse avec une seule requête SQL (ULTRA OPTIMISÉ pour 400k+ lignes)
         if ( ! empty( $batch ) ) {
             $table_name = esc_sql( $this->compatibility_table );
-            $values = array();
-            $placeholders = array();
+            
+            // Utiliser des transactions pour améliorer les performances
+            $wpdb->query( 'START TRANSACTION' );
+            
+            // Construire la requête INSERT en masse (plus efficace que prepare() pour chaque ligne)
+            $values_parts = array();
+            $all_values = array();
             
             foreach ( $batch as $data ) {
-                $values[] = $wpdb->prepare(
-                    '(%s, %s, %s, %s, %s, %s, %s, %s)',
-                    $data['vehicle_code'],
-                    $data['part_number'],
-                    $data['barcode'],
-                    $data['manufacturer_part_number'],
-                    $data['position_id'],
-                    $data['position_value'],
-                    $data['attributes'],
-                    $data['source_brand']
-                );
+                $values_parts[] = '(%s, %s, %s, %s, %s, %s, %s, %s)';
+                $all_values[] = $data['vehicle_code'];
+                $all_values[] = $data['part_number'];
+                $all_values[] = $data['barcode'];
+                $all_values[] = $data['manufacturer_part_number'];
+                $all_values[] = $data['position_id'];
+                $all_values[] = $data['position_value'];
+                $all_values[] = $data['attributes'];
+                $all_values[] = $data['source_brand'];
             }
             
-            if ( ! empty( $values ) ) {
+            if ( ! empty( $values_parts ) ) {
                 $sql = "INSERT INTO `{$table_name}` 
                         (`vehicle_code`, `part_number`, `barcode`, `manufacturer_part_number`, 
                          `position_id`, `position_value`, `attributes`, `source_brand`) 
-                        VALUES " . implode( ', ', $values );
+                        VALUES " . implode( ', ', $values_parts );
                 
-                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared above with all placeholders
-                $result = $wpdb->query( $sql );
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared below with all placeholders
+                $prepared_sql = $wpdb->prepare( $sql, $all_values );
+                
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared above
+                $result = $wpdb->query( $prepared_sql );
                 
                 if ( false !== $result ) {
                     $count = $result; // Nombre de lignes insérées
+                    $wpdb->query( 'COMMIT' );
                 } else {
-                    // En cas d'erreur, essayer les insertions individuelles pour identifier le problème
+                    // En cas d'erreur, rollback
+                    $wpdb->query( 'ROLLBACK' );
                     $errors = count( $batch );
                     $count = 0;
-                    $this->logger->log( 'Erreur insertion en masse, fallback sur insertions individuelles' );
+                    $this->logger->log( 'Erreur insertion en masse pour ' . $brand_name . ': ' . $wpdb->last_error );
                 }
+            } else {
+                $wpdb->query( 'ROLLBACK' );
             }
         }
 
