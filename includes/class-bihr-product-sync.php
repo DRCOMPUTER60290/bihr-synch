@@ -191,7 +191,7 @@ class BihrWI_Product_Sync {
         $prepared = $wpdb->prepare( $sql, $all_args );
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Query is prepared above with all placeholders
-        return $wpdb->get_results( $prepared, ARRAY_A );
+        return $wpdb->get_results( $prepared, OBJECT );
     }
 
     /**
