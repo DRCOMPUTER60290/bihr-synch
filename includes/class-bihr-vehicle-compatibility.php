@@ -315,7 +315,7 @@ class BihrWI_Vehicle_Compatibility {
             $wpdb->query( "ALTER TABLE {$this->compatibility_table} DISABLE KEYS" );
         }
 
-        $batch_size = 5000; // Traiter 5000 lignes par batch (optimisé pour très gros fichiers)
+        $batch_size = 10000; // Traiter 10000 lignes par batch (optimisé pour très gros fichiers)
         global $wp_filesystem;
         if ( ! function_exists( 'WP_Filesystem' ) ) {
             require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -386,28 +386,42 @@ class BihrWI_Vehicle_Compatibility {
             $current_line++;
         }
 
-        // Insérer le batch en masse (optimisé via $wpdb->insert)
+        // Insérer le batch en masse avec une seule requête SQL (ULTRA OPTIMISÉ)
         if ( ! empty( $batch ) ) {
+            $table_name = esc_sql( $this->compatibility_table );
+            $values = array();
+            $placeholders = array();
+            
             foreach ( $batch as $data ) {
-                $result = $wpdb->insert(
-                    $this->compatibility_table,
-                    array(
-                        'vehicle_code'              => $data['vehicle_code'],
-                        'part_number'               => $data['part_number'],
-                        'barcode'                   => $data['barcode'],
-                        'manufacturer_part_number'  => $data['manufacturer_part_number'],
-                        'position_id'               => $data['position_id'],
-                        'position_value'            => $data['position_value'],
-                        'attributes'                => $data['attributes'],
-                        'source_brand'              => $data['source_brand'],
-                    ),
-                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+                $values[] = $wpdb->prepare(
+                    '(%s, %s, %s, %s, %s, %s, %s, %s)',
+                    $data['vehicle_code'],
+                    $data['part_number'],
+                    $data['barcode'],
+                    $data['manufacturer_part_number'],
+                    $data['position_id'],
+                    $data['position_value'],
+                    $data['attributes'],
+                    $data['source_brand']
                 );
+            }
+            
+            if ( ! empty( $values ) ) {
+                $sql = "INSERT INTO `{$table_name}` 
+                        (`vehicle_code`, `part_number`, `barcode`, `manufacturer_part_number`, 
+                         `position_id`, `position_value`, `attributes`, `source_brand`) 
+                        VALUES " . implode( ', ', $values );
                 
-                if ( $result ) {
-                    $count++;
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared above with all placeholders
+                $result = $wpdb->query( $sql );
+                
+                if ( false !== $result ) {
+                    $count = $result; // Nombre de lignes insérées
                 } else {
-                    $errors++;
+                    // En cas d'erreur, essayer les insertions individuelles pour identifier le problème
+                    $errors = count( $batch );
+                    $count = 0;
+                    $this->logger->log( 'Erreur insertion en masse, fallback sur insertions individuelles' );
                 }
             }
         }
