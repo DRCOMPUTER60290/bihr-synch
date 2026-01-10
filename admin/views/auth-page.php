@@ -57,6 +57,15 @@ if ( ! defined( 'ABSPATH' ) ) {
                     <p class="description">
                         Si renseignée, l'IA générera automatiquement des descriptions courtes et longues lors de l'import des produits.
                     </p>
+                    <p class="description" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
+                        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; color: #2271b1; font-weight: 500;">
+                            <span class="dashicons dashicons-admin-links" style="font-size: 16px; width: 16px; height: 16px; color: #2271b1;"></span>
+                            Configurer ma clé API OpenAI
+                            <span class="dashicons dashicons-external" style="font-size: 14px; width: 14px; height: 14px; opacity: 0.7;"></span>
+                        </a>
+                        <br>
+                        <small style="color: #666; font-style: italic; margin-top: 4px; display: inline-block;">Ouvre la page OpenAI pour créer ou gérer vos clés API</small>
+                    </p>
                 </td>
             </tr>
         </table>
