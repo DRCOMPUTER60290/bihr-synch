@@ -230,7 +230,7 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
                 <div class="action-icon">❓</div>
                 <h3><?php esc_html_e( 'Aide & Support', 'bihr-synch' ); ?></h3>
                 <p><?php esc_html_e( 'Accéder à la documentation', 'bihr-synch' ); ?></p>
-                <a href="#" class="button" id="bihr-open-help">
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-help' ) ); ?>" class="button">
                     <?php esc_html_e( 'Ouvrir', 'bihr-synch' ); ?>
                 </a>
             </div>
@@ -609,11 +609,6 @@ $synced_products = (int) get_option( 'bihrwi_synced_products_count', 0 );
         });
     });
     
-    // Ouvrir l'aide
-    $('#bihr-open-help').on('click', function(e) {
-        e.preventDefault();
-        alert('📖 Consultez la documentation:\n\nhttps://github.com/DRCOMPUTER60290/BIHR-SYNCH');
-    });
     
     console.log('[BIHR] Dashboard chargé');
 })(jQuery);

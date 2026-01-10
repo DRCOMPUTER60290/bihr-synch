@@ -406,6 +406,15 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
+            __( 'Aide & Tutoriels', 'bihr-synch' ),
+            __( '📚 Aide', 'bihr-synch' ),
+            'manage_woocommerce',
+            'bihr-help',
+            array( $this, 'render_help_page' )
+        );
+
+        add_submenu_page(
+            'bihr-dashboard',
             __( 'Diagnostic WP‑Cron', 'bihr-synch' ),
             __( '⚙️ WP‑Cron', 'bihr-synch' ),
             'manage_woocommerce',
@@ -497,6 +506,10 @@ class BihrWI_Admin {
     /**
      * Affiche la page de diagnostic WP‑Cron
      */
+    public function render_help_page() {
+        include BIHRWI_PLUGIN_DIR . 'admin/views/help-page.php';
+    }
+
     public function render_wpcron_diagnostic_page() {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_die( 'Permission denied.' );
