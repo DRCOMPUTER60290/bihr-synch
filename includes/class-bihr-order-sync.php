@@ -35,6 +35,27 @@ class BihrWI_Order_Sync {
             return;
         }
 
+        // PROTECTION : Vérifier que la commande existe et n'est pas un brouillon
+        if ( ! $order || ! is_a( $order, 'WC_Order' ) ) {
+            $this->logger->log( "[WC{$order_id}] ⚠️ Commande invalide ou introuvable - synchronisation annulée" );
+            return;
+        }
+
+        // PROTECTION : Ne synchroniser que les commandes avec un statut valide (pas les brouillons)
+        $order_status = $order->get_status();
+        $valid_statuses = array( 'processing', 'completed', 'on-hold', 'pending' );
+        
+        if ( ! in_array( $order_status, $valid_statuses, true ) ) {
+            $this->logger->log( "[WC{$order_id}] ⚠️ Statut de commande non valide pour synchronisation: {$order_status} - ignoré" );
+            return;
+        }
+
+        // PROTECTION : Vérifier que la commande a au moins un produit
+        if ( $order->get_item_count() === 0 ) {
+            $this->logger->log( "[WC{$order_id}] ⚠️ Commande vide (0 produit) - synchronisation annulée" );
+            return;
+        }
+
         // Génération d'un Ticket ID unique pour tracer toutes les étapes
         $ticket_id = 'WC' . $order_id . '-' . time() . '-' . substr( md5( uniqid( '', true ) ), 0, 8 );
 
@@ -52,7 +73,7 @@ class BihrWI_Order_Sync {
         // Planifier la tâche dans les secondes qui suivent (WP-Cron)
         wp_schedule_single_event( time() + 5, 'bihrwi_async_order_sync', array( $order_id, $ticket_id ) );
 
-        $this->logger->log( "[{$ticket_id}] ⏳ Synchronisation BIHR planifiée (asynchrone) pour la commande #{$order_id}" );
+        $this->logger->log( "[{$ticket_id}] ⏳ Synchronisation BIHR planifiée (asynchrone) pour la commande #{$order_id} (statut: {$order_status})" );
     }
 
     /**
@@ -63,6 +84,18 @@ class BihrWI_Order_Sync {
 
         if ( ! $order ) {
             $this->logger->log( "[{$ticket_id}] ❌ Impossible de charger la commande #{$order_id} pour la synchro." );
+            return;
+        }
+
+        // PROTECTION : Vérifier que la synchronisation automatique est toujours activée
+        if ( ! get_option( 'bihrwi_auto_sync_orders', 1 ) ) {
+            $this->logger->log( "[{$ticket_id}] ❌ Synchronisation automatique désactivée entre-temps - annulation" );
+            return;
+        }
+
+        // PROTECTION : Vérifier que la commande a au moins un produit
+        if ( $order->get_item_count() === 0 ) {
+            $this->logger->log( "[{$ticket_id}] ⚠️ Commande vide (0 produit) - synchronisation annulée" );
             return;
         }
 
