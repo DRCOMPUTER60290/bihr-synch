@@ -80,6 +80,7 @@ require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-sync.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-order-sync.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-compatibility.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-filter.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-filters.php';
 require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
 
 // Activation : création table + dossier logs
@@ -274,8 +275,11 @@ function bihrwi_check_prices_catalog() {
 add_action( 'plugins_loaded', function() {
     if ( is_admin() ) {
         new BihrWI_Admin();
+        // Filtres de catégories WooCommerce pour la page bihr-products.
+        $bihr_category_filters = new BihrWI_Category_Filters();
+        $bihr_category_filters->init();
     }
-    
+
     // Initialisation de la synchronisation automatique des commandes
     if ( class_exists( 'WooCommerce' ) ) {
         $logger     = new BihrWI_Logger();

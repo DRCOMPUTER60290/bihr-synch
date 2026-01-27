@@ -560,38 +560,55 @@ class BihrWI_Admin {
         $current_page = isset( $_GET['paged'] ) ? max( 1, intval( $_GET['paged'] ) ) : 1;
         $per_page     = 20;
 
-        // Récupération des filtres
-        $filter_search   = isset( $_GET['search'] ) ? sanitize_text_field( wp_unslash( $_GET['search'] ) ) : '';
-        $filter_stock    = isset( $_GET['stock_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['stock_filter'] ) ) : '';
+        // Récupération des filtres existants
+        $filter_search    = isset( $_GET['search'] ) ? sanitize_text_field( wp_unslash( $_GET['search'] ) ) : '';
+        $filter_stock     = isset( $_GET['stock_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['stock_filter'] ) ) : '';
         $filter_price_min = isset( $_GET['price_min'] ) ? sanitize_text_field( wp_unslash( $_GET['price_min'] ) ) : '';
         $filter_price_max = isset( $_GET['price_max'] ) ? sanitize_text_field( wp_unslash( $_GET['price_max'] ) ) : '';
-        $filter_category = isset( $_GET['category_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['category_filter'] ) ) : '';
-        $sort_by         = isset( $_GET['sort_by'] ) ? sanitize_text_field( wp_unslash( $_GET['sort_by'] ) ) : '';
+        $filter_category  = isset( $_GET['category_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['category_filter'] ) ) : '';
+        $sort_by          = isset( $_GET['sort_by'] ) ? sanitize_text_field( wp_unslash( $_GET['sort_by'] ) ) : '';
+
+        // Nouveaux filtres hiérarchiques basés sur product_cat
+        $bihr_cat    = isset( $_GET['bihr_cat'] ) ? absint( $_GET['bihr_cat'] ) : 0;
+        $bihr_subcat = isset( $_GET['bihr_subcat'] ) ? absint( $_GET['bihr_subcat'] ) : 0;
+        $bihr_subcat2 = isset( $_GET['bihr_subcat2'] ) ? absint( $_GET['bihr_subcat2'] ) : 0;
+
+        $selected_product_cat_term_id = 0;
+        if ( class_exists( 'BihrWI_Category_Filters' ) ) {
+            $selected_product_cat_term_id = BihrWI_Category_Filters::get_selected_term_id_from_request_priority();
+        }
 
         // Calculer d'abord le total pour pouvoir borner la pagination (évite les pages vides)
-        $total       = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category );
+        $total                  = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $selected_product_cat_term_id );
         $debug_count_last_query = $wpdb->last_query;
         $debug_count_last_error = $wpdb->last_error;
-        $total_pages = max( 1, (int) ceil( $total / $per_page ) );
+        $total_pages            = max( 1, (int) ceil( $total / $per_page ) );
 
         // Si on demande une page au-delà du total, revenir à la dernière page valide
         if ( $current_page > $total_pages ) {
             $current_page = $total_pages;
         }
 
-        $products = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by );
+        $products                  = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by, $selected_product_cat_term_id );
         $debug_products_last_query = $wpdb->last_query;
         $debug_products_last_error = $wpdb->last_error;
-        
-        // Récupérer la liste des catégories disponibles pour le dropdown
+
+        // Récupérer la liste des catégories disponibles pour le dropdown (catégories Bihr internes)
         $available_categories = $this->product_sync->get_distinct_categories();
+
+        // Filtres de taxonomie pour la vue (persistance + JS)
+        $bihr_product_cat_filters = array(
+            'cat'    => $bihr_cat,
+            'subcat' => $bihr_subcat,
+            'subcat2'=> $bihr_subcat2,
+        );
 
         // Debug optionnel (affiché dans la vue uniquement si demandé)
         $bihrwi_debug = isset( $_GET['bihrwi_debug'] ) ? (int) $_GET['bihrwi_debug'] : 0;
 
         // On transmet à la vue si l'utilisateur a accès aux fonctionnalités Pro (licence active ou essai)
-$is_premium = bwi_fs()->can_use_premium_code();
-include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
+        $is_premium = bwi_fs()->can_use_premium_code();
+        include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
     }
 
     public function render_imported_products_page() {

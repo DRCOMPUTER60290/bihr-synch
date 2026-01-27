@@ -532,7 +532,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
                 <div class="bihr-filter-field">
                     <label for="category_filter">
-                        Catégorie
+                        Catégorie (Bihr)
                     </label>
                     <select name="category_filter" id="category_filter">
                         <option value="">Toutes</option>
@@ -543,6 +543,34 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                                 </option>
                             <?php endforeach; ?>
                         <?php endif; ?>
+                    </select>
+                </div>
+
+                <!-- Nouvelle hiérarchie de catégories WooCommerce -->
+                <div class="bihr-filter-field">
+                    <label for="bihr_cat">
+                        Catégorie WooCommerce
+                    </label>
+                    <select name="bihr_cat" id="bihr_cat">
+                        <!-- Options remplies dynamiquement par JS (BihrCategoryFilters.rootCategories) -->
+                    </select>
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="bihr_subcat">
+                        Sous-catégorie
+                    </label>
+                    <select name="bihr_subcat" id="bihr_subcat" disabled>
+                        <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
+                    </select>
+                </div>
+
+                <div class="bihr-filter-field">
+                    <label for="bihr_subcat2">
+                        Sous-sous-catégorie
+                    </label>
+                    <select name="bihr_subcat2" id="bihr_subcat2" disabled>
+                        <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
                     </select>
                 </div>
 

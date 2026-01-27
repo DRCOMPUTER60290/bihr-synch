@@ -93,9 +93,19 @@ class BihrWI_Product_Sync {
         return $wpdb->get_col( $prepared );
     }
     /**
-     * Retourne une page de produits depuis wp_bihr_products avec filtres
+     * Retourne une page de produits depuis wp_bihr_products avec filtres.
+     *
+     * @param int    $page                      Page courante.
+     * @param int    $per_page                  Nombre d'éléments par page.
+     * @param string $search                    Mot-clé de recherche.
+     * @param string $stock_filter              Filtre de stock.
+     * @param string $price_min                 Prix minimum.
+     * @param string $price_max                 Prix maximum.
+     * @param string $category_filter           Filtre de catégorie interne Bihr.
+     * @param string $sort_by                   Clé de tri.
+     * @param int    $product_cat_term_id       Term product_cat le plus précis sélectionné (cat/sous/sous-sous).
      */
-    public function get_products( $page = 1, $per_page = 20, $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $sort_by = '' ) {
+    public function get_products( $page = 1, $per_page = 20, $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $sort_by = '', $product_cat_term_id = 0 ) {
         global $wpdb;
 
         $page     = max( 1, (int) $page );
@@ -108,6 +118,7 @@ class BihrWI_Product_Sync {
         $stock_filter    = sanitize_text_field( (string) $stock_filter );
         $category_filter = sanitize_text_field( (string) $category_filter );
         $sort_by         = sanitize_key( (string) $sort_by );
+        $product_cat_term_id = absint( $product_cat_term_id );
 
         // Construire les conditions WHERE directement dans la chaîne SQL principale
         // Construire la requête SQL directement sans utiliser de tableau pour éviter les problèmes avec Plugin Check
@@ -145,6 +156,22 @@ class BihrWI_Product_Sync {
             $category_column = esc_sql( 'category' );
             $where_sql .= " AND REPLACE(TRIM(`{$category_column}`), CHAR(160), ' ') = %s";
             $args[] = $normalized_category;
+        }
+
+        // Filtre product_cat basé sur WooCommerce (catégorie / sous-catégorie / sous-sous-catégorie).
+        if ( $product_cat_term_id > 0 && class_exists( 'WooCommerce' ) ) {
+            $skus_for_term = $this->get_skus_for_product_cat_term( $product_cat_term_id );
+
+            if ( empty( $skus_for_term ) ) {
+                // Aucun produit WooCommerce pour ce term => aucun produit Bihr ne doit remonter.
+                return array();
+            }
+
+            // Construire une clause IN sécurisée pour product_code et new_part_number.
+            $placeholders = implode( ',', array_fill( 0, count( $skus_for_term ), '%s' ) );
+            // On applique le filtre sur product_code OU sur new_part_number (SKU = NewPartNumber prioritaire à l'import).
+            $where_sql .= " AND (product_code IN ($placeholders) OR new_part_number IN ($placeholders))";
+            $args      = array_merge( $args, $skus_for_term, $skus_for_term );
         }
 
         // Whitelist des colonnes autorisées pour ORDER BY
@@ -195,9 +222,16 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Nombre total de lignes dans wp_bihr_products avec filtres
+     * Nombre total de lignes dans wp_bihr_products avec filtres.
+     *
+     * @param string $search              Mot-clé de recherche.
+     * @param string $stock_filter        Filtre de stock.
+     * @param string $price_min           Prix minimum.
+     * @param string $price_max           Prix maximum.
+     * @param string $category_filter     Filtre de catégorie interne Bihr.
+     * @param int    $product_cat_term_id Term product_cat le plus précis sélectionné.
      */
-    public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '' ) {
+    public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $product_cat_term_id = 0 ) {
         global $wpdb;
 
         $where = array();
@@ -205,9 +239,10 @@ class BihrWI_Product_Sync {
 
         $args = array();
 
-        $search          = sanitize_text_field( (string) $search );
-        $stock_filter    = sanitize_text_field( (string) $stock_filter );
-        $category_filter = sanitize_text_field( (string) $category_filter );
+        $search              = sanitize_text_field( (string) $search );
+        $stock_filter        = sanitize_text_field( (string) $stock_filter );
+        $category_filter     = sanitize_text_field( (string) $category_filter );
+        $product_cat_term_id = absint( $product_cat_term_id );
 
         // Construire les conditions WHERE directement dans la chaîne SQL principale
         // Construire la requête SQL directement sans utiliser de tableau pour éviter les problèmes avec Plugin Check
@@ -247,6 +282,19 @@ class BihrWI_Product_Sync {
             $args[] = $normalized_category;
         }
 
+        // Filtre product_cat basé sur WooCommerce.
+        if ( $product_cat_term_id > 0 && class_exists( 'WooCommerce' ) ) {
+            $skus_for_term = $this->get_skus_for_product_cat_term( $product_cat_term_id );
+
+            if ( empty( $skus_for_term ) ) {
+                return 0;
+            }
+
+            $placeholders = implode( ',', array_fill( 0, count( $skus_for_term ), '%s' ) );
+            $where_sql   .= " AND (product_code IN ($placeholders) OR new_part_number IN ($placeholders))";
+            $args         = array_merge( $args, $skus_for_term, $skus_for_term );
+        }
+
         // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
         $table_name = esc_sql( $this->table_name );
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where_sql contains only placeholders and constant strings, all values are passed to prepare()
@@ -258,6 +306,54 @@ class BihrWI_Product_Sync {
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Query is prepared above with all placeholders
         return (int) $wpdb->get_var( $prepared );
+    }
+
+    /**
+     * Récupère la liste des SKU (_sku) des produits WooCommerce associés à un term product_cat donné.
+     * Utilisé pour filtrer les lignes de wp_bihr_products sur la base de la taxonomie WooCommerce.
+     *
+     * @param int $term_id Term product_cat ciblé.
+     * @return array Liste de SKU uniques.
+     */
+    protected function get_skus_for_product_cat_term( $term_id ) {
+        $term_id = absint( $term_id );
+
+        if ( $term_id <= 0 || ! class_exists( 'WooCommerce' ) ) {
+            return array();
+        }
+
+        $args = array(
+            'post_type'      => 'product',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'post_status'    => array( 'publish', 'pending', 'draft', 'private' ),
+            'tax_query'      => array(
+                array(
+                    'taxonomy'         => 'product_cat',
+                    'field'            => 'term_id',
+                    'terms'            => array( $term_id ),
+                    'include_children' => true,
+                ),
+            ),
+        );
+
+        $query = new WP_Query( $args );
+
+        if ( ! $query->have_posts() ) {
+            return array();
+        }
+
+        $skus = array();
+
+        foreach ( $query->posts as $product_id ) {
+            $sku = get_post_meta( $product_id, '_sku', true );
+
+            if ( is_string( $sku ) && $sku !== '' ) {
+                $skus[] = $sku;
+            }
+        }
+
+        return array_values( array_unique( $skus ) );
     }
 
     /* =========================================================
