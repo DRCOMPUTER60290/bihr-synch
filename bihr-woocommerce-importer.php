@@ -80,6 +80,7 @@ require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-sync.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-order-sync.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-compatibility.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-filter.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-path.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-filters.php';
 require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
 

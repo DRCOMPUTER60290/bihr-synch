@@ -502,12 +502,36 @@ class BihrWI_Product_Sync {
             update_post_meta( $product_id_wc, '_bihr_new_part_number', $row->new_part_number );
         }
 
-        // Gestion des catégories
-        if ( ! empty( $row->category ) ) {
-            $category_ids = $this->create_or_get_category_hierarchy( $row->category );
-            if ( ! empty( $category_ids ) ) {
-                wp_set_object_terms( $product_id_wc, $category_ids, 'product_cat' );
-                $this->logger->log( 'Catégories assignées : ' . implode( ', ', $category_ids ) );
+        // Gestion des catégories WooCommerce à partir du CategoryPath Bihr.
+        if ( class_exists( 'BihrWI_Category_Path' ) ) {
+            $levels = array(
+                'l1' => '',
+                'l2' => '',
+                'l3' => '',
+            );
+
+            if ( ! empty( $row->category ) ) {
+                // $row->category contient le CategoryPath au format "Niveau1 -> Niveau2 -> Niveau3".
+                $levels = BihrWI_Category_Path::parse_category_path( $row->category );
+            }
+
+            $term_id = BihrWI_Category_Path::ensure_product_categories( $levels['l1'], $levels['l2'], $levels['l3'] );
+
+            if ( $term_id ) {
+                // Assigner uniquement la catégorie la plus précise (les parents sont gérés par product_cat).
+                wp_set_object_terms( $product_id_wc, array( $term_id ), 'product_cat' );
+                $this->logger->log( 'Catégorie product_cat assignée (term_id=' . $term_id . ') pour ' . $row->product_code );
+            }
+
+            // Stocker les niveaux Bihr en métadonnées (facultatif mais utile).
+            if ( ! empty( $levels['l1'] ) ) {
+                update_post_meta( $product_id_wc, '_bihr_cat_l1', $levels['l1'] );
+            }
+            if ( ! empty( $levels['l2'] ) ) {
+                update_post_meta( $product_id_wc, '_bihr_cat_l2', $levels['l2'] );
+            }
+            if ( ! empty( $levels['l3'] ) ) {
+                update_post_meta( $product_id_wc, '_bihr_cat_l3', $levels['l3'] );
             }
         }
 
@@ -611,40 +635,6 @@ class BihrWI_Product_Sync {
         update_post_meta( $attachment_id, '_bihr_image_source', esc_url_raw( $image_url ) );
 
         return $attachment_id;
-    }
-
-    /**
-     * Crée ou récupère une catégorie WooCommerce (simple, sans hiérarchie)
-     * @param string $category_name Ex: "RIDER GEAR" ou "VEHICLE PARTS & ACCESSORIES"
-     * @return array Liste contenant l'ID de la catégorie
-     */
-    protected function create_or_get_category_hierarchy( $category_name ) {
-        if ( empty( $category_name ) ) {
-            return array();
-        }
-
-        // Chercher si la catégorie existe déjà
-        $existing_term = get_term_by( 'name', $category_name, 'product_cat' );
-        
-        if ( $existing_term ) {
-            // La catégorie existe déjà
-            return array( $existing_term->term_id );
-        }
-
-        // Créer la nouvelle catégorie
-        $term = wp_insert_term( $category_name, 'product_cat' );
-
-        if ( is_wp_error( $term ) ) {
-            // Si erreur "duplicate", récupérer l'ID existant
-            if ( isset( $term->error_data['term_exists'] ) ) {
-                return array( $term->error_data['term_exists'] );
-            } else {
-                $this->logger->log( 'Erreur création catégorie "' . $category_name . '": ' . $term->get_error_message() );
-                return array();
-            }
-        }
-
-        return array( $term['term_id'] );
     }
 
     /**

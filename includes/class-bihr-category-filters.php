@@ -132,9 +132,18 @@ class BihrWI_Category_Filters {
 
         if ( ! empty( $terms ) ) {
             foreach ( $terms as $term ) {
+                // Ne pas renvoyer d'éventuelles catégories placeholder.
+                $name = isset( $term->name ) ? trim( $term->name ) : '';
+                if ( '' === $name ) {
+                    continue;
+                }
+                if ( 0 === strcasecmp( $name, '¯\_(ツ)_/¯' ) || 0 === strcasecmp( $name, '?' ) ) {
+                    continue;
+                }
+
                 $data[] = array(
                     'id'   => (int) $term->term_id,
-                    'name' => $term->name,
+                    'name' => $name,
                 );
             }
         }
