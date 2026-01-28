@@ -71,7 +71,8 @@ class BihrWI_Product_Sync {
 
 
     /**
-     * Récupère la liste des catégories distinctes dans la base
+     * Récupère la liste des catégories Bihr distinctes dans la base.
+     * (Champ `category` historique, utilisé pour les marges.)
      */
     public function get_distinct_categories() {
         global $wpdb;
@@ -92,6 +93,68 @@ class BihrWI_Product_Sync {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
         return $wpdb->get_col( $prepared );
     }
+
+    /**
+     * Récupère la liste des niveaux 1 distincts (cat_l1) depuis wp_bihr_products.
+     */
+    public function get_distinct_cat_level1() {
+        global $wpdb;
+
+        $table_name = esc_sql( $this->table_name );
+        $sql        = "SELECT DISTINCT TRIM(cat_l1) AS cat_l1 FROM `{$table_name}` WHERE cat_l1 IS NOT NULL AND TRIM(cat_l1) <> '' ORDER BY cat_l1 ASC";
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- pas de paramètres utilisateur
+        return $wpdb->get_col( $sql );
+    }
+
+    /**
+     * Récupère la liste des niveaux 2 distincts (cat_l2) pour un niveau 1 donné.
+     *
+     * @param string $cat_l1 Niveau 1 sélectionné.
+     * @return array
+     */
+    public function get_distinct_cat_level2( $cat_l1 ) {
+        global $wpdb;
+
+        $cat_l1     = sanitize_text_field( (string) $cat_l1 );
+        if ( '' === $cat_l1 ) {
+            return array();
+        }
+
+        $table_name = esc_sql( $this->table_name );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL préparée juste après
+        $sql        = "SELECT DISTINCT TRIM(cat_l2) AS cat_l2 FROM `{$table_name}` WHERE cat_l1 = %s AND cat_l2 IS NOT NULL AND TRIM(cat_l2) <> '' ORDER BY cat_l2 ASC";
+
+        $prepared = $wpdb->prepare( $sql, $cat_l1 );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        return $wpdb->get_col( $prepared );
+    }
+
+    /**
+     * Récupère la liste des niveaux 3 distincts (cat_l3) pour un couple (l1, l2).
+     *
+     * @param string $cat_l1
+     * @param string $cat_l2
+     * @return array
+     */
+    public function get_distinct_cat_level3( $cat_l1, $cat_l2 ) {
+        global $wpdb;
+
+        $cat_l1 = sanitize_text_field( (string) $cat_l1 );
+        $cat_l2 = sanitize_text_field( (string) $cat_l2 );
+
+        if ( '' === $cat_l1 || '' === $cat_l2 ) {
+            return array();
+        }
+
+        $table_name = esc_sql( $this->table_name );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL préparée juste après
+        $sql        = "SELECT DISTINCT TRIM(cat_l3) AS cat_l3 FROM `{$table_name}` WHERE cat_l1 = %s AND cat_l2 = %s AND cat_l3 IS NOT NULL AND TRIM(cat_l3) <> '' ORDER BY cat_l3 ASC";
+
+        $prepared = $wpdb->prepare( $sql, $cat_l1, $cat_l2 );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        return $wpdb->get_col( $prepared );
+    }
     /**
      * Retourne une page de produits depuis wp_bihr_products avec filtres.
      *
@@ -103,9 +166,11 @@ class BihrWI_Product_Sync {
      * @param string $price_max                 Prix maximum.
      * @param string $category_filter           Filtre de catégorie interne Bihr.
      * @param string $sort_by                   Clé de tri.
-     * @param int    $product_cat_term_id       Term product_cat le plus précis sélectionné (cat/sous/sous-sous).
+     * @param string $cat_l1_filter             Filtre niveau 1 (CategoryPath).
+     * @param string $cat_l2_filter             Filtre niveau 2 (CategoryPath).
+     * @param string $cat_l3_filter             Filtre niveau 3 (CategoryPath).
      */
-    public function get_products( $page = 1, $per_page = 20, $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $sort_by = '', $product_cat_term_id = 0 ) {
+    public function get_products( $page = 1, $per_page = 20, $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $sort_by = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '' ) {
         global $wpdb;
 
         $page     = max( 1, (int) $page );
@@ -118,7 +183,9 @@ class BihrWI_Product_Sync {
         $stock_filter    = sanitize_text_field( (string) $stock_filter );
         $category_filter = sanitize_text_field( (string) $category_filter );
         $sort_by         = sanitize_key( (string) $sort_by );
-        $product_cat_term_id = absint( $product_cat_term_id );
+        $cat_l1_filter   = sanitize_text_field( (string) $cat_l1_filter );
+        $cat_l2_filter   = sanitize_text_field( (string) $cat_l2_filter );
+        $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
 
         // Construire les conditions WHERE directement dans la chaîne SQL principale
         // Construire la requête SQL directement sans utiliser de tableau pour éviter les problèmes avec Plugin Check
@@ -158,20 +225,20 @@ class BihrWI_Product_Sync {
             $args[] = $normalized_category;
         }
 
-        // Filtre product_cat basé sur WooCommerce (catégorie / sous-catégorie / sous-sous-catégorie).
-        if ( $product_cat_term_id > 0 && class_exists( 'WooCommerce' ) ) {
-            $skus_for_term = $this->get_skus_for_product_cat_term( $product_cat_term_id );
+        // Filtres sur les niveaux CategoryPath (cat_l1 / cat_l2 / cat_l3) stockés dans wp_bihr_products.
+        if ( $cat_l1_filter !== '' ) {
+            $where_sql .= ' AND cat_l1 = %s';
+            $args[]     = $cat_l1_filter;
+        }
 
-            if ( empty( $skus_for_term ) ) {
-                // Aucun produit WooCommerce pour ce term => aucun produit Bihr ne doit remonter.
-                return array();
-            }
+        if ( $cat_l2_filter !== '' ) {
+            $where_sql .= ' AND cat_l2 = %s';
+            $args[]     = $cat_l2_filter;
+        }
 
-            // Construire une clause IN sécurisée pour product_code et new_part_number.
-            $placeholders = implode( ',', array_fill( 0, count( $skus_for_term ), '%s' ) );
-            // On applique le filtre sur product_code OU sur new_part_number (SKU = NewPartNumber prioritaire à l'import).
-            $where_sql .= " AND (product_code IN ($placeholders) OR new_part_number IN ($placeholders))";
-            $args      = array_merge( $args, $skus_for_term, $skus_for_term );
+        if ( $cat_l3_filter !== '' ) {
+            $where_sql .= ' AND cat_l3 = %s';
+            $args[]     = $cat_l3_filter;
         }
 
         // Whitelist des colonnes autorisées pour ORDER BY
@@ -229,9 +296,11 @@ class BihrWI_Product_Sync {
      * @param string $price_min           Prix minimum.
      * @param string $price_max           Prix maximum.
      * @param string $category_filter     Filtre de catégorie interne Bihr.
-     * @param int    $product_cat_term_id Term product_cat le plus précis sélectionné.
+     * @param string $cat_l1_filter       Filtre niveau 1 (CategoryPath).
+     * @param string $cat_l2_filter       Filtre niveau 2 (CategoryPath).
+     * @param string $cat_l3_filter       Filtre niveau 3 (CategoryPath).
      */
-    public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $product_cat_term_id = 0 ) {
+    public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '' ) {
         global $wpdb;
 
         $where = array();
@@ -239,10 +308,12 @@ class BihrWI_Product_Sync {
 
         $args = array();
 
-        $search              = sanitize_text_field( (string) $search );
-        $stock_filter        = sanitize_text_field( (string) $stock_filter );
-        $category_filter     = sanitize_text_field( (string) $category_filter );
-        $product_cat_term_id = absint( $product_cat_term_id );
+        $search          = sanitize_text_field( (string) $search );
+        $stock_filter    = sanitize_text_field( (string) $stock_filter );
+        $category_filter = sanitize_text_field( (string) $category_filter );
+        $cat_l1_filter   = sanitize_text_field( (string) $cat_l1_filter );
+        $cat_l2_filter   = sanitize_text_field( (string) $cat_l2_filter );
+        $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
 
         // Construire les conditions WHERE directement dans la chaîne SQL principale
         // Construire la requête SQL directement sans utiliser de tableau pour éviter les problèmes avec Plugin Check
@@ -282,17 +353,20 @@ class BihrWI_Product_Sync {
             $args[] = $normalized_category;
         }
 
-        // Filtre product_cat basé sur WooCommerce.
-        if ( $product_cat_term_id > 0 && class_exists( 'WooCommerce' ) ) {
-            $skus_for_term = $this->get_skus_for_product_cat_term( $product_cat_term_id );
+        // Filtres sur les niveaux CategoryPath.
+        if ( $cat_l1_filter !== '' ) {
+            $where_sql .= ' AND cat_l1 = %s';
+            $args[]     = $cat_l1_filter;
+        }
 
-            if ( empty( $skus_for_term ) ) {
-                return 0;
-            }
+        if ( $cat_l2_filter !== '' ) {
+            $where_sql .= ' AND cat_l2 = %s';
+            $args[]     = $cat_l2_filter;
+        }
 
-            $placeholders = implode( ',', array_fill( 0, count( $skus_for_term ), '%s' ) );
-            $where_sql   .= " AND (product_code IN ($placeholders) OR new_part_number IN ($placeholders))";
-            $args         = array_merge( $args, $skus_for_term, $skus_for_term );
+        if ( $cat_l3_filter !== '' ) {
+            $where_sql .= ' AND cat_l3 = %s';
+            $args[]     = $cat_l3_filter;
         }
 
         // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
@@ -306,54 +380,6 @@ class BihrWI_Product_Sync {
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Query is prepared above with all placeholders
         return (int) $wpdb->get_var( $prepared );
-    }
-
-    /**
-     * Récupère la liste des SKU (_sku) des produits WooCommerce associés à un term product_cat donné.
-     * Utilisé pour filtrer les lignes de wp_bihr_products sur la base de la taxonomie WooCommerce.
-     *
-     * @param int $term_id Term product_cat ciblé.
-     * @return array Liste de SKU uniques.
-     */
-    protected function get_skus_for_product_cat_term( $term_id ) {
-        $term_id = absint( $term_id );
-
-        if ( $term_id <= 0 || ! class_exists( 'WooCommerce' ) ) {
-            return array();
-        }
-
-        $args = array(
-            'post_type'      => 'product',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'post_status'    => array( 'publish', 'pending', 'draft', 'private' ),
-            'tax_query'      => array(
-                array(
-                    'taxonomy'         => 'product_cat',
-                    'field'            => 'term_id',
-                    'terms'            => array( $term_id ),
-                    'include_children' => true,
-                ),
-            ),
-        );
-
-        $query = new WP_Query( $args );
-
-        if ( ! $query->have_posts() ) {
-            return array();
-        }
-
-        $skus = array();
-
-        foreach ( $query->posts as $product_id ) {
-            $sku = get_post_meta( $product_id, '_sku', true );
-
-            if ( is_string( $sku ) && $sku !== '' ) {
-                $skus[] = $sku;
-            }
-        }
-
-        return array_values( array_unique( $skus ) );
     }
 
     /* =========================================================

@@ -546,31 +546,52 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     </select>
                 </div>
 
-                <!-- Nouvelle hiérarchie de catégories WooCommerce -->
+                <!-- Filtres hiérarchiques basés sur les niveaux CategoryPath (cat_l1 / cat_l2 / cat_l3) -->
                 <div class="bihr-filter-field">
-                    <label for="bihr_cat">
-                        Catégorie WooCommerce
+                    <label for="cat_l1">
+                        Niveau 1 (CategoryPath)
                     </label>
-                    <select name="bihr_cat" id="bihr_cat">
-                        <!-- Options remplies dynamiquement par JS (BihrCategoryFilters.rootCategories) -->
+                    <select name="cat_l1" id="cat_l1">
+                        <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
+                        <?php if ( ! empty( $available_cat_l1 ) ) : ?>
+                            <?php foreach ( $available_cat_l1 as $cat_l1_value ) : ?>
+                                <option value="<?php echo esc_attr( $cat_l1_value ); ?>" <?php selected( $filter_cat_l1, $cat_l1_value ); ?>>
+                                    <?php echo esc_html( $cat_l1_value ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </select>
                 </div>
 
                 <div class="bihr-filter-field">
-                    <label for="bihr_subcat">
-                        Sous-catégorie
+                    <label for="cat_l2">
+                        Niveau 2
                     </label>
-                    <select name="bihr_subcat" id="bihr_subcat" disabled>
+                    <select name="cat_l2" id="cat_l2" <?php echo empty( $available_cat_l2 ) ? 'disabled' : ''; ?>>
                         <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
+                        <?php if ( ! empty( $available_cat_l2 ) ) : ?>
+                            <?php foreach ( $available_cat_l2 as $cat_l2_value ) : ?>
+                                <option value="<?php echo esc_attr( $cat_l2_value ); ?>" <?php selected( $filter_cat_l2, $cat_l2_value ); ?>>
+                                    <?php echo esc_html( $cat_l2_value ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </select>
                 </div>
 
                 <div class="bihr-filter-field">
-                    <label for="bihr_subcat2">
-                        Sous-sous-catégorie
+                    <label for="cat_l3">
+                        Niveau 3
                     </label>
-                    <select name="bihr_subcat2" id="bihr_subcat2" disabled>
+                    <select name="cat_l3" id="cat_l3" <?php echo empty( $available_cat_l3 ) ? 'disabled' : ''; ?>>
                         <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
+                        <?php if ( ! empty( $available_cat_l3 ) ) : ?>
+                            <?php foreach ( $available_cat_l3 as $cat_l3_value ) : ?>
+                                <option value="<?php echo esc_attr( $cat_l3_value ); ?>" <?php selected( $filter_cat_l3, $cat_l3_value ); ?>>
+                                    <?php echo esc_html( $cat_l3_value ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </select>
                 </div>
 
@@ -593,7 +614,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             <!-- Boutons d'action -->
             <div class="bihr-filters-actions">
                 <?php submit_button( 'Filtrer', 'secondary', 'submit', false ); ?>
-                <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price_min ) || ! empty( $filter_price_max ) || ! empty( $filter_category ) || ! empty( $sort_by ) ) : ?>
+                <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price_min ) || ! empty( $filter_price_max ) || ! empty( $filter_category ) || ! empty( $sort_by ) || ! empty( $filter_cat_l1 ) || ! empty( $filter_cat_l2 ) || ! empty( $filter_cat_l3 ) ) : ?>
                     <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-products' ) ); ?>" class="button">
                         Réinitialiser
                     </a>
@@ -630,7 +651,10 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 <th style="width:60px;">ID</th>
                 <th style="width:120px;">Code produit</th>
                 <th>Nom</th>
-                <th>Catégorie</th>
+                <th>Catégorie (Bihr)</th>
+                <th>Niveau 1</th>
+                <th>Niveau 2</th>
+                <th>Niveau 3</th>
                 <th>Description</th>
                 <th style="width:80px;">Image</th>
                 <th style="width:80px;">Stock</th>
@@ -658,6 +682,15 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                             echo '&mdash;';
                         }
                         ?>
+                    </td>
+                    <td>
+                        <?php echo ! empty( $row->cat_l1 ) ? esc_html( $row->cat_l1 ) : '&mdash;'; ?>
+                    </td>
+                    <td>
+                        <?php echo ! empty( $row->cat_l2 ) ? esc_html( $row->cat_l2 ) : '&mdash;'; ?>
+                    </td>
+                    <td>
+                        <?php echo ! empty( $row->cat_l3 ) ? esc_html( $row->cat_l3 ) : '&mdash;'; ?>
                     </td>
                     <td>
                         <?php
@@ -731,7 +764,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 <?php
                 // Préserver exactement les filtres actuellement dans l'URL.
                 // Important: ne pas utiliser empty() (ex: "0" serait perdu).
-                $allowed_keys = array( 'search', 'stock_filter', 'price_min', 'price_max', 'category_filter', 'sort_by' );
+                $allowed_keys = array( 'search', 'stock_filter', 'price_min', 'price_max', 'category_filter', 'sort_by', 'cat_l1', 'cat_l2', 'cat_l3' );
                 $params = array( 'page' => 'bihr-products' );
 
                 foreach ( $allowed_keys as $key ) {

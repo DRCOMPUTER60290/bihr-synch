@@ -568,18 +568,13 @@ class BihrWI_Admin {
         $filter_category  = isset( $_GET['category_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['category_filter'] ) ) : '';
         $sort_by          = isset( $_GET['sort_by'] ) ? sanitize_text_field( wp_unslash( $_GET['sort_by'] ) ) : '';
 
-        // Nouveaux filtres hiérarchiques basés sur product_cat
-        $bihr_cat    = isset( $_GET['bihr_cat'] ) ? absint( $_GET['bihr_cat'] ) : 0;
-        $bihr_subcat = isset( $_GET['bihr_subcat'] ) ? absint( $_GET['bihr_subcat'] ) : 0;
-        $bihr_subcat2 = isset( $_GET['bihr_subcat2'] ) ? absint( $_GET['bihr_subcat2'] ) : 0;
-
-        $selected_product_cat_term_id = 0;
-        if ( class_exists( 'BihrWI_Category_Filters' ) ) {
-            $selected_product_cat_term_id = BihrWI_Category_Filters::get_selected_term_id_from_request_priority();
-        }
+        // Nouveaux filtres hiérarchiques basés sur les colonnes cat_l1 / cat_l2 / cat_l3 de wp_bihr_products.
+        $filter_cat_l1 = isset( $_GET['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_GET['cat_l1'] ) ) : '';
+        $filter_cat_l2 = isset( $_GET['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_GET['cat_l2'] ) ) : '';
+        $filter_cat_l3 = isset( $_GET['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_GET['cat_l3'] ) ) : '';
 
         // Calculer d'abord le total pour pouvoir borner la pagination (évite les pages vides)
-        $total                  = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $selected_product_cat_term_id );
+        $total                  = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3 );
         $debug_count_last_query = $wpdb->last_query;
         $debug_count_last_error = $wpdb->last_error;
         $total_pages            = max( 1, (int) ceil( $total / $per_page ) );
@@ -589,19 +584,17 @@ class BihrWI_Admin {
             $current_page = $total_pages;
         }
 
-        $products                  = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by, $selected_product_cat_term_id );
+        $products                  = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3 );
         $debug_products_last_query = $wpdb->last_query;
         $debug_products_last_error = $wpdb->last_error;
 
         // Récupérer la liste des catégories disponibles pour le dropdown (catégories Bihr internes)
         $available_categories = $this->product_sync->get_distinct_categories();
 
-        // Filtres de taxonomie pour la vue (persistance + JS)
-        $bihr_product_cat_filters = array(
-            'cat'    => $bihr_cat,
-            'subcat' => $bihr_subcat,
-            'subcat2'=> $bihr_subcat2,
-        );
+        // Listes pour les filtres de niveaux CategoryPath (cat_l1 / cat_l2 / cat_l3).
+        $available_cat_l1 = $this->product_sync->get_distinct_cat_level1();
+        $available_cat_l2 = ! empty( $filter_cat_l1 ) ? $this->product_sync->get_distinct_cat_level2( $filter_cat_l1 ) : array();
+        $available_cat_l3 = ( ! empty( $filter_cat_l1 ) && ! empty( $filter_cat_l2 ) ) ? $this->product_sync->get_distinct_cat_level3( $filter_cat_l1, $filter_cat_l2 ) : array();
 
         // Debug optionnel (affiché dans la vue uniquement si demandé)
         $bihrwi_debug = isset( $_GET['bihrwi_debug'] ) ? (int) $_GET['bihrwi_debug'] : 0;
