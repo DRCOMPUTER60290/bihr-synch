@@ -502,18 +502,13 @@ class BihrWI_Product_Sync {
             update_post_meta( $product_id_wc, '_bihr_new_part_number', $row->new_part_number );
         }
 
-        // Gestion des catégories WooCommerce à partir du CategoryPath Bihr.
-        if ( class_exists( 'BihrWI_Category_Path' ) ) {
+        // Gestion des catégories WooCommerce à partir des niveaux CategoryPath Bihr (cat_l1/2/3).
+        if ( class_exists( 'BihrWI_Category_Path' ) && taxonomy_exists( 'product_cat' ) ) {
             $levels = array(
-                'l1' => '',
-                'l2' => '',
-                'l3' => '',
+                'l1' => ! empty( $row->cat_l1 ) ? (string) $row->cat_l1 : '',
+                'l2' => ! empty( $row->cat_l2 ) ? (string) $row->cat_l2 : '',
+                'l3' => ! empty( $row->cat_l3 ) ? (string) $row->cat_l3 : '',
             );
-
-            if ( ! empty( $row->category ) ) {
-                // $row->category contient le CategoryPath au format "Niveau1 -> Niveau2 -> Niveau3".
-                $levels = BihrWI_Category_Path::parse_category_path( $row->category );
-            }
 
             $term_id = BihrWI_Category_Path::ensure_product_categories( $levels['l1'], $levels['l2'], $levels['l3'] );
 
@@ -1076,6 +1071,9 @@ class BihrWI_Product_Sync {
 
                 $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
                 $name            = '';
+                $cat_l1          = '';
+                $cat_l2          = '';
+                $cat_l3          = '';
 
                 // Utiliser LongDescription1 pour le nom du produit
                 if ( ! empty( $row['longdescription1'] ) ) {
@@ -1091,11 +1089,22 @@ class BihrWI_Product_Sync {
                     $description = trim( $row['furtherdescription'] );
                 }
 
+                // CategoryPath (si présent dans le CSV)
+                if ( isset( $row['categorypath'] ) && class_exists( 'BihrWI_Category_Path' ) ) {
+                    $levels = BihrWI_Category_Path::parse_category_path( $row['categorypath'] );
+                    $cat_l1 = $levels['l1'];
+                    $cat_l2 = $levels['l2'];
+                    $cat_l3 = $levels['l3'];
+                }
+
                 $result[ $code ] = array(
                     'product_code'    => $code,
                     'new_part_number' => $new_part_number ?: null,
                     'name'            => $name ?: null,
                     'description'     => $description ?: null,
+                    'cat_l1'          => $cat_l1 ?: null,
+                    'cat_l2'          => $cat_l2 ?: null,
+                    'cat_l3'          => $cat_l3 ?: null,
                 );
             }
         );
@@ -1467,7 +1476,23 @@ class BihrWI_Product_Sync {
 
             if ( isset( $data['category'] ) ) {
                 $fields['category'] = $data['category'];
-                $formats[] = '%s';
+                $formats[]          = '%s';
+            }
+
+            // Niveaux de catégorie issus de CategoryPath (CSV References).
+            if ( isset( $data['cat_l1'] ) ) {
+                $fields['cat_l1'] = $data['cat_l1'];
+                $formats[]        = '%s';
+            }
+
+            if ( isset( $data['cat_l2'] ) ) {
+                $fields['cat_l2'] = $data['cat_l2'];
+                $formats[]        = '%s';
+            }
+
+            if ( isset( $data['cat_l3'] ) ) {
+                $fields['cat_l3'] = $data['cat_l3'];
+                $formats[]        = '%s';
             }
 
             if ( $existing ) {

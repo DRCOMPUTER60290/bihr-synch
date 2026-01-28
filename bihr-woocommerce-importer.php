@@ -119,6 +119,9 @@ function bihrwi_activate_plugin() {
         stock_level INT NULL,
         stock_description TEXT NULL,
         category VARCHAR(255) NULL,
+        cat_l1 VARCHAR(255) NULL,
+        cat_l2 VARCHAR(255) NULL,
+        cat_l3 VARCHAR(255) NULL,
         PRIMARY KEY  (id),
         KEY product_code (product_code)
     ) $charset_collate;";
