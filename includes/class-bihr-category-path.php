@@ -17,6 +17,8 @@ class BihrWI_Category_Path {
     protected static $invalid_values = array(
         '?',
         '¯\_(ツ)_/¯',
+        'Â¯\_(ãƒ„)_/Â¯',
+        'Â¯\_(ツ)_/Â¯',
     );
 
     /**
@@ -145,10 +147,17 @@ class BihrWI_Category_Path {
             return true;
         }
 
+        // Vérification exacte des placeholders connus
         foreach ( self::$invalid_values as $invalid ) {
             if ( 0 === strcasecmp( $value, $invalid ) ) {
                 return true;
             }
+        }
+
+        // Détection des variantes contenant "ツ" ou "ãƒ„" + "¯"
+        // (caractères Unicode pour le smiley shrug)
+        if ( preg_match( '/[ツãƒ„]/u', $value ) && preg_match( '/[¯Â]/u', $value ) ) {
+            return true;
         }
 
         return false;

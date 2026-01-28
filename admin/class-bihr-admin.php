@@ -52,6 +52,10 @@ class BihrWI_Admin {
         }
         add_action( 'wp_ajax_bihrwi_get_order_data', array( $this, 'ajax_get_order_data' ) );
         add_action( 'wp_ajax_bihr_toggle_beginner_mode', array( $this, 'ajax_toggle_beginner_mode' ) );
+        
+        // Handlers pour recalcul catégories depuis cat-ref-full
+        add_action( 'wp_ajax_bihr_rebuild_cat_levels', array( $this, 'ajax_rebuild_cat_levels' ) );
+        add_action( 'wp_ajax_bihr_get_cat_children', array( $this, 'ajax_get_cat_children' ) );
 
         // Handlers pour synchronisation automatique des stocks
         add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
@@ -106,6 +110,30 @@ class BihrWI_Admin {
 				'ajaxurl' => admin_url( 'admin-ajax.php' ),
 			)
 		);
+
+		// Charger le JS des filtres dépendants uniquement sur la page bihr-products
+		$current_screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		$is_products_page = ( $current_screen && 'bihr-products' === $current_screen->id ) || 
+		                    ( isset( $_GET['page'] ) && 'bihr-products' === $_GET['page'] );
+		
+		if ( $is_products_page ) {
+			wp_enqueue_script(
+				'bihr-category-filters-ajax',
+				BIHRWI_PLUGIN_URL . 'assets/admin/category-filters-ajax.js',
+				array( 'jquery' ),
+				BIHRWI_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'bihr-category-filters-ajax',
+				'bihrCategoryFiltersData',
+				array(
+					'nonce'   => wp_create_nonce( 'bihrwi_ajax_nonce' ),
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				)
+			);
+		}
 	}
 
     /**
@@ -2318,6 +2346,68 @@ class BihrWI_Admin {
         wp_send_json_success( array(
             'mode' => $enabled ? 'beginner' : 'expert'
         ) );
+    }
+
+    /**
+     * Endpoint AJAX pour recalculer les catégories depuis cat-ref-full-*.csv (batch processing).
+     */
+    public function ajax_rebuild_cat_levels() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée.' ) );
+        }
+
+        $offset = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
+        $limit  = isset( $_POST['limit'] ) ? absint( $_POST['limit'] ) : 2000;
+
+        $result = $this->product_sync->rebuild_cat_levels_from_catref( $offset, $limit );
+
+        if ( isset( $result['error'] ) ) {
+            wp_send_json_error( array( 'message' => $result['error'] ) );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    /**
+     * Endpoint AJAX pour récupérer les options de filtres dépendants (Niveau 2 ou 3).
+     */
+    public function ajax_get_cat_children() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée.' ) );
+        }
+
+        $level = isset( $_POST['level'] ) ? absint( $_POST['level'] ) : 0;
+        $cat_l1 = isset( $_POST['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l1'] ) ) : '';
+        $cat_l2 = isset( $_POST['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2'] ) ) : '';
+
+        if ( $level === 2 ) {
+            if ( empty( $cat_l1 ) ) {
+                wp_send_json_error( array( 'message' => 'cat_l1 requis pour niveau 2.' ) );
+            }
+            $options = $this->product_sync->get_distinct_cat_level2( $cat_l1 );
+        } elseif ( $level === 3 ) {
+            if ( empty( $cat_l1 ) || empty( $cat_l2 ) ) {
+                wp_send_json_error( array( 'message' => 'cat_l1 et cat_l2 requis pour niveau 3.' ) );
+            }
+            $options = $this->product_sync->get_distinct_cat_level3( $cat_l1, $cat_l2 );
+        } else {
+            wp_send_json_error( array( 'message' => 'Niveau invalide (2 ou 3 requis).' ) );
+        }
+
+        // Formater en {value, label}
+        $formatted = array();
+        foreach ( $options as $opt ) {
+            $formatted[] = array(
+                'value' => esc_attr( $opt ),
+                'label' => esc_html( $opt ),
+            );
+        }
+
+        wp_send_json_success( array( 'options' => $formatted ) );
     }
 
 	

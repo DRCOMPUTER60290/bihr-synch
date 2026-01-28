@@ -1695,5 +1695,244 @@ class BihrWI_Product_Sync {
             return $price + $value;
         }
     }
+
+    /**
+     * Recalcule les catégories cat_l1/cat_l2/cat_l3 depuis le fichier cat-ref-full-*.csv.
+     * Cette fonction lit le CSV avec fgetcsv() (comme Excel) et met à jour wp_bihr_products.
+     *
+     * @param int $offset Ligne de départ (pour traitement batch).
+     * @param int $limit Nombre de lignes à traiter par batch.
+     * @return array Statut: { 'processed' => int, 'updated' => int, 'errors' => int, 'has_more' => bool, 'file' => string }
+     */
+    public function rebuild_cat_levels_from_catref( $offset = 0, $limit = 2000 ) {
+        global $wpdb;
+
+        $this->logger->log( '=== Recalcul catégories depuis cat-ref-full ===' );
+        $this->logger->log( "Offset: {$offset}, Limit: {$limit}" );
+
+        $upload_dir = WP_CONTENT_DIR . '/uploads/bihr-import';
+        if ( ! is_dir( $upload_dir ) ) {
+            return array(
+                'processed' => 0,
+                'updated'   => 0,
+                'errors'    => 0,
+                'has_more'  => false,
+                'file'      => '',
+                'error'     => 'Dossier d\'import introuvable: ' . $upload_dir,
+            );
+        }
+
+        // Trouver le fichier cat-ref-full le plus récent
+        $pattern = $upload_dir . '/cat-ref-full-*.csv';
+        $files   = glob( $pattern );
+        if ( empty( $files ) ) {
+            return array(
+                'processed' => 0,
+                'updated'   => 0,
+                'errors'    => 0,
+                'has_more'  => false,
+                'file'      => '',
+                'error'     => 'Aucun fichier cat-ref-full-*.csv trouvé dans ' . $upload_dir,
+            );
+        }
+
+        // Prendre le plus récent
+        usort( $files, function( $a, $b ) {
+            return filemtime( $b ) - filemtime( $a );
+        } );
+        $file_path = $files[0];
+        $this->logger->log( 'Fichier utilisé: ' . basename( $file_path ) );
+
+        if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
+            return array(
+                'processed' => 0,
+                'updated'   => 0,
+                'errors'    => 0,
+                'has_more'  => false,
+                'file'      => basename( $file_path ),
+                'error'     => 'Fichier non lisible: ' . $file_path,
+            );
+        }
+
+        $processed = 0;
+        $updated   = 0;
+        $errors    = 0;
+        $current_line = 0;
+
+        // Ouvrir le fichier avec fopen + fgetcsv (comme Excel)
+        $handle = fopen( $file_path, 'r' );
+        if ( false === $handle ) {
+            return array(
+                'processed' => 0,
+                'updated'   => 0,
+                'errors'    => 0,
+                'has_more'  => false,
+                'file'      => basename( $file_path ),
+                'error'     => 'Impossible d\'ouvrir le fichier: ' . $file_path,
+            );
+        }
+
+        // Détection BOM UTF-8
+        $bom = fread( $handle, 3 );
+        if ( $bom !== "\xEF\xBB\xBF" ) {
+            rewind( $handle );
+        }
+
+        // Détection du délimiteur (virgule par défaut pour cat-ref-full)
+        $first_line = fgets( $handle );
+        rewind( $handle );
+        if ( $bom === "\xEF\xBB\xBF" ) {
+            fread( $handle, 3 ); // Skip BOM
+        }
+        $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+
+        // Lire l'en-tête
+        $header = fgetcsv( $handle, 0, $delimiter );
+        if ( false === $header ) {
+            fclose( $handle );
+            return array(
+                'processed' => 0,
+                'updated'   => 0,
+                'errors'    => 0,
+                'has_more'  => false,
+                'file'      => basename( $file_path ),
+                'error'     => 'Impossible de lire l\'en-tête CSV',
+            );
+        }
+
+        // Normaliser les en-têtes (lowercase)
+        $header = array_map( function( $h ) {
+            return strtolower( trim( $h ) );
+        }, $header );
+
+        // Vérifier que CategoryPath existe
+        $categorypath_index = array_search( 'categorypath', $header, true );
+        if ( false === $categorypath_index ) {
+            fclose( $handle );
+            return array(
+                'processed' => 0,
+                'updated'   => 0,
+                'errors'    => 0,
+                'has_more'  => false,
+                'file'      => basename( $file_path ),
+                'error'     => 'Colonne CategoryPath introuvable dans le CSV',
+            );
+        }
+
+        // Trouver les index des colonnes de matching
+        $productid_index      = array_search( 'productid', $header, true );
+        $newpartnumber_index = array_search( 'newpartnumber', $header, true );
+
+        // Lire les lignes jusqu'à l'offset
+        while ( $current_line < $offset && ( $row = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+            $current_line++;
+        }
+
+        // Traiter les lignes dans la limite du batch
+        $batch_count = 0;
+        while ( $batch_count < $limit && ( $row = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+            $current_line++;
+            $processed++;
+
+            if ( count( $row ) !== count( $header ) ) {
+                $errors++;
+                continue;
+            }
+
+            // Récupérer CategoryPath
+            $categorypath = isset( $row[ $categorypath_index ] ) ? trim( $row[ $categorypath_index ] ) : '';
+            if ( empty( $categorypath ) ) {
+                continue; // Pas d'erreur, juste skip
+            }
+
+            // Parser CategoryPath
+            if ( ! class_exists( 'BihrWI_Category_Path' ) ) {
+                $errors++;
+                continue;
+            }
+
+            $levels = BihrWI_Category_Path::parse_category_path( $categorypath );
+            $cat_l1 = ! empty( $levels['l1'] ) ? $levels['l1'] : null;
+            $cat_l2 = ! empty( $levels['l2'] ) ? $levels['l2'] : null;
+            $cat_l3 = ! empty( $levels['l3'] ) ? $levels['l3'] : null;
+
+            // Si tous les niveaux sont vides, on met NULL
+            if ( empty( $cat_l1 ) && empty( $cat_l2 ) && empty( $cat_l3 ) ) {
+                $cat_l1 = null;
+                $cat_l2 = null;
+                $cat_l3 = null;
+            }
+
+            // Trouver le produit dans wp_bihr_products
+            // Priorité: ProductId, puis NewPartNumber (qui correspond à product_code)
+            $product_id_match = null;
+            if ( false !== $productid_index && isset( $row[ $productid_index ] ) ) {
+                $product_id = trim( $row[ $productid_index ] );
+                if ( ! empty( $product_id ) ) {
+                    // Chercher par product_code = ProductId
+                    $product_id_match = $wpdb->get_var(
+                        $wpdb->prepare(
+                            "SELECT id FROM `{$this->table_name}` WHERE product_code = %s LIMIT 1",
+                            $product_id
+                        )
+                    );
+                }
+            }
+
+            // Si pas trouvé par ProductId, essayer NewPartNumber
+            if ( empty( $product_id_match ) && false !== $newpartnumber_index && isset( $row[ $newpartnumber_index ] ) ) {
+                $new_part_number = trim( $row[ $newpartnumber_index ] );
+                if ( ! empty( $new_part_number ) ) {
+                    $product_id_match = $wpdb->get_var(
+                        $wpdb->prepare(
+                            "SELECT id FROM `{$this->table_name}` WHERE new_part_number = %s LIMIT 1",
+                            $new_part_number
+                        )
+                    );
+                }
+            }
+
+            if ( empty( $product_id_match ) ) {
+                // Produit non trouvé dans wp_bihr_products, skip (pas une erreur)
+                continue;
+            }
+
+            // Mettre à jour cat_l1, cat_l2, cat_l3 (NE JAMAIS modifier "category")
+            $update_result = $wpdb->update(
+                $this->table_name,
+                array(
+                    'cat_l1' => $cat_l1,
+                    'cat_l2' => $cat_l2,
+                    'cat_l3' => $cat_l3,
+                ),
+                array( 'id' => $product_id_match ),
+                array( '%s', '%s', '%s' ),
+                array( '%d' )
+            );
+
+            if ( false !== $update_result ) {
+                $updated++;
+            } else {
+                $errors++;
+            }
+
+            $batch_count++;
+        }
+
+        $has_more = ( $row !== false ); // Si on a atteint EOF, has_more = false
+
+        fclose( $handle );
+
+        $this->logger->log( "Batch terminé: {$processed} lignes lues, {$updated} produits mis à jour, {$errors} erreurs" );
+
+        return array(
+            'processed' => $processed,
+            'updated'   => $updated,
+            'errors'    => $errors,
+            'has_more'  => $has_more,
+            'file'      => basename( $file_path ),
+            'offset'    => $current_line,
+        );
+    }
 }
 

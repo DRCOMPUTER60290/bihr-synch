@@ -273,6 +273,26 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         </div>
     </div>
 
+    <div class="bihr-section" style="margin-top: 20px;">
+        <h3>Recalculer les catégories depuis cat-ref-full</h3>
+        <p>
+            Recalcule les colonnes <code>cat_l1</code>, <code>cat_l2</code>, <code>cat_l3</code> 
+            depuis le fichier <code>cat-ref-full-*.csv</code> le plus récent.
+            <br><strong>⚠️ Cette opération met à jour uniquement les catégories CategoryPath, pas la colonne "category".</strong>
+        </p>
+
+        <button type="button" id="bihr-rebuild-cat-levels-btn" class="button button-secondary">
+            🔄 Recalculer catégories (cat-ref-full)
+        </button>
+
+        <div id="bihr-rebuild-cat-progress" class="bihr-progress-container" style="display:none; margin-top: 15px;">
+            <div class="bihr-progress-bar-wrapper">
+                <div id="bihr-rebuild-cat-progress-bar" class="bihr-progress-bar"></div>
+            </div>
+            <div id="bihr-rebuild-cat-progress-text" class="bihr-progress-text">Initialisation...</div>
+        </div>
+    </div>
+
     <!-- Bouton pour effacer les données -->
     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:10px;" onsubmit="return confirm('Êtes-vous sûr de vouloir effacer toutes les données de la table wp_bihr_products ?');">
         <?php wp_nonce_field( 'bihrwi_reset_data_action', 'bihrwi_reset_data_nonce' ); ?>
