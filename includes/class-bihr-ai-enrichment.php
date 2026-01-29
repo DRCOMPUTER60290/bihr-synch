@@ -30,11 +30,11 @@ class BihrWI_AI_Enrichment {
     }
 
     /**
-     * Génère les descriptions courte et longue via OpenAI GPT-4 Vision
-     * @param string $product_name Nom du produit
+     * Génère un nom amélioré et les descriptions courte et longue via OpenAI GPT-4 Vision
+     * @param string $product_name Nom du produit original
      * @param string $image_url URL de l'image du produit
      * @param string $product_code Code produit (pour référence)
-     * @return array ['short_description' => string, 'long_description' => string] ou false en cas d'erreur
+     * @return array ['product_name' => string, 'short_description' => string, 'long_description' => string] ou false en cas d'erreur
      */
     public function generate_descriptions( $product_name, $image_url = '', $product_code = '' ) {
         if ( ! $this->is_enabled() ) {
@@ -117,17 +117,21 @@ class BihrWI_AI_Enrichment {
      * Construit le prompt pour OpenAI
      */
     protected function build_prompt( $product_name, $product_code ) {
-        $prompt = "Génère deux descriptions pour ce produit moto :\n\n";
-        $prompt .= "**Produit :** {$product_name}\n";
+        $prompt = "Génère un nom amélioré et deux descriptions pour ce produit moto :\n\n";
+        $prompt .= "**Produit original :** {$product_name}\n";
         
         if ( ! empty( $product_code ) ) {
             $prompt .= "**Référence :** {$product_code}\n";
         }
 
         $prompt .= "\n**Instructions :**\n";
-        $prompt .= "1. **Description courte** (2-3 phrases, max 160 caractères) : Résumé accrocheur pour la liste de produits.\n";
-        $prompt .= "2. **Description longue** (4-6 paragraphes) : Détails techniques, avantages, compatibilité, utilisation.\n\n";
+        $prompt .= "1. **Nom amélioré** (max 80 caractères) : Nom de produit optimisé pour le SEO, clair et accrocheur. Garde les informations techniques importantes mais rends-le plus vendeur.\n";
+        $prompt .= "2. **Description courte** (2-3 phrases, max 160 caractères) : Résumé accrocheur pour la liste de produits.\n";
+        $prompt .= "3. **Description longue** (4-6 paragraphes) : Détails techniques, avantages, compatibilité, utilisation.\n\n";
         $prompt .= "**Format de réponse (strict) :**\n";
+        $prompt .= "[NAME]\n";
+        $prompt .= "[Nom amélioré du produit]\n";
+        $prompt .= "[/NAME]\n\n";
         $prompt .= "[SHORT]\n";
         $prompt .= "[Contenu de la description courte]\n";
         $prompt .= "[/SHORT]\n\n";
@@ -191,13 +195,20 @@ class BihrWI_AI_Enrichment {
     }
 
     /**
-     * Parse la réponse d'OpenAI pour extraire les descriptions
+     * Parse la réponse d'OpenAI pour extraire le nom et les descriptions
      */
     protected function parse_response( $response ) {
+        $product_name      = '';
         $short_description = '';
         $long_description  = '';
 
         $this->log( 'IA - Réponse brute à parser: ' . substr( $response, 0, 200 ) . '...' );
+
+        // Extraction du nom amélioré
+        if ( preg_match( '/\[NAME\](.*?)\[\/NAME\]/s', $response, $name_matches ) ) {
+            $product_name = trim( $name_matches[1] );
+            $this->log( 'IA - Nom amélioré trouvé via balises: ' . $product_name );
+        }
 
         // Extraction de la description courte
         if ( preg_match( '/\[SHORT\](.*?)\[\/SHORT\]/s', $response, $short_matches ) ) {
@@ -214,11 +225,23 @@ class BihrWI_AI_Enrichment {
         // Si les balises ne sont pas trouvées, on essaie de splitter par ligne vide
         if ( empty( $short_description ) || empty( $long_description ) ) {
             $this->log( 'IA - Tentative de parsing sans balises (fallback)' );
-            $parts = preg_split( '/\n\s*\n/', trim( $response ), 2 );
-            if ( count( $parts ) === 2 ) {
-                $short_description = trim( $parts[0] );
-                $long_description  = trim( $parts[1] );
-                $this->log( 'IA - Descriptions splitées en 2 parties' );
+            $parts = preg_split( '/\n\s*\n/', trim( $response ), 3 );
+            if ( count( $parts ) >= 2 ) {
+                // Premier bloc = nom (si pas déjà extrait)
+                if ( empty( $product_name ) && ! empty( $parts[0] ) ) {
+                    $product_name = trim( $parts[0] );
+                }
+                // Deuxième bloc = description courte
+                if ( empty( $short_description ) && isset( $parts[1] ) ) {
+                    $short_description = trim( $parts[1] );
+                }
+                // Troisième bloc = description longue
+                if ( empty( $long_description ) && isset( $parts[2] ) ) {
+                    $long_description = trim( $parts[2] );
+                } elseif ( empty( $long_description ) && isset( $parts[1] ) ) {
+                    $long_description = trim( $parts[1] );
+                }
+                $this->log( 'IA - Contenu splité en ' . count( $parts ) . ' parties' );
             } else {
                 // Fallback: tout dans la description longue
                 $long_description = trim( $response );
@@ -232,11 +255,18 @@ class BihrWI_AI_Enrichment {
             return false;
         }
 
-        $this->log( 'IA - Parse réussi | Short: ' . substr( $short_description, 0, 50 ) . '... | Long: ' . substr( $long_description, 0, 50 ) . '...' );
+        $this->log( 'IA - Parse réussi | Name: ' . ( $product_name ?: 'non généré' ) . ' | Short: ' . substr( $short_description, 0, 50 ) . '... | Long: ' . substr( $long_description, 0, 50 ) . '...' );
 
-        return array(
+        $result = array(
             'short_description' => $short_description,
             'long_description'  => $long_description,
         );
+
+        // Ajouter le nom amélioré si disponible
+        if ( ! empty( $product_name ) ) {
+            $result['product_name'] = $product_name;
+        }
+
+        return $result;
     }
 }

@@ -519,9 +519,8 @@ class BihrWI_Product_Sync {
             $product = new WC_Product_Simple();
         }
 
-        // Nom du produit
+        // Nom du produit (sera peut-être amélioré par l'IA)
         $name = $row->name ?: $row->product_code;
-        $product->set_name( $name );
 
         // SKU : utiliser NewPartNumber si disponible, sinon ProductCode
         if ( ! empty( $sku ) ) {
@@ -551,12 +550,18 @@ class BihrWI_Product_Sync {
             
             $this->logger->log( 'IA - Appel generate_descriptions pour: ' . $name . ' | Image URL: ' . $full_image_url . ' | Code: ' . $row->product_code );
             
-            // Génération des descriptions enrichies
+            // Génération du nom amélioré et des descriptions enrichies
             $ai_descriptions = $ai_enrichment->generate_descriptions( $name, $full_image_url, $row->product_code );
             
             $this->logger->log( 'IA - Résultat generate_descriptions: ' . wp_json_encode( $ai_descriptions ) );
             
             if ( $ai_descriptions && is_array( $ai_descriptions ) ) {
+                // Nom amélioré par l'IA (si disponible)
+                if ( ! empty( $ai_descriptions['product_name'] ) ) {
+                    $name = $ai_descriptions['product_name'];
+                    $this->logger->log( 'Import WooCommerce: nom amélioré par IA - ' . $name );
+                }
+                
                 // Description courte (excerpt WooCommerce)
                 if ( ! empty( $ai_descriptions['short_description'] ) ) {
                     $product->set_short_description( $ai_descriptions['short_description'] );
@@ -585,6 +590,9 @@ class BihrWI_Product_Sync {
             // Pas d'enrichissement IA
             $product->set_description( $base_description );
         }
+
+        // Définir le nom du produit (amélioré par IA si disponible, sinon nom original)
+        $product->set_name( $name );
 
         // Prix HT avec application de la marge
         if ( $row->dealer_price_ht !== null ) {
