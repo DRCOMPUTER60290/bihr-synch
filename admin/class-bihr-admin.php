@@ -445,6 +445,15 @@ class BihrWI_Admin {
 
         add_submenu_page(
             'bihr-dashboard',
+            __( 'Tutoriel Complet', 'bihr-synch' ),
+            __( '📖 Tuto', 'bihr-synch' ),
+            'manage_woocommerce',
+            'bihr-tutorial',
+            array( $this, 'render_tutorial_page' )
+        );
+
+        add_submenu_page(
+            'bihr-dashboard',
             __( 'Diagnostic WP‑Cron', 'bihr-synch' ),
             __( '⚙️ WP‑Cron', 'bihr-synch' ),
             'manage_woocommerce',
@@ -538,6 +547,10 @@ class BihrWI_Admin {
      */
     public function render_help_page() {
         include BIHRWI_PLUGIN_DIR . 'admin/views/help-page.php';
+    }
+
+    public function render_tutorial_page() {
+        include BIHRWI_PLUGIN_DIR . 'admin/views/tutorial-page.php';
     }
 
     public function render_wpcron_diagnostic_page() {
