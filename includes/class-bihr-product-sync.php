@@ -382,6 +382,94 @@ class BihrWI_Product_Sync {
         return (int) $wpdb->get_var( $prepared );
     }
 
+    /**
+     * Récupère tous les IDs de produits correspondant aux filtres (sans pagination).
+     * Utilisé pour importer tous les produits d'une catégorie/filtre.
+     *
+     * @param string $search
+     * @param string $stock_filter
+     * @param string $price_min
+     * @param string $price_max
+     * @param string $category_filter
+     * @param string $cat_l1_filter
+     * @param string $cat_l2_filter
+     * @param string $cat_l3_filter
+     * @return array Tableau d'IDs (int[])
+     */
+    public function get_all_filtered_product_ids( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '' ) {
+        global $wpdb;
+
+        $args = array();
+
+        $search          = sanitize_text_field( (string) $search );
+        $stock_filter    = sanitize_text_field( (string) $stock_filter );
+        $category_filter = sanitize_text_field( (string) $category_filter );
+        $cat_l1_filter   = sanitize_text_field( (string) $cat_l1_filter );
+        $cat_l2_filter   = sanitize_text_field( (string) $cat_l2_filter );
+        $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
+
+        $where_sql = '1=1';
+        
+        if ( $search !== '' ) {
+            $search_like = '%' . $wpdb->esc_like( $search ) . '%';
+            $where_sql .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
+            $args[] = $search_like;
+            $args[] = $search_like;
+            $args[] = $search_like;
+            $args[] = $search_like;
+        }
+
+        if ( $stock_filter === 'in_stock' ) {
+            $where_sql .= ' AND stock_level > 0';
+        } elseif ( $stock_filter === 'out_of_stock' ) {
+            $where_sql .= ' AND (stock_level = 0 OR stock_level IS NULL)';
+        }
+
+        if ( $price_min !== '' && is_numeric( $price_min ) ) {
+            $where_sql .= ' AND dealer_price_ht >= %f';
+            $args[] = (float) $price_min;
+        }
+
+        if ( $price_max !== '' && is_numeric( $price_max ) ) {
+            $where_sql .= ' AND dealer_price_ht <= %f';
+            $args[] = (float) $price_max;
+        }
+
+        if ( $category_filter !== '' ) {
+            $where_sql .= ' AND category = %s';
+            $args[] = $category_filter;
+        }
+
+        // Filtres sur les niveaux CategoryPath
+        if ( $cat_l1_filter !== '' ) {
+            $where_sql .= ' AND cat_l1 = %s';
+            $args[] = $cat_l1_filter;
+        }
+        if ( $cat_l2_filter !== '' ) {
+            $where_sql .= ' AND cat_l2 = %s';
+            $args[] = $cat_l2_filter;
+        }
+        if ( $cat_l3_filter !== '' ) {
+            $where_sql .= ' AND cat_l3 = %s';
+            $args[] = $cat_l3_filter;
+        }
+
+        $table_name = esc_sql( $this->table_name );
+        $sql = "SELECT id FROM `{$table_name}` WHERE {$where_sql} ORDER BY id ASC";
+
+        if ( ! empty( $args ) ) {
+            $prepared = $wpdb->prepare( $sql, $args );
+        } else {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- pas de paramètres utilisateur
+            $prepared = $sql;
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
+        $ids = $wpdb->get_col( $prepared );
+
+        return array_map( 'intval', $ids );
+    }
+
     /* =========================================================
      *          IMPORT D’UN PRODUIT DANS WOOCOMMERCE
      * ======================================================= */

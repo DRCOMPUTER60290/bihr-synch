@@ -56,6 +56,7 @@ class BihrWI_Admin {
         // Handlers pour recalcul catégories depuis cat-ref-full
         add_action( 'wp_ajax_bihr_rebuild_cat_levels', array( $this, 'ajax_rebuild_cat_levels' ) );
         add_action( 'wp_ajax_bihr_get_cat_children', array( $this, 'ajax_get_cat_children' ) );
+        add_action( 'wp_ajax_bihr_get_all_filtered_ids', array( $this, 'ajax_get_all_filtered_ids' ) );
 
         // Handlers pour synchronisation automatique des stocks
         add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
@@ -2408,6 +2409,39 @@ class BihrWI_Admin {
         }
 
         wp_send_json_success( array( 'options' => $formatted ) );
+    }
+
+    /**
+     * Endpoint AJAX pour récupérer tous les IDs de produits correspondant aux filtres actuels.
+     */
+    public function ajax_get_all_filtered_ids() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée.' ) );
+        }
+
+        $search          = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
+        $stock_filter    = isset( $_POST['stock_filter'] ) ? sanitize_text_field( wp_unslash( $_POST['stock_filter'] ) ) : '';
+        $price_min       = isset( $_POST['price_min'] ) ? sanitize_text_field( wp_unslash( $_POST['price_min'] ) ) : '';
+        $price_max       = isset( $_POST['price_max'] ) ? sanitize_text_field( wp_unslash( $_POST['price_max'] ) ) : '';
+        $category_filter = isset( $_POST['category_filter'] ) ? sanitize_text_field( wp_unslash( $_POST['category_filter'] ) ) : '';
+        $cat_l1          = isset( $_POST['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l1'] ) ) : '';
+        $cat_l2          = isset( $_POST['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2'] ) ) : '';
+        $cat_l3          = isset( $_POST['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
+
+        $ids = $this->product_sync->get_all_filtered_product_ids(
+            $search,
+            $stock_filter,
+            $price_min,
+            $price_max,
+            $category_filter,
+            $cat_l1,
+            $cat_l2,
+            $cat_l3
+        );
+
+        wp_send_json_success( array( 'ids' => $ids, 'count' => count( $ids ) ) );
     }
 
 	

@@ -30,6 +30,32 @@ jQuery(document).ready(function($) {
             });
         });
     }
+
+    // Navigation directe vers une page
+    $('#bihr-goto-page-btn').on('click', function() {
+        var pageNum = parseInt($('#bihr-goto-page').val(), 10);
+        var maxPages = parseInt($('#bihr-goto-page').attr('max'), 10);
+        
+        if (isNaN(pageNum) || pageNum < 1) {
+            pageNum = 1;
+        }
+        if (pageNum > maxPages) {
+            pageNum = maxPages;
+        }
+        
+        // Récupérer les paramètres de l'URL actuelle
+        var urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('paged', pageNum);
+        
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    });
+
+    // Permettre d'appuyer sur Entrée dans le champ de saisie
+    $('#bihr-goto-page').on('keypress', function(e) {
+        if (e.which === 13) {
+            $('#bihr-goto-page-btn').click();
+        }
+    });
     
     // Sélectionner tout
     $('#bihr-select-all, #bihr-select-all-checkbox').on('click', function(e) {
@@ -181,6 +207,171 @@ jQuery(document).ready(function($) {
         
         // Démarrer l'import
         importNextProduct();
+    });
+
+    // Import de tous les produits filtrés
+    $('#bihr-import-all-filtered').on('click', function(e) {
+        e.preventDefault();
+        
+        // Récupérer les filtres depuis l'URL
+        var urlParams = new URLSearchParams(window.location.search);
+        var filters = {
+            search: urlParams.get('search') || '',
+            stock_filter: urlParams.get('stock_filter') || '',
+            price_min: urlParams.get('price_min') || '',
+            price_max: urlParams.get('price_max') || '',
+            category_filter: urlParams.get('category_filter') || '',
+            cat_l1: urlParams.get('cat_l1') || '',
+            cat_l2: urlParams.get('cat_l2') || '',
+            cat_l3: urlParams.get('cat_l3') || ''
+        };
+        
+        // Désactiver le bouton
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('⏳ Récupération des produits...');
+        
+        // Récupérer tous les IDs filtrés
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'bihr_get_all_filtered_ids',
+                nonce: bihrProgressData.nonce,
+                search: filters.search,
+                stock_filter: filters.stock_filter,
+                price_min: filters.price_min,
+                price_max: filters.price_max,
+                category_filter: filters.category_filter,
+                cat_l1: filters.cat_l1,
+                cat_l2: filters.cat_l2,
+                cat_l3: filters.cat_l3
+            },
+            success: function(response) {
+                if (response.success && response.data.ids && response.data.ids.length > 0) {
+                    var allIds = response.data.ids;
+                    var count = allIds.length;
+                    
+                    if (!confirm('Voulez-vous importer ' + count + ' produit(s) correspondant aux filtres actuels dans WooCommerce ?\n\nCette opération peut prendre plusieurs minutes.')) {
+                        $btn.prop('disabled', false).html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
+                        return;
+                    }
+                    
+                    // Construire la liste de produits (sans les noms, on utilisera juste les IDs)
+                    var allProducts = [];
+                    for (var i = 0; i < allIds.length; i++) {
+                        allProducts.push({
+                            id: allIds[i],
+                            name: 'Produit ID ' + allIds[i]
+                        });
+                    }
+                    
+                    // Afficher la barre de progression
+                    var $progressContainer = $('#bihr-import-progress');
+                    var $progressBar = $('#bihr-progress-bar');
+                    var $progressText = $('#bihr-progress-text');
+                    var $progressDetails = $('#bihr-progress-details');
+                    
+                    $progressContainer.show();
+                    $progressBar.css('width', '0%').text('0%');
+                    $progressText.text('0 / ' + count + ' produits importés');
+                    $progressDetails.html('');
+                    
+                    // Désactiver les boutons
+                    $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', true);
+                    $('.bihr-product-checkbox').prop('disabled', true);
+                    
+                    // Importer les produits un par un
+                    var currentIndex = 0;
+                    var successCount = 0;
+                    var errorCount = 0;
+                    
+                    function importNextFilteredProduct() {
+                        if (currentIndex >= allProducts.length) {
+                            // Terminé
+                            $progressBar.css('width', '100%').text('100%');
+                            var finalMsg = 'Import terminé : ' + successCount + ' succès';
+                            if (errorCount > 0) {
+                                finalMsg += ', ' + errorCount + ' erreur(s)';
+                            }
+                            $progressText.html('<strong style="color: green;">' + finalMsg + '</strong>');
+                            
+                            // Réactiver les boutons après 2 secondes
+                            setTimeout(function() {
+                                $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
+                                $('.bihr-product-checkbox').prop('disabled', false);
+                                $btn.html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
+                            }, 2000);
+                            
+                            return;
+                        }
+                        
+                        var product = allProducts[currentIndex];
+                        var percent = Math.round(((currentIndex + 1) / allProducts.length) * 100);
+                        
+                        $progressBar.css('width', percent + '%').text(percent + '%');
+                        $progressText.text((currentIndex + 1) + ' / ' + allProducts.length + ' produits importés');
+                        
+                        // Ajouter une ligne de progression
+                        $progressDetails.append('<div id="bihr-import-' + product.id + '" style="padding: 5px; border-bottom: 1px solid #ddd;">' +
+                            '<span class="dashicons dashicons-update" style="color: #2271b1; animation: rotation 1s infinite linear;"></span> ' +
+                            '<strong>' + product.name + '</strong> - Import en cours...' +
+                            '</div>');
+                        
+                        // Scroll vers le bas
+                        $progressDetails.scrollTop($progressDetails[0].scrollHeight);
+                        
+                        // Appel AJAX pour importer le produit
+                        $.ajax({
+                            url: ajaxurl,
+                            type: 'POST',
+                            data: {
+                                action: 'bihrwi_import_single_product',
+                                product_id: product.id,
+                                nonce: bihrProgressData.nonce
+                            },
+                            success: function(response) {
+                                if (response.success) {
+                                    $('#bihr-import-' + product.id).html(
+                                        '<span id="bihr-success-' + product.id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
+                                        '<strong>' + product.name + '</strong> - Importé avec succès (WC ID: ' + response.data.wc_id + ')'
+                                    );
+                                    successCount++;
+                                } else {
+                                    $('#bihr-import-' + product.id).html(
+                                        '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
+                                        '<strong>' + product.name + '</strong> - Erreur : ' + response.data.message
+                                    );
+                                    errorCount++;
+                                }
+                            },
+                            error: function() {
+                                $('#bihr-import-' + product.id).html(
+                                    '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
+                                    '<strong>' + product.name + '</strong> - Erreur de connexion'
+                                );
+                                errorCount++;
+                            },
+                            complete: function() {
+                                currentIndex++;
+                                // Petit délai pour éviter de surcharger le serveur
+                                setTimeout(importNextFilteredProduct, 500);
+                            }
+                        });
+                    }
+                    
+                    // Démarrer l'import
+                    importNextFilteredProduct();
+                    
+                } else {
+                    alert('Aucun produit trouvé correspondant aux filtres actuels.');
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
+                }
+            },
+            error: function() {
+                alert('Erreur lors de la récupération des produits filtrés.');
+                $btn.prop('disabled', false).html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
+            }
+        });
     });
     
     // ============================================

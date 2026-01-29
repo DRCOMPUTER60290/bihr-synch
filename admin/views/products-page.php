@@ -654,11 +654,15 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     </div>
 
     <div style="margin-bottom: 15px;">
-        <button id="bihr-select-all" class="button" style="margin-right: 5px;">Sélectionner tout</button>
+        <button id="bihr-select-all" class="button" style="margin-right: 5px;">Sélectionner tout (page)</button>
         <button id="bihr-deselect-all" class="button" style="margin-right: 5px;">Désélectionner tout</button>
         <button id="bihr-import-selected" class="button button-primary" disabled>
             <span class="dashicons dashicons-upload" style="vertical-align: middle;"></span>
             Importer les produits sélectionnés (<span id="bihr-selected-count">0</span>)
+        </button>
+        <button id="bihr-import-all-filtered" class="button button-secondary" style="margin-left: 10px;">
+            <span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span>
+            Importer tous les produits filtrés
         </button>
     </div>
 
@@ -801,15 +805,19 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     echo '<a class="button" href="' . esc_url( $prev_url ) . '">&laquo; Page précédente</a> ';
                 }
 
+                // Saisie directe du numéro de page
+                echo '<span style="margin-left:10px; margin-right:10px;">';
+                echo 'Page <input type="number" id="bihr-goto-page" min="1" max="' . intval( $total_pages ) . '" value="' . intval( $current_page ) . '" style="width:60px; text-align:center;" />';
+                echo ' / ' . intval( $total_pages );
+                echo ' <button type="button" id="bihr-goto-page-btn" class="button" style="margin-left:5px;">Aller</button>';
+                echo '</span>';
+
                 if ( $current_page < $total_pages ) {
                     $next_params = array_merge( $params, array( 'paged' => $current_page + 1 ) );
                     $next_url = $base_admin_url . '?' . http_build_query( $next_params, '', '&', PHP_QUERY_RFC3986 );
                     echo '<a class="button" href="' . esc_url( $next_url ) . '">Page suivante &raquo;</a>';
                 }
                 ?>
-                <span style="margin-left:10px;">
-                    Page <?php echo intval( $current_page ); ?> / <?php echo intval( $total_pages ); ?>
-                </span>
             </div>
         </div>
     <?php endif; ?>
