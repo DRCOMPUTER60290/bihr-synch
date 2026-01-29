@@ -57,6 +57,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihr_rebuild_cat_levels', array( $this, 'ajax_rebuild_cat_levels' ) );
         add_action( 'wp_ajax_bihr_get_cat_children', array( $this, 'ajax_get_cat_children' ) );
         add_action( 'wp_ajax_bihr_get_all_filtered_ids', array( $this, 'ajax_get_all_filtered_ids' ) );
+        add_action( 'wp_ajax_bihr_test_openai_key', array( $this, 'ajax_test_openai_key' ) );
 
         // Handlers pour synchronisation automatique des stocks
         add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
@@ -2442,6 +2443,31 @@ class BihrWI_Admin {
         );
 
         wp_send_json_success( array( 'ids' => $ids, 'count' => count( $ids ) ) );
+    }
+
+    /**
+     * Endpoint AJAX pour tester la clé OpenAI sans sauvegarder
+     */
+    public function ajax_test_openai_key() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée.' ) );
+        }
+
+        $api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
+
+        if ( empty( $api_key ) ) {
+            wp_send_json_error( array( 'message' => 'Veuillez saisir une clé API.' ) );
+        }
+
+        $test_result = $this->test_openai_key( $api_key );
+
+        if ( $test_result === true ) {
+            wp_send_json_success( array( 'message' => '✓ Clé OpenAI valide et opérationnelle !' ) );
+        } else {
+            wp_send_json_error( array( 'message' => '✗ ' . $test_result ) );
+        }
     }
 
 	

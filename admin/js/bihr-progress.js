@@ -375,6 +375,50 @@ jQuery(document).ready(function($) {
     });
     
     // ============================================
+    // TEST DE LA CLÉ OPENAI
+    // ============================================
+    
+    $('#bihr-test-openai-key').on('click', function(e) {
+        e.preventDefault();
+        
+        var $btn = $(this);
+        var $input = $('#bihrwi_openai_key');
+        var $result = $('#bihr-openai-test-result');
+        var apiKey = $input.val();
+        
+        if (!apiKey || apiKey.trim() === '') {
+            $result.html('<span style="color: #d63638;">⚠️ Veuillez saisir une clé API</span>');
+            return;
+        }
+        
+        $btn.prop('disabled', true).text('⏳ Test en cours...');
+        $result.html('<span style="color: #666;">⏳ Test de la clé en cours...</span>');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'bihr_test_openai_key',
+                nonce: bihrProgressData.nonce,
+                api_key: apiKey
+            },
+            success: function(response) {
+                if (response.success) {
+                    $result.html('<span style="color: #00a32a; font-weight: 600;">' + response.data.message + '</span>');
+                } else {
+                    $result.html('<span style="color: #d63638; font-weight: 600;">' + response.data.message + '</span>');
+                }
+            },
+            error: function() {
+                $result.html('<span style="color: #d63638;">❌ Erreur de connexion au serveur</span>');
+            },
+            complete: function() {
+                $btn.prop('disabled', false).text('🧪 Tester la clé');
+            }
+        });
+    });
+    
+    // ============================================
     // GESTION DU TÉLÉCHARGEMENT DES CATALOGUES
     // ============================================
     

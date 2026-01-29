@@ -54,8 +54,12 @@ if ( ! defined( 'ABSPATH' ) ) {
                 <th scope="row"><label for="bihrwi_openai_key">Clé API OpenAI (optionnel)</label></th>
                 <td>
                     <input name="bihrwi_openai_key" id="bihrwi_openai_key" type="password" class="regular-text" value="<?php echo esc_attr( $openai_key ); ?>">
+                    <button type="button" id="bihr-test-openai-key" class="button" style="margin-left: 10px;">
+                        🧪 Tester la clé
+                    </button>
+                    <span id="bihr-openai-test-result" style="margin-left: 10px;"></span>
                     <p class="description">
-                        Si renseignée, l'IA générera automatiquement des descriptions courtes et longues lors de l'import des produits.
+                        Si renseignée, l'IA générera automatiquement un nom amélioré, une description courte et une description longue lors de l'import des produits.
                     </p>
                     <p class="description" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
                         <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; color: #2271b1; font-weight: 500;">

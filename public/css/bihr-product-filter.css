@@ -89,7 +89,7 @@
 
 .bihr-filter-button {
     background-color: #0073aa;
-    color: #fff;
+    color: #ffffff !important;
 }
 
 .bihr-filter-button:hover {
