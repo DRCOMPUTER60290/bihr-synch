@@ -172,6 +172,156 @@ if ( ! defined( 'ABSPATH' ) ) {
             </div>
         </div>
 
+        <!-- Section Filtre Produit -->
+        <div class="bihr-help-section">
+            <h2>📦 Filtre de Produits par Catégories</h2>
+            
+            <div class="bihr-help-box">
+                <h3>🎯 À quoi sert ce filtre ?</h3>
+                <p>Le filtre de produits par catégories permet à vos clients de naviguer dans votre catalogue BIHR en utilisant la hiérarchie de catégories à 3 niveaux. Il affiche un formulaire avec des sélecteurs en cascade : <strong>Catégorie Niveau 1 → Niveau 2 → Niveau 3</strong>.</p>
+                <p><strong>Différence avec le filtre véhicule :</strong> Ce filtre utilise les catégories produits (ex: "Moteur → Admission → Gicleur") alors que le filtre véhicule utilise la compatibilité avec les véhicules (Fabricant → Modèle → Année).</p>
+            </div>
+
+            <div class="bihr-help-box">
+                <h3>📝 Shortcode de base</h3>
+                <p>Pour afficher le filtre sur une page, utilisez le shortcode suivant :</p>
+                <div class="bihr-code-block">
+                    <code>[bihr_product_filter]</code>
+                    <button class="button button-small bihr-copy-btn" data-copy="[bihr_product_filter]">📋 Copier</button>
+                </div>
+            </div>
+
+            <div class="bihr-help-box">
+                <h3>⚙️ Options disponibles</h3>
+                <p>Le shortcode accepte deux paramètres optionnels :</p>
+                
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Paramètre</th>
+                            <th>Description</th>
+                            <th>Valeurs possibles</th>
+                            <th>Défaut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>title</code></td>
+                            <td>Titre affiché au-dessus du filtre</td>
+                            <td>Texte personnalisé</td>
+                            <td>"Filtrez nos produits"</td>
+                        </tr>
+                        <tr>
+                            <td><code>show_button</code></td>
+                            <td>Afficher le bouton de recherche</td>
+                            <td><code>yes</code> ou <code>no</code></td>
+                            <td><code>yes</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bihr-help-box">
+                <h3>💡 Exemples d'utilisation</h3>
+                
+                <div class="bihr-example">
+                    <h4>Exemple 1 : Shortcode simple</h4>
+                    <div class="bihr-code-block">
+                        <code>[bihr_product_filter]</code>
+                        <button class="button button-small bihr-copy-btn" data-copy="[bihr_product_filter]">📋 Copier</button>
+                    </div>
+                    <p class="bihr-note">Affiche le filtre avec le titre par défaut "Filtrez nos produits" et le bouton de recherche.</p>
+                </div>
+
+                <div class="bihr-example">
+                    <h4>Exemple 2 : Avec titre personnalisé</h4>
+                    <div class="bihr-code-block">
+                        <code>[bihr_product_filter title="Naviguez par catégorie"]</code>
+                        <button class="button button-small bihr-copy-btn" data-copy='[bihr_product_filter title="Naviguez par catégorie"]'>📋 Copier</button>
+                    </div>
+                    <p class="bihr-note">Affiche le filtre avec un titre personnalisé.</p>
+                </div>
+
+                <div class="bihr-example">
+                    <h4>Exemple 3 : Sans bouton (pour intégration personnalisée)</h4>
+                    <div class="bihr-code-block">
+                        <code>[bihr_product_filter show_button="no"]</code>
+                        <button class="button button-small bihr-copy-btn" data-copy='[bihr_product_filter show_button="no"]'>📋 Copier</button>
+                    </div>
+                    <p class="bihr-note">Affiche uniquement les sélecteurs sans le bouton de recherche. Utile si vous voulez créer votre propre bouton ou déclencher la recherche via JavaScript.</p>
+                </div>
+
+                <div class="bihr-example">
+                    <h4>Exemple 4 : Configuration complète</h4>
+                    <div class="bihr-code-block">
+                        <code>[bihr_product_filter title="Trouvez votre pièce par catégorie" show_button="yes"]</code>
+                        <button class="button button-small bihr-copy-btn" data-copy='[bihr_product_filter title="Trouvez votre pièce par catégorie" show_button="yes"]'>📋 Copier</button>
+                    </div>
+                    <p class="bihr-note">Configuration complète avec titre personnalisé et bouton activé.</p>
+                </div>
+            </div>
+
+            <div class="bihr-help-box">
+                <h3>📖 Comment l'utiliser dans WordPress</h3>
+                
+                <h4>Méthode 1 : Dans l'éditeur de blocs (Gutenberg)</h4>
+                <ol>
+                    <li>Créez ou éditez une page/article</li>
+                    <li>Cliquez sur <strong>+</strong> pour ajouter un bloc</li>
+                    <li>Recherchez et sélectionnez le bloc <strong>"Shortcode"</strong></li>
+                    <li>Collez le shortcode : <code>[bihr_product_filter]</code></li>
+                    <li>Publiez ou mettez à jour la page</li>
+                </ol>
+
+                <h4>Méthode 2 : Dans l'éditeur classique</h4>
+                <ol>
+                    <li>Créez ou éditez une page/article</li>
+                    <li>Collez directement le shortcode dans le contenu : <code>[bihr_product_filter]</code></li>
+                    <li>Publiez ou mettez à jour la page</li>
+                </ol>
+
+                <h4>Méthode 3 : Dans un template PHP</h4>
+                <p>Si vous éditez un template de thème (fichier PHP), utilisez :</p>
+                <div class="bihr-code-block">
+                    <code>&lt;?php echo do_shortcode('[bihr_product_filter]'); ?&gt;</code>
+                    <button class="button button-small bihr-copy-btn" data-copy="<?php echo esc_attr( '<?php echo do_shortcode(\'[bihr_product_filter]\'); ?>' ); ?>">📋 Copier</button>
+                </div>
+            </div>
+
+            <div class="bihr-help-box">
+                <h3>🎨 Emplacements recommandés</h3>
+                <ul>
+                    <li><strong>Page boutique (Shop)</strong> : Permet de filtrer tous les produits par catégorie</li>
+                    <li><strong>Page dédiée "Catalogue BIHR"</strong> : Créez une page spéciale avec le filtre</li>
+                    <li><strong>Page d'accueil</strong> : Pour améliorer la découverte des produits</li>
+                    <li><strong>Page catégorie</strong> : Pour affiner la recherche dans une catégorie spécifique</li>
+                </ul>
+            </div>
+
+            <div class="bihr-help-box bihr-info-box">
+                <h3>ℹ️ Fonctionnement du filtre</h3>
+                <ol>
+                    <li><strong>Sélection du niveau 1</strong> : Le client choisit une catégorie principale (ex: "Moteur", "Equipement du pilote", "Outillage")</li>
+                    <li><strong>Sélection du niveau 2</strong> : Les sous-catégories disponibles pour ce niveau 1 s'affichent automatiquement (ex: "Admission", "Echappement")</li>
+                    <li><strong>Sélection du niveau 3</strong> : Les sous-sous-catégories disponibles pour ce couple (niveau 1 + niveau 2) s'affichent (ex: "Gicleur", "Filtre à air")</li>
+                    <li><strong>Recherche</strong> : Clique sur "Voir les produits"</li>
+                    <li><strong>Résultats</strong> : Les produits WooCommerce correspondant aux catégories sélectionnées sont affichés en grille avec images, prix et liens</li>
+                </ol>
+                <p><strong>Note :</strong> Les catégories sont chargées dynamiquement via AJAX. Si aucun niveau 1 n'est sélectionné, les niveaux 2 et 3 sont désactivés.</p>
+            </div>
+
+            <div class="bihr-help-box bihr-warning-box">
+                <h3>⚠️ Prérequis</h3>
+                <p>Pour que le filtre fonctionne correctement, assurez-vous que :</p>
+                <ul>
+                    <li>✅ Les catalogues BIHR ont été fusionnés (page <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-products' ) ); ?>">📦 Produits Bihr</a>)</li>
+                    <li>✅ Les catégories ont été recalculées depuis le fichier <code>cat-ref-full-*.csv</code> (bouton "Recalculer catégories")</li>
+                    <li>✅ Les produits ont été importés dans WooCommerce avec leurs codes BIHR</li>
+                    <li>✅ Les produits WooCommerce ont des meta <code>_bihr_product_code</code> correspondant aux codes dans <code>wp_bihr_products</code></li>
+                </ul>
+            </div>
+        </div>
+
         <!-- Section Support -->
         <div class="bihr-help-section">
             <h2>🆘 Besoin d'aide supplémentaire ?</h2>
