@@ -1,0 +1,254 @@
+/* ===================================
+   BIHR Product Filter Styles
+   =================================== */
+
+.bihr-product-filter-wrapper {
+    background: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 20px 0;
+}
+
+.bihr-filter-title {
+    margin: 0 0 20px 0;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #0073aa;
+    color: #23282d;
+    font-size: 24px;
+}
+
+/* Form Layout */
+.bihr-product-filter-form {
+    width: 100%;
+}
+
+.bihr-filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.bihr-filter-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.bihr-filter-field label {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 14px;
+}
+
+.bihr-filter-field select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: #fff;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.bihr-filter-field select:hover:not(:disabled) {
+    border-color: #0073aa;
+}
+
+.bihr-filter-field select:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.bihr-filter-field select:focus {
+    outline: none;
+    border-color: #0073aa;
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1);
+}
+
+/* Actions */
+.bihr-filter-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.bihr-filter-button,
+.bihr-reset-button {
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+
+.bihr-filter-button {
+    background-color: #0073aa;
+    color: #fff;
+}
+
+.bihr-filter-button:hover {
+    background-color: #005a87;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 115, 170, 0.3);
+}
+
+.bihr-reset-button {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.bihr-reset-button:hover {
+    background-color: #e0e0e0;
+}
+
+/* Results */
+.bihr-product-filter-results {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.bihr-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.bihr-results-header h4 {
+    margin: 0;
+    font-size: 20px;
+    color: #23282d;
+}
+
+.bihr-results-count {
+    font-size: 16px;
+    color: #0073aa;
+    font-weight: 600;
+}
+
+.bihr-results-content {
+    min-height: 100px;
+}
+
+.bihr-loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 16px;
+}
+
+.bihr-no-results {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.bihr-no-results p {
+    font-size: 16px;
+    margin: 0;
+}
+
+/* Products Grid */
+.bihr-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.bihr-product-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.bihr-product-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.bihr-product-image {
+    width: 100%;
+    height: 180px;
+    object-fit: contain;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.bihr-product-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #23282d;
+    line-height: 1.4;
+    min-height: 40px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.bihr-product-title a {
+    color: #23282d;
+    text-decoration: none;
+}
+
+.bihr-product-title a:hover {
+    color: #0073aa;
+}
+
+.bihr-product-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0073aa;
+    margin-top: 10px;
+}
+
+.bihr-product-sku {
+    font-size: 12px;
+    color: #999;
+    margin-top: 5px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .bihr-filter-row {
+        grid-template-columns: 1fr;
+    }
+
+    .bihr-products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+    }
+
+    .bihr-results-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .bihr-product-filter-wrapper {
+        padding: 15px;
+    }
+
+    .bihr-filter-title {
+        font-size: 20px;
+    }
+
+    .bihr-products-grid {
+        grid-template-columns: 1fr;
+    }
+}
