@@ -931,6 +931,22 @@ class BihrWI_Product_Sync {
         $this->logger->log( '========================================' );
         $this->logger->log( 'Dossier de recherche: ' . $upload_dir );
 
+        // 1) Tentative "mode Extended seul" : si les fichiers cat-extended-full-*.csv
+        // contiennent déjà toutes les données, on peut construire directement
+        // la liste des produits sans dépendre des autres catalogues.
+        $extended_master_products = $this->build_products_from_extended_full( $upload_dir );
+        if ( ! empty( $extended_master_products ) ) {
+            $this->logger->log( 'Mode Extended seul: utilisation directe de cat-extended-full pour construire les produits.' );
+
+            $count = $this->save_merged_products( $extended_master_products );
+
+            $this->logger->log( 'TOTAL FUSIONNÉ (Extended seul): ' . count( $extended_master_products ) . ' produits uniques' );
+            $this->logger->log( 'Produits enregistrés: ' . $count );
+            $this->logger->log( '=== FIN FUSION (mode Extended seul) ===' );
+
+            return $count;
+        }
+
         // Recherche des différents fichiers (le plus récent pour chaque type)
         // IMPORTANT : on utilise des patterns STRICTS pour References et ExtendedReferences
         // afin d'éviter les collisions entre cat-ref-full-*.csv et cat-extref-full-*.csv.
@@ -1342,6 +1358,200 @@ class BihrWI_Product_Sync {
         );
 
         return $extended;
+    }
+
+    /**
+     * Mode "Extended seul" : construit une liste complète de produits
+     * à partir des fichiers cat-extended-full-*.csv lorsque ceux-ci
+     * contiennent déjà toutes les informations nécessaires
+     * (code produit, nom, prix, stock, images, catégories 1/2/3, etc.).
+     *
+     * Retourne un tableau:
+     *   [ProductCode] => [
+     *      'product_code'    => string,
+     *      'new_part_number' => string|null,
+     *      'name'            => string|null,
+     *      'description'     => string|null,
+     *      'dealer_price_ht' => float|null,
+     *      'stock_level'     => int|null,
+     *      'image_url'       => string|null,
+     *      'category'        => string|null, // macro (Category1)
+     *      'cat_l1'          => string|null,
+     *      'cat_l2'          => string|null,
+     *      'cat_l3'          => string|null,
+     *   ]
+     *
+     * Si aucun fichier n'est trouvé ou qu'aucune ligne exploitable
+     * n'est présente, retourne un tableau vide.
+     */
+    protected function build_products_from_extended_full( $dir ) {
+        $products = array();
+
+        $pattern = trailingslashit( $dir ) . 'cat-extended-full-*.csv';
+        $files   = glob( $pattern );
+
+        if ( empty( $files ) ) {
+            $this->logger->log( 'ExtendedFull Master: aucun fichier cat-extended-full-*.csv trouvé dans ' . $dir );
+            return $products;
+        }
+
+        $total_rows   = 0;
+        $total_built  = 0;
+
+        $this->logger->log( 'ExtendedFull Master: ' . count( $files ) . ' fichier(s) détecté(s).' );
+
+        foreach ( $files as $file_path ) {
+            $basename = basename( $file_path );
+            $this->logger->log( 'ExtendedFull Master: parsing ' . $basename );
+
+            if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
+                $this->logger->log( 'ExtendedFull Master: fichier non lisible, ignoré: ' . $file_path );
+                continue;
+            }
+
+            $handle = fopen( $file_path, 'r' );
+            if ( false === $handle ) {
+                $this->logger->log( 'ExtendedFull Master: impossible d\'ouvrir le fichier: ' . $file_path );
+                continue;
+            }
+
+            // Gestion BOM UTF-8 éventuel
+            $bom = fread( $handle, 3 );
+            if ( $bom !== "\xEF\xBB\xBF" ) {
+                rewind( $handle );
+            }
+
+            // Détection du séparateur sur la première ligne lisible
+            $first_line = fgets( $handle );
+            rewind( $handle );
+            if ( $bom === "\xEF\xBB\xBF" ) {
+                fread( $handle, 3 ); // Skip BOM
+            }
+            $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+
+            // Lecture de l'en-tête
+            $header = fgetcsv( $handle, 0, $delimiter );
+            if ( false === $header ) {
+                fclose( $handle );
+                $this->logger->log( 'ExtendedFull Master: impossible de lire l\'en-tête CSV dans ' . $basename );
+                continue;
+            }
+
+            $header = array_map(
+                function( $h ) {
+                    return strtolower( trim( $h ) );
+                },
+                $header
+            );
+
+            // Index utiles
+            $idx_partnumber   = array_search( 'partnumber', $header, true );
+            $idx_productname  = array_search( 'productname', $header, true );
+            $idx_designation  = array_search( 'designation', $header, true );
+            $idx_price_ht     = array_search( 'retailpriceexcludingtax', $header, true );
+            $idx_price_base   = array_search( 'basedealerpriceexcludingtax', $header, true );
+            $idx_stock        = array_search( 'stockvalue', $header, true );
+            $idx_htmldesc     = array_search( 'htmldescription', $header, true );
+            $idx_desc         = array_search( 'description', $header, true );
+            $idx_cat1         = array_search( 'category1', $header, true );
+            $idx_cat2         = array_search( 'category2', $header, true );
+            $idx_cat3         = array_search( 'category3', $header, true );
+            $idx_picture1     = array_search( 'picture1', $header, true );
+            $idx_picture2     = array_search( 'picture2', $header, true );
+
+            if ( false === $idx_partnumber ) {
+                fclose( $handle );
+                $this->logger->log( 'ExtendedFull Master: colonne PartNumber introuvable dans ' . $basename . ', fichier ignoré.' );
+                continue;
+            }
+
+            while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+                if ( empty( $data ) || count( $data ) < ( $idx_partnumber + 1 ) ) {
+                    continue;
+                }
+
+                $total_rows++;
+
+                $partnumber = trim( (string) $data[ $idx_partnumber ] );
+                if ( $partnumber === '' ) {
+                    continue;
+                }
+
+                $code = $partnumber;
+
+                // Nom du produit
+                $name = '';
+                if ( false !== $idx_productname && isset( $data[ $idx_productname ] ) && $data[ $idx_productname ] !== '' ) {
+                    $name = trim( (string) $data[ $idx_productname ] );
+                } elseif ( false !== $idx_designation && isset( $data[ $idx_designation ] ) && $data[ $idx_designation ] !== '' ) {
+                    $name = trim( (string) $data[ $idx_designation ] );
+                }
+
+                // Description
+                $description = '';
+                if ( false !== $idx_desc && isset( $data[ $idx_desc ] ) && $data[ $idx_desc ] !== '' ) {
+                    $description = trim( (string) $data[ $idx_desc ] );
+                } elseif ( false !== $idx_htmldesc && isset( $data[ $idx_htmldesc ] ) && $data[ $idx_htmldesc ] !== '' ) {
+                    $description = trim( (string) $data[ $idx_htmldesc ] );
+                }
+
+                // Prix HT (en priorité RetailPriceExcludingTax, sinon BaseDealerPriceExcludingTax)
+                $price_ht = null;
+                if ( false !== $idx_price_ht && isset( $data[ $idx_price_ht ] ) && $data[ $idx_price_ht ] !== '' ) {
+                    $price_ht = (float) str_replace( ',', '.', $data[ $idx_price_ht ] );
+                } elseif ( false !== $idx_price_base && isset( $data[ $idx_price_base ] ) && $data[ $idx_price_base ] !== '' ) {
+                    $price_ht = (float) str_replace( ',', '.', $data[ $idx_price_base ] );
+                }
+
+                // Stock
+                $stock_level = null;
+                if ( false !== $idx_stock && isset( $data[ $idx_stock ] ) && $data[ $idx_stock ] !== '' ) {
+                    $stock_level = (int) $data[ $idx_stock ];
+                }
+
+                // Image principale
+                $image_url = '';
+                if ( false !== $idx_picture1 && isset( $data[ $idx_picture1 ] ) && $data[ $idx_picture1 ] !== '' ) {
+                    $image_url = trim( (string) $data[ $idx_picture1 ] );
+                } elseif ( false !== $idx_picture2 && isset( $data[ $idx_picture2 ] ) && $data[ $idx_picture2 ] !== '' ) {
+                    $image_url = trim( (string) $data[ $idx_picture2 ] );
+                }
+
+                // Catégories 1/2/3
+                $cat1 = ( false !== $idx_cat1 && isset( $data[ $idx_cat1 ] ) ) ? trim( (string) $data[ $idx_cat1 ] ) : '';
+                $cat2 = ( false !== $idx_cat2 && isset( $data[ $idx_cat2 ] ) ) ? trim( (string) $data[ $idx_cat2 ] ) : '';
+                $cat3 = ( false !== $idx_cat3 && isset( $data[ $idx_cat3 ] ) ) ? trim( (string) $data[ $idx_cat3 ] ) : '';
+
+                $products[ $code ] = array(
+                    'product_code'    => $code,
+                    'new_part_number' => $code,
+                    'name'            => $name ?: null,
+                    'description'     => $description ?: null,
+                    'dealer_price_ht' => $price_ht,
+                    'stock_level'     => $stock_level,
+                    'image_url'       => $image_url ?: null,
+                    // Category1 sert de macro-catégorie + Niveau 1
+                    'category'        => $cat1 ?: null,
+                    'cat_l1'          => $cat1 !== '' ? $cat1 : null,
+                    'cat_l2'          => $cat2 !== '' ? $cat2 : null,
+                    'cat_l3'          => $cat3 !== '' ? $cat3 : null,
+                );
+
+                $total_built++;
+            }
+
+            fclose( $handle );
+        }
+
+        $this->logger->log(
+            sprintf(
+                'ExtendedFull Master: %d lignes lues, %d produits construits.',
+                $total_rows,
+                $total_built
+            )
+        );
+
+        return $products;
     }
 
     /**
