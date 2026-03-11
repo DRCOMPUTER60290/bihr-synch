@@ -1120,10 +1120,15 @@ class BihrWI_Admin {
 			$this->logger->log( 'Téléchargement de tous les catalogues: démarrage' );
 
 			// Liste des catalogues à télécharger
-			// Tu as choisi de ne conserver que le catalog "Extended" (cat-extended-full-*.zip)
-			// pour la hiérarchie produit. On ne génère plus ici les autres catalogues.
+			// Extended (cat-extended-full-*.zip) sert pour la hiérarchie,
+            // mais on a toujours besoin de References / Images / Stocks / Attributes
+            // pour que la fusion produise des produits complets.
 			$catalogs = array(
+				'References'   => 'References',
                 'ExtendedFull' => 'Extended',
+				'Attributes'   => 'Attributes',
+				'Images'       => 'Images',
+				'Stocks'       => 'Stocks',
 			);
             $downloaded_files = array();
 
@@ -1229,9 +1234,15 @@ class BihrWI_Admin {
 			$this->logger->log( 'AJAX: Téléchargement de tous les catalogues' );
 
             // Liste des catalogues
-            // Ici aussi on ne télécharge plus que "Extended" (cat-extended-full-*.zip).
+            // On garde Extended pour les catégories hiérarchiques,
+            // mais aussi References / Images / Stocks / Attributes
+            // pour avoir toutes les données nécessaires à la fusion.
             $catalogs = array(
+                'References'   => 'References',
                 'ExtendedFull' => 'Extended',
+                'Attributes'   => 'Attributes',
+                'Images'       => 'Images',
+                'Stocks'       => 'Stocks',
             );
             $downloaded_files = array();
 		$failed_catalogs  = array();
