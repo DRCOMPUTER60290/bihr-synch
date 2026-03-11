@@ -1047,6 +1047,15 @@ class BihrWI_Product_Sync {
             $this->logger->log( 'Description: ' . ( isset( $first_merged['description'] ) ? substr( $first_merged['description'], 0, 80 ) . '...' : 'NULL' ) );
         }
 
+        // Appliquer un fallback de catégories hiérarchiques depuis cat-extended-full-*.csv
+        $this->logger->log( '--- Fallback catégories depuis cat-extended-full (si disponible) ---' );
+        $extended_categories = $this->load_extended_full_categories( $upload_dir );
+        if ( ! empty( $extended_categories ) ) {
+            $this->apply_extended_categories_fallback( $merged, $extended_categories );
+        } else {
+            $this->logger->log( 'ExtendedFull: aucun catalogue cat-extended-full-* détecté, aucun fallback appliqué.' );
+        }
+
         $this->logger->log( '--- Statistiques de fusion ---' );
         $this->logger->log( 'References: ' . count( $references_data ) . ' entrées' );
         $this->logger->log( 'ExtendedReferences: ' . count( $extendedreferences_data ) . ' entrées' );
@@ -1139,6 +1148,131 @@ class BihrWI_Product_Sync {
 
         $this->logger->log( 'Aucun cat-extref-full-*.csv trouvé, fallback sur recherche générique *extref*.csv' );
         return $this->find_latest_catalog_file( $dir, 'extref' );
+    }
+
+    /**
+     * Charge les catégories hiérarchiques depuis les fichiers cat-extended-full-*.csv
+     * extraits dans le dossier d'import.
+     *
+     * Retourne un tableau associatif:
+     *   [PartNumber] => [ 'cat_l1' => Category1, 'cat_l2' => Category2, 'cat_l3' => Category3 ]
+     *
+     * Fallback silencieux si aucun fichier n'est présent.
+     */
+    protected function load_extended_full_categories( $dir ) {
+        $extended = array();
+
+        $pattern = trailingslashit( $dir ) . 'cat-extended-full-*.csv';
+        $files   = glob( $pattern );
+
+        if ( empty( $files ) ) {
+            $this->logger->log( 'ExtendedFull: aucun fichier cat-extended-full-*.csv trouvé dans ' . $dir );
+            return $extended;
+        }
+
+        $total_rows        = 0;
+        $total_with_cats   = 0;
+
+        $this->logger->log( 'ExtendedFull: ' . count( $files ) . ' fichier(s) détecté(s) pour les catégories étendues.' );
+
+        foreach ( $files as $file_path ) {
+            $basename = basename( $file_path );
+            $this->logger->log( 'ExtendedFull: parsing ' . $basename );
+
+            if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
+                $this->logger->log( 'ExtendedFull: fichier non lisible, ignoré: ' . $file_path );
+                continue;
+            }
+
+            $handle = fopen( $file_path, 'r' );
+            if ( false === $handle ) {
+                $this->logger->log( 'ExtendedFull: impossible d\'ouvrir le fichier: ' . $file_path );
+                continue;
+            }
+
+            // Gestion BOM UTF-8 éventuel
+            $bom = fread( $handle, 3 );
+            if ( $bom !== "\xEF\xBB\xBF" ) {
+                rewind( $handle );
+            }
+
+            // Détection du séparateur sur la première ligne lisible
+            $first_line = fgets( $handle );
+            rewind( $handle );
+            if ( $bom === "\xEF\xBB\xBF" ) {
+                fread( $handle, 3 ); // Skip BOM
+            }
+            $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+
+            // Lecture de l'en-tête
+            $header = fgetcsv( $handle, 0, $delimiter );
+            if ( false === $header ) {
+                fclose( $handle );
+                $this->logger->log( 'ExtendedFull: impossible de lire l\'en-tête CSV dans ' . $basename );
+                continue;
+            }
+
+            $header = array_map(
+                function( $h ) {
+                    return strtolower( trim( $h ) );
+                },
+                $header
+            );
+
+            // Index des colonnes
+            $idx_partnumber = array_search( 'partnumber', $header, true );
+            $idx_cat1       = array_search( 'category1', $header, true );
+            $idx_cat2       = array_search( 'category2', $header, true );
+            $idx_cat3       = array_search( 'category3', $header, true );
+
+            if ( false === $idx_partnumber ) {
+                fclose( $handle );
+                $this->logger->log( 'ExtendedFull: colonne PartNumber introuvable dans ' . $basename . ', fichier ignoré.' );
+                continue;
+            }
+
+            // Parcours des lignes
+            while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+                if ( empty( $data ) || count( $data ) < ( $idx_partnumber + 1 ) ) {
+                    continue;
+                }
+
+                $total_rows++;
+
+                $partnumber = trim( (string) $data[ $idx_partnumber ] );
+                if ( $partnumber === '' ) {
+                    continue;
+                }
+
+                $cat1 = ( false !== $idx_cat1 && isset( $data[ $idx_cat1 ] ) ) ? trim( (string) $data[ $idx_cat1 ] ) : '';
+                $cat2 = ( false !== $idx_cat2 && isset( $data[ $idx_cat2 ] ) ) ? trim( (string) $data[ $idx_cat2 ] ) : '';
+                $cat3 = ( false !== $idx_cat3 && isset( $data[ $idx_cat3 ] ) ) ? trim( (string) $data[ $idx_cat3 ] ) : '';
+
+                if ( $cat1 === '' && $cat2 === '' && $cat3 === '' ) {
+                    continue;
+                }
+
+                $extended[ $partnumber ] = array(
+                    'cat_l1' => $cat1 !== '' ? $cat1 : null,
+                    'cat_l2' => $cat2 !== '' ? $cat2 : null,
+                    'cat_l3' => $cat3 !== '' ? $cat3 : null,
+                );
+
+                $total_with_cats++;
+            }
+
+            fclose( $handle );
+        }
+
+        $this->logger->log(
+            sprintf(
+                'ExtendedFull: %d lignes lues, %d produits avec catégories hiérarchiques.',
+                $total_rows,
+                $total_with_cats
+            )
+        );
+
+        return $extended;
     }
 
     /**
@@ -1853,6 +1987,82 @@ class BihrWI_Product_Sync {
         }
 
         return $count;
+    }
+
+    /**
+     * Applique un fallback de catégories hiérarchiques depuis cat-extended-full
+     * sur le tableau fusionné $merged, SANS écraser les niveaux déjà présents.
+     *
+     * @param array $merged              Référence vers le tableau [product_code => data[]].
+     * @param array $extended_categories Tableau [PartNumber => ['cat_l1','cat_l2','cat_l3']].
+     */
+    protected function apply_extended_categories_fallback( array &$merged, array $extended_categories ) {
+        if ( empty( $merged ) || empty( $extended_categories ) ) {
+            return;
+        }
+
+        $updated = 0;
+        $total   = 0;
+
+        foreach ( $merged as $code => &$data ) {
+            $total++;
+
+            // Si les niveaux sont déjà présents (via CategoryPath ou autre), ne rien faire.
+            $has_cat_levels =
+                ( ! empty( $data['cat_l1'] ) ) ||
+                ( ! empty( $data['cat_l2'] ) ) ||
+                ( ! empty( $data['cat_l3'] ) );
+
+            if ( $has_cat_levels ) {
+                continue;
+            }
+
+            // Clé de lookup : prioriser NewPartNumber si disponible, sinon ProductCode.
+            $lookup_key = '';
+            if ( ! empty( $data['new_part_number'] ) ) {
+                $lookup_key = (string) $data['new_part_number'];
+            } else {
+                $lookup_key = (string) $code;
+            }
+
+            if ( $lookup_key === '' ) {
+                continue;
+            }
+
+            if ( ! isset( $extended_categories[ $lookup_key ] ) ) {
+                continue;
+            }
+
+            $cats = $extended_categories[ $lookup_key ];
+
+            // Remplir uniquement si non vide, sans jamais toucher à "category".
+            if ( isset( $cats['cat_l1'] ) && $cats['cat_l1'] !== null && $cats['cat_l1'] !== '' ) {
+                $data['cat_l1'] = $cats['cat_l1'];
+            }
+            if ( isset( $cats['cat_l2'] ) && $cats['cat_l2'] !== null && $cats['cat_l2'] !== '' ) {
+                $data['cat_l2'] = $cats['cat_l2'];
+            }
+            if ( isset( $cats['cat_l3'] ) && $cats['cat_l3'] !== null && $cats['cat_l3'] !== '' ) {
+                $data['cat_l3'] = $cats['cat_l3'];
+            }
+
+            // Si au moins un niveau a été renseigné, compter comme "updated".
+            if (
+                ( ! empty( $data['cat_l1'] ) ) ||
+                ( ! empty( $data['cat_l2'] ) ) ||
+                ( ! empty( $data['cat_l3'] ) )
+            ) {
+                $updated++;
+            }
+        }
+
+        $this->logger->log(
+            sprintf(
+                'ExtendedFull: fallback catégories appliqué à %d produits (sur %d produits fusionnés).',
+                $updated,
+                $total
+            )
+        );
     }
 
     /**
