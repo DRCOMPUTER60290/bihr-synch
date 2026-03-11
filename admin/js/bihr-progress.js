@@ -118,12 +118,13 @@ jQuery(document).ready(function($) {
         $('#bihr-import-selected, #bihr-select-all, #bihr-deselect-all').prop('disabled', true);
         $('.bihr-product-checkbox').prop('disabled', true);
         
-        // Importer les produits un par un
+        // Importer les produits par batch pour accélérer l'import
         var currentIndex = 0;
         var successCount = 0;
         var errorCount = 0;
+        var batchSize = 50; // Taille de batch cible (50 produits par requête)
         
-        function importNextProduct() {
+        function importNextProductBatch() {
             if (currentIndex >= selectedProducts.length) {
                 // Terminé
                 $progressBar.css('width', '100%').text('100%');
@@ -150,63 +151,94 @@ jQuery(document).ready(function($) {
                 
                 return;
             }
-            
-            var product = selectedProducts[currentIndex];
-            var percent = Math.round(((currentIndex + 1) / selectedProducts.length) * 100);
-            
-            $progressBar.css('width', percent + '%').text(percent + '%');
-            $progressText.text((currentIndex + 1) + ' / ' + selectedProducts.length + ' produits importés');
-            
-            // Ajouter une ligne de progression
-            $progressDetails.append('<div id="bihr-import-' + product.id + '" style="padding: 5px; border-bottom: 1px solid #ddd;">' +
-                '<span class="dashicons dashicons-update" style="color: #2271b1; animation: rotation 1s infinite linear;"></span> ' +
-                '<strong>' + product.name + '</strong> (ID: ' + product.id + ') - Import en cours...' +
-                '</div>');
-            
+
+            // Construire le batch courant
+            var batch = selectedProducts.slice(currentIndex, currentIndex + batchSize);
+            var batchIds = [];
+
+            // Ajouter une ligne de progression pour chaque produit du batch
+            for (var i = 0; i < batch.length; i++) {
+                var product = batch[i];
+                batchIds.push(product.id);
+
+                $progressDetails.append('<div id="bihr-import-' + product.id + '" style="padding: 5px; border-bottom: 1px solid #ddd;">' +
+                    '<span class="dashicons dashicons-update" style="color: #2271b1; animation: rotation 1s infinite linear;"></span> ' +
+                    '<strong>' + product.name + '</strong> (ID: ' + product.id + ') - Import en cours...' +
+                    '</div>');
+            }
+
             // Scroll vers le bas
             $progressDetails.scrollTop($progressDetails[0].scrollHeight);
-            
-            // Appel AJAX pour importer le produit
+
+            // Appel AJAX pour importer le batch de produits
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'bihrwi_import_single_product',
-                    product_id: product.id,
+                    action: 'bihrwi_import_products_batch',
+                    product_ids: batchIds,
                     nonce: bihrProgressData.nonce
                 },
                 success: function(response) {
-                    if (response.success) {
-                        $('#bihr-import-' + product.id).html(
-                            '<span id="bihr-success-' + product.id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
-                            '<strong>' + product.name + '</strong> - Importé avec succès (WC ID: ' + response.data.wc_id + ')'
-                        );
-                        successCount++;
+                    if (response.success && response.data && response.data.results) {
+                        // Parcourir les résultats renvoyés par le serveur
+                        for (var j = 0; j < response.data.results.length; j++) {
+                            var res = response.data.results[j];
+                            var lineId = '#bihr-import-' + res.product_id;
+
+                            if (res.success) {
+                                $(lineId).html(
+                                    '<span id="bihr-success-' + res.product_id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
+                                    '<strong>Produit ID ' + res.product_id + '</strong> - Importé avec succès (WC ID: ' + res.wc_id + ')'
+                                );
+                                successCount++;
+                            } else {
+                                $(lineId).html(
+                                    '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
+                                    '<strong>Produit ID ' + res.product_id + '</strong> - Erreur : ' + res.message
+                                );
+                                errorCount++;
+                            }
+                        }
                     } else {
-                        $('#bihr-import-' + product.id).html(
+                        // Si la réponse n'est pas valide, marquer tout le batch en erreur
+                        for (var k = 0; k < batch.length; k++) {
+                            var p = batch[k];
+                            $('#bihr-import-' + p.id).html(
+                                '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
+                                '<strong>' + p.name + '</strong> - Erreur : réponse invalide du serveur'
+                            );
+                            errorCount++;
+                        }
+                    }
+                },
+                error: function() {
+                    // Erreur de connexion pour tout le batch
+                    for (var k = 0; k < batch.length; k++) {
+                        var p = batch[k];
+                        $('#bihr-import-' + p.id).html(
                             '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
-                            '<strong>' + product.name + '</strong> - Erreur : ' + response.data.message
+                            '<strong>' + p.name + '</strong> - Erreur de connexion'
                         );
                         errorCount++;
                     }
                 },
-                error: function() {
-                    $('#bihr-import-' + product.id).html(
-                        '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
-                        '<strong>' + product.name + '</strong> - Erreur de connexion'
-                    );
-                    errorCount++;
-                },
                 complete: function() {
-                    currentIndex++;
+                    // Avancer l'index du nombre d'éléments traités dans ce batch
+                    currentIndex += batch.length;
+
+                    var percent = Math.round((currentIndex / selectedProducts.length) * 100);
+                    $progressBar.css('width', percent + '%').text(percent + '%');
+                    $progressText.text(currentIndex + ' / ' + selectedProducts.length + ' produits importés');
+
                     // Petit délai pour éviter de surcharger le serveur
-                    setTimeout(importNextProduct, 500);
+                    setTimeout(importNextProductBatch, 500);
                 }
             });
         }
         
-        // Démarrer l'import
-        importNextProduct();
+        // Démarrer l'import par batch
+        importNextProductBatch();
     });
 
     // Import de tous les produits filtrés
@@ -280,12 +312,13 @@ jQuery(document).ready(function($) {
                     $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', true);
                     $('.bihr-product-checkbox').prop('disabled', true);
                     
-                    // Importer les produits un par un
+                    // Importer les produits par batch pour accélérer l'import
                     var currentIndex = 0;
                     var successCount = 0;
                     var errorCount = 0;
+                    var batchSize = 50; // Taille de batch cible (50 produits par requête)
                     
-                    function importNextFilteredProduct() {
+                    function importNextFilteredProductBatch() {
                         if (currentIndex >= allProducts.length) {
                             // Terminé
                             $progressBar.css('width', '100%').text('100%');
@@ -304,63 +337,94 @@ jQuery(document).ready(function($) {
                             
                             return;
                         }
-                        
-                        var product = allProducts[currentIndex];
-                        var percent = Math.round(((currentIndex + 1) / allProducts.length) * 100);
-                        
-                        $progressBar.css('width', percent + '%').text(percent + '%');
-                        $progressText.text((currentIndex + 1) + ' / ' + allProducts.length + ' produits importés');
-                        
-                        // Ajouter une ligne de progression
-                        $progressDetails.append('<div id="bihr-import-' + product.id + '" style="padding: 5px; border-bottom: 1px solid #ddd;">' +
-                            '<span class="dashicons dashicons-update" style="color: #2271b1; animation: rotation 1s infinite linear;"></span> ' +
-                            '<strong>' + product.name + '</strong> - Import en cours...' +
-                            '</div>');
-                        
+
+                        // Construire le batch courant
+                        var batch = allProducts.slice(currentIndex, currentIndex + batchSize);
+                        var batchIds = [];
+
+                        // Ajouter une ligne de progression pour chaque produit du batch
+                        for (var i = 0; i < batch.length; i++) {
+                            var product = batch[i];
+                            batchIds.push(product.id);
+
+                            $progressDetails.append('<div id="bihr-import-' + product.id + '" style="padding: 5px; border-bottom: 1px solid #ddd;">' +
+                                '<span class="dashicons dashicons-update" style="color: #2271b1; animation: rotation 1s infinite linear;"></span> ' +
+                                '<strong>' + product.name + '</strong> - Import en cours...' +
+                                '</div>');
+                        }
+
                         // Scroll vers le bas
                         $progressDetails.scrollTop($progressDetails[0].scrollHeight);
-                        
-                        // Appel AJAX pour importer le produit
+
+                        // Appel AJAX pour importer le batch de produits
                         $.ajax({
                             url: ajaxurl,
                             type: 'POST',
                             data: {
-                                action: 'bihrwi_import_single_product',
-                                product_id: product.id,
+                                action: 'bihrwi_import_products_batch',
+                                product_ids: batchIds,
                                 nonce: bihrProgressData.nonce
                             },
                             success: function(response) {
-                                if (response.success) {
-                                    $('#bihr-import-' + product.id).html(
-                                        '<span id="bihr-success-' + product.id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
-                                        '<strong>' + product.name + '</strong> - Importé avec succès (WC ID: ' + response.data.wc_id + ')'
-                                    );
-                                    successCount++;
+                                if (response.success && response.data && response.data.results) {
+                                    // Parcourir les résultats renvoyés par le serveur
+                                    for (var j = 0; j < response.data.results.length; j++) {
+                                        var res = response.data.results[j];
+                                        var lineId = '#bihr-import-' + res.product_id;
+
+                                        if (res.success) {
+                                            $(lineId).html(
+                                                '<span id="bihr-success-' + res.product_id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
+                                                '<strong>Produit ID ' + res.product_id + '</strong> - Importé avec succès (WC ID: ' + res.wc_id + ')'
+                                            );
+                                            successCount++;
+                                        } else {
+                                            $(lineId).html(
+                                                '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
+                                                '<strong>Produit ID ' + res.product_id + '</strong> - Erreur : ' + res.message
+                                            );
+                                            errorCount++;
+                                        }
+                                    }
                                 } else {
-                                    $('#bihr-import-' + product.id).html(
+                                    // Si la réponse n'est pas valide, marquer tout le batch en erreur
+                                    for (var k = 0; k < batch.length; k++) {
+                                        var p = batch[k];
+                                        $('#bihr-import-' + p.id).html(
+                                            '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
+                                            '<strong>' + p.name + '</strong> - Erreur : réponse invalide du serveur'
+                                        );
+                                        errorCount++;
+                                    }
+                                }
+                            },
+                            error: function() {
+                                // Erreur de connexion pour tout le batch
+                                for (var k = 0; k < batch.length; k++) {
+                                    var p = batch[k];
+                                    $('#bihr-import-' + p.id).html(
                                         '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
-                                        '<strong>' + product.name + '</strong> - Erreur : ' + response.data.message
+                                        '<strong>' + p.name + '</strong> - Erreur de connexion'
                                     );
                                     errorCount++;
                                 }
                             },
-                            error: function() {
-                                $('#bihr-import-' + product.id).html(
-                                    '<span class="dashicons dashicons-dismiss" style="color: red;"></span> ' +
-                                    '<strong>' + product.name + '</strong> - Erreur de connexion'
-                                );
-                                errorCount++;
-                            },
                             complete: function() {
-                                currentIndex++;
+                                // Avancer l'index du nombre d'éléments traités dans ce batch
+                                currentIndex += batch.length;
+
+                                var percent = Math.round((currentIndex / allProducts.length) * 100);
+                                $progressBar.css('width', percent + '%').text(percent + '%');
+                                $progressText.text(currentIndex + ' / ' + allProducts.length + ' produits importés');
+
                                 // Petit délai pour éviter de surcharger le serveur
-                                setTimeout(importNextFilteredProduct, 500);
+                                setTimeout(importNextFilteredProductBatch, 500);
                             }
                         });
                     }
                     
-                    // Démarrer l'import
-                    importNextFilteredProduct();
+                    // Démarrer l'import par batch
+                    importNextFilteredProductBatch();
                     
                 } else {
                     alert('Aucun produit trouvé correspondant aux filtres actuels.');

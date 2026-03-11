@@ -653,17 +653,38 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         <div id="bihr-progress-details" style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-size: 12px;"></div>
     </div>
 
-    <div style="margin-bottom: 15px;">
-        <button id="bihr-select-all" class="button" style="margin-right: 5px;">Sélectionner tout (page)</button>
-        <button id="bihr-deselect-all" class="button" style="margin-right: 5px;">Désélectionner tout</button>
-        <button id="bihr-import-selected" class="button button-primary" disabled>
-            <span class="dashicons dashicons-upload" style="vertical-align: middle;"></span>
-            Importer les produits sélectionnés (<span id="bihr-selected-count">0</span>)
-        </button>
-        <button id="bihr-import-all-filtered" class="button button-secondary" style="margin-left: 10px;">
-            <span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span>
-            Importer tous les produits filtrés
-        </button>
+    <div style="margin-bottom: 15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+        <div>
+            <button id="bihr-select-all" class="button" style="margin-right: 5px;">Sélectionner tout (page)</button>
+            <button id="bihr-deselect-all" class="button" style="margin-right: 5px;">Désélectionner tout</button>
+            <button id="bihr-import-selected" class="button button-primary" disabled>
+                <span class="dashicons dashicons-upload" style="vertical-align: middle;"></span>
+                Importer les produits sélectionnés (<span id="bihr-selected-count">0</span>)
+            </button>
+            <button id="bihr-import-all-filtered" class="button button-secondary" style="margin-left: 10px;">
+                <span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span>
+                Importer tous les produits filtrés
+            </button>
+        </div>
+
+        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+            <input type="hidden" name="action" value="bihrwi_start_mass_import" />
+            <?php wp_nonce_field( 'bihrwi_start_mass_import_action', 'bihrwi_start_mass_import_nonce' ); ?>
+            <!-- Repasser les filtres actuels au handler -->
+            <input type="hidden" name="search" value="<?php echo esc_attr( $filter_search ); ?>" />
+            <input type="hidden" name="stock_filter" value="<?php echo esc_attr( $filter_stock ); ?>" />
+            <input type="hidden" name="price_min" value="<?php echo esc_attr( $filter_price_min ); ?>" />
+            <input type="hidden" name="price_max" value="<?php echo esc_attr( $filter_price_max ); ?>" />
+            <input type="hidden" name="category_filter" value="<?php echo esc_attr( $filter_category ); ?>" />
+            <input type="hidden" name="cat_l1" value="<?php echo esc_attr( $filter_cat_l1 ); ?>" />
+            <input type="hidden" name="cat_l2" value="<?php echo esc_attr( $filter_cat_l2 ); ?>" />
+            <input type="hidden" name="cat_l3" value="<?php echo esc_attr( $filter_cat_l3 ); ?>" />
+
+            <button type="submit" class="button button-secondary" style="border-color:#2271b1; color:#2271b1;">
+                <span class="dashicons dashicons-clock" style="vertical-align: middle;"></span>
+                Import massif en tâche de fond (tous les produits filtrés)
+            </button>
+        </form>
     </div>
 
     <table class="widefat fixed striped">

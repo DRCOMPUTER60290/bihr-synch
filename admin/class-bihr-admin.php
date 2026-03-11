@@ -34,11 +34,15 @@ class BihrWI_Admin {
         }
         add_action( 'admin_post_bihrwi_save_prices_schedule', array( $this, 'handle_save_prices_schedule' ) );
         add_action( 'admin_post_bihrwi_run_prices_cron_now', array( $this, 'handle_run_prices_cron_now' ) );
+        // Import massif en tâche de fond (type "WP-CLI" mais lancé depuis l'admin)
+        add_action( 'admin_post_bihrwi_start_mass_import', array( $this, 'handle_start_mass_import' ) );
 
         // Handlers AJAX
         add_action( 'wp_ajax_bihrwi_download_all_catalogs_ajax', array( $this, 'ajax_download_all_catalogs' ) );
         add_action( 'wp_ajax_bihrwi_merge_catalogs_ajax', array( $this, 'ajax_merge_catalogs' ) );
         add_action( 'wp_ajax_bihrwi_import_single_product', array( $this, 'ajax_import_single_product' ) );
+        // Import en batch (jusqu'à 50–100 produits par requête pour accélérer fortement l'import)
+        add_action( 'wp_ajax_bihrwi_import_products_batch', array( $this, 'ajax_import_products_batch' ) );
         add_action( 'wp_ajax_bihr_refresh_stock', array( $this, 'ajax_refresh_stock' ) );
         add_action( 'wp_ajax_bihrwi_import_vehicles', array( $this, 'ajax_import_vehicles' ) );
         if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
@@ -66,6 +70,8 @@ class BihrWI_Admin {
         // WP-Cron hooks pour synchronisation automatique
         add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
         add_action( 'bihrwi_auto_prices_generation', array( $this, 'run_auto_prices_generation' ), 10, 0 );
+        // Cron personnalisé pour l'import massif de produits
+        add_action( 'bihrwi_mass_import_event', array( $this, 'run_mass_import_batch' ) );
         
         // Initialiser le WP-Cron si activé
         add_action( 'init', array( $this, 'setup_stock_sync_cron' ) );
@@ -1486,6 +1492,224 @@ class BihrWI_Admin {
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
 		}
 	}
+
+    /**
+     * Handler AJAX pour l'import d'un batch de produits (accélération massive de l'import)
+     *
+     * Réceptionne un tableau d'IDs `product_ids` et les importe dans WooCommerce
+     * dans une seule requête, ce qui réduit drastiquement le nombre d'appels AJAX.
+     */
+    public function ajax_import_products_batch() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        $product_ids = isset( $_POST['product_ids'] ) ? (array) $_POST['product_ids'] : array();
+        $product_ids = array_map( 'intval', $product_ids );
+        $product_ids = array_filter( $product_ids );
+
+        if ( empty( $product_ids ) ) {
+            wp_send_json_error( array( 'message' => 'Aucun ID de produit valide fourni.' ) );
+        }
+
+        // Sécurité serveur : limiter la taille du batch côté PHP également (au cas où)
+        $max_per_batch = 100; // On pourra monter plus haut si le serveur le supporte
+        if ( count( $product_ids ) > $max_per_batch ) {
+            $product_ids = array_slice( $product_ids, 0, $max_per_batch );
+        }
+
+        $results = array();
+
+        foreach ( $product_ids as $product_id ) {
+            try {
+                $this->logger->log( "AJAX: Import (batch) du produit ID {$product_id}" );
+
+                $wc_id = $this->product_sync->import_to_woocommerce( $product_id );
+
+                if ( $wc_id ) {
+                    $this->logger->log( "AJAX: Produit {$product_id} importé avec succès en batch (WC ID: {$wc_id})" );
+                    $results[] = array(
+                        'product_id' => $product_id,
+                        'wc_id'      => $wc_id,
+                        'success'    => true,
+                        'message'    => 'Produit importé avec succès.',
+                    );
+                } else {
+                    $this->logger->log( "AJAX: Échec de l'import en batch du produit {$product_id}" );
+                    $results[] = array(
+                        'product_id' => $product_id,
+                        'success'    => false,
+                        'message'    => 'Échec de l\'import du produit.',
+                    );
+                }
+            } catch ( Exception $e ) {
+                $this->logger->log( "AJAX: Erreur import batch produit {$product_id} - " . $e->getMessage() );
+                $results[] = array(
+                    'product_id' => $product_id,
+                    'success'    => false,
+                    'message'    => $e->getMessage(),
+                );
+            }
+        }
+
+        wp_send_json_success(
+            array(
+                'results' => $results,
+            )
+        );
+    }
+
+    /**
+     * Handler du formulaire "Import massif en tâche de fond"
+     *
+     * Lance un job WP‑Cron qui va importer tous les produits correspondant aux
+     * filtres actuels, par batch, sans rester sur la page admin.
+     */
+    public function handle_start_mass_import() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( esc_html__( 'Permissions insuffisantes.', 'bihr-synch' ) );
+        }
+
+        check_admin_referer( 'bihrwi_start_mass_import_action', 'bihrwi_start_mass_import_nonce' );
+
+        // Récupérer les filtres depuis le POST (mêmes noms que pour la page produits)
+        $filter_search    = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
+        $filter_stock     = isset( $_POST['stock_filter'] ) ? sanitize_text_field( wp_unslash( $_POST['stock_filter'] ) ) : '';
+        $filter_price_min = isset( $_POST['price_min'] ) ? sanitize_text_field( wp_unslash( $_POST['price_min'] ) ) : '';
+        $filter_price_max = isset( $_POST['price_max'] ) ? sanitize_text_field( wp_unslash( $_POST['price_max'] ) ) : '';
+        $filter_category  = isset( $_POST['category_filter'] ) ? sanitize_text_field( wp_unslash( $_POST['category_filter'] ) ) : '';
+        $filter_cat_l1    = isset( $_POST['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l1'] ) ) : '';
+        $filter_cat_l2    = isset( $_POST['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2'] ) ) : '';
+        $filter_cat_l3    = isset( $_POST['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
+
+        // Récupérer tous les IDs correspondant à ces filtres
+        $ids = $this->product_sync->get_all_filtered_product_ids(
+            $filter_search,
+            $filter_stock,
+            $filter_price_min,
+            $filter_price_max,
+            $filter_category,
+            $filter_cat_l1,
+            $filter_cat_l2,
+            $filter_cat_l3
+        );
+
+        if ( empty( $ids ) ) {
+            wp_safe_redirect(
+                add_query_arg(
+                    array(
+                        'page'                  => 'bihr-products',
+                        'mass_import_started'   => 0,
+                        'mass_import_no_result' => 1,
+                    ),
+                    admin_url( 'admin.php' )
+                )
+            );
+            exit;
+        }
+
+        $queue = array(
+            'ids'        => array_map( 'intval', $ids ),
+            'position'   => 0,
+            'total'      => count( $ids ),
+            'started_at' => time(),
+            'success'    => 0,
+            'errors'     => 0,
+        );
+
+        update_option( 'bihrwi_mass_import_queue', $queue );
+
+        // Planifier le premier batch si aucun n'est en attente
+        if ( ! wp_next_scheduled( 'bihrwi_mass_import_event' ) ) {
+            wp_schedule_single_event( time() + 10, 'bihrwi_mass_import_event' );
+        }
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'                => 'bihr-products',
+                    'mass_import_started' => 1,
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    /**
+     * Tâche WP‑Cron : traite un batch de produits depuis la queue stockée en option.
+     */
+    public function run_mass_import_batch() {
+        $queue = get_option( 'bihrwi_mass_import_queue' );
+
+        if ( empty( $queue ) || empty( $queue['ids'] ) ) {
+            return;
+        }
+
+        $ids        = isset( $queue['ids'] ) ? (array) $queue['ids'] : array();
+        $position   = isset( $queue['position'] ) ? (int) $queue['position'] : 0;
+        $total      = isset( $queue['total'] ) ? (int) $queue['total'] : count( $ids );
+        $success    = isset( $queue['success'] ) ? (int) $queue['success'] : 0;
+        $errors     = isset( $queue['errors'] ) ? (int) $queue['errors'] : 0;
+        $batch_size = 100; // Nombre de produits importés par exécution de cron
+
+        if ( $position >= $total ) {
+            // Plus rien à faire
+            $this->logger->log( '[Mass Import] Queue terminée. Succès: ' . $success . ' / Erreurs: ' . $errors );
+            delete_option( 'bihrwi_mass_import_queue' );
+            return;
+        }
+
+        $end = min( $position + $batch_size, $total );
+
+        $this->logger->log(
+            sprintf(
+                '[Mass Import] Traitement du batch %d-%d sur %d produits (succès=%d, erreurs=%d)',
+                $position + 1,
+                $end,
+                $total,
+                $success,
+                $errors
+            )
+        );
+
+        for ( $i = $position; $i < $end; $i++ ) {
+            $product_id = isset( $ids[ $i ] ) ? (int) $ids[ $i ] : 0;
+
+            if ( ! $product_id ) {
+                continue;
+            }
+
+            try {
+                $wc_id = $this->product_sync->import_to_woocommerce( $product_id );
+                if ( $wc_id ) {
+                    $success++;
+                    $this->logger->log( "[Mass Import] Produit {$product_id} importé (WC ID: {$wc_id})" );
+                } else {
+                    $errors++;
+                    $this->logger->log( "[Mass Import] Échec de l'import du produit {$product_id}" );
+                }
+            } catch ( Exception $e ) {
+                $errors++;
+                $this->logger->log( "[Mass Import] Erreur produit {$product_id} : " . $e->getMessage() );
+            }
+        }
+
+        // Mettre à jour la queue
+        $queue['position'] = $end;
+        $queue['success']  = $success;
+        $queue['errors']   = $errors;
+        update_option( 'bihrwi_mass_import_queue', $queue );
+
+        // Replanifier un prochain batch si nécessaire
+        if ( $end < $total ) {
+            wp_schedule_single_event( time() + 60, 'bihrwi_mass_import_event' );
+        } else {
+            $this->logger->log( '[Mass Import] Tous les produits ont été traités.' );
+        }
+    }
 
 	/**
 	 * AJAX: Rafraîchir le stock en temps réel depuis l'API BIHR
