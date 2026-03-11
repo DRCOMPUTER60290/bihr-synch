@@ -863,9 +863,11 @@ class BihrWI_Product_Sync {
         $this->logger->log( 'Dossier de recherche: ' . $upload_dir );
 
         // Recherche des différents fichiers (le plus récent pour chaque type)
+        // IMPORTANT : on utilise des patterns STRICTS pour References et ExtendedReferences
+        // afin d'éviter les collisions entre cat-ref-full-*.csv et cat-extref-full-*.csv.
         $files = array(
-            'references'         => $this->find_latest_catalog_file( $upload_dir, 'ref' ),
-            'extendedreferences' => $this->find_latest_catalog_file( $upload_dir, 'extref' ),
+            'references'         => $this->find_latest_references_file( $upload_dir ),
+            'extendedreferences' => $this->find_latest_extreferences_file( $upload_dir ),
             'prices'             => $this->find_latest_catalog_file( $upload_dir, 'prices' ),
             'images'             => $this->find_latest_catalog_file( $upload_dir, 'images' ),
             'inventory'          => $this->find_latest_catalog_file( $upload_dir, 'inventory' ),
@@ -1066,14 +1068,16 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Trouve le fichier CSV le plus récent contenant un mot clé
+     * Trouve le fichier CSV le plus récent contenant un mot clé (fallback générique).
+     * NOTE : pour References et ExtendedReferences on privilégie désormais des helpers
+     * dédiés avec des patterns stricts (cat-ref-full-*.csv / cat-extref-full-*.csv).
      */
     protected function find_latest_catalog_file( $dir, $keyword ) {
         $pattern = trailingslashit( $dir ) . '*' . $keyword . '*.csv';
 
         $files = glob( $pattern );
         if ( empty( $files ) ) {
-            $this->logger->log( "Aucun fichier trouvé pour pattern: {$pattern}" );
+            $this->logger->log( "Aucun fichier trouvé pour pattern générique: {$pattern}" );
             return '';
         }
 
@@ -1084,8 +1088,57 @@ class BihrWI_Product_Sync {
             }
         );
 
-        $this->logger->log( "Fichier trouvé pour '{$keyword}': " . basename( $files[0] ) );
+        $this->logger->log( "Fichier (fallback) trouvé pour '{$keyword}': " . basename( $files[0] ) );
         return $files[0];
+    }
+
+    /**
+     * Trouve le fichier de références principal (cat-ref-full-*.csv) le plus récent.
+     * Fallback : si aucun fichier strict n'est trouvé, on revient au comportement historique
+     * via find_latest_catalog_file( 'ref' ) pour ne rien casser.
+     */
+    protected function find_latest_references_file( $dir ) {
+        $strict_pattern = trailingslashit( $dir ) . 'cat-ref-full-*.csv';
+        $files          = glob( $strict_pattern );
+
+        if ( ! empty( $files ) ) {
+            usort(
+                $files,
+                function( $a, $b ) {
+                    return filemtime( $b ) - filemtime( $a );
+                }
+            );
+            $this->logger->log( 'Fichier References (strict) trouvé: ' . basename( $files[0] ) );
+            return $files[0];
+        }
+
+        // Fallback documenté : on garde l'ancien comportement si aucun cat-ref-full n'est trouvé.
+        $this->logger->log( 'Aucun cat-ref-full-*.csv trouvé, fallback sur recherche générique *ref*.csv' );
+        return $this->find_latest_catalog_file( $dir, 'ref' );
+    }
+
+    /**
+     * Trouve le fichier ExtendedReferences (cat-extref-full-*.csv) le plus récent.
+     * Fallback : si aucun fichier strict n'est trouvé, on revient au comportement historique
+     * via find_latest_catalog_file( 'extref' ).
+     */
+    protected function find_latest_extreferences_file( $dir ) {
+        $strict_pattern = trailingslashit( $dir ) . 'cat-extref-full-*.csv';
+        $files          = glob( $strict_pattern );
+
+        if ( ! empty( $files ) ) {
+            usort(
+                $files,
+                function( $a, $b ) {
+                    return filemtime( $b ) - filemtime( $a );
+                }
+            );
+            $this->logger->log( 'Fichier ExtendedReferences (strict) trouvé: ' . basename( $files[0] ) );
+            return $files[0];
+        }
+
+        $this->logger->log( 'Aucun cat-extref-full-*.csv trouvé, fallback sur recherche générique *extref*.csv' );
+        return $this->find_latest_catalog_file( $dir, 'extref' );
     }
 
     /**
@@ -1148,10 +1201,24 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Parcourt un CSV en streaming et appelle un callback pour chaque ligne.
+     * Parcourt un CSV et appelle un callback pour chaque ligne.
      * Retourne le nombre de lignes lues.
+     *
+     * NOTE : pour limiter les risques de régression, on distingue deux chemins :
+     * - pour les fichiers cat-ref-full-*.csv (References), on utilise un parsing robuste
+     *   basé sur fopen() + fgetcsv() (comme Excel) via iterate_csv_rows_stream().
+     * - pour les autres fichiers historiques, on conserve la logique existante
+     *   basée sur get_contents() + str_getcsv(), qui a déjà été validée en production.
      */
     protected function iterate_csv_rows( $file_path, callable $callback ) {
+        $basename = basename( $file_path );
+
+        // Chemin robuste uniquement pour cat-ref-full-*.csv (contient CategoryPath)
+        if ( preg_match( '/^cat-ref-full-.*\.csv$/i', $basename ) ) {
+            return $this->iterate_csv_rows_stream( $file_path, $callback );
+        }
+
+        // Comportement historique pour tous les autres fichiers (compatibilité maximale)
         $wp_filesystem = $this->get_wp_filesystem();
 
         if ( ! $wp_filesystem->exists( $file_path ) ) {
@@ -1170,7 +1237,7 @@ class BihrWI_Product_Sync {
 
         // Détection du séparateur ; ou ,
         $first_line = $lines[0];
-        $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+        $delimiter  = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
 
         $header = str_getcsv( $first_line, $delimiter );
         if ( ! $header ) {
@@ -1188,7 +1255,7 @@ class BihrWI_Product_Sync {
 
         for ( $i = 1; $i < count( $lines ); $i++ ) {
             $line = trim( $lines[ $i ] );
-            if ( empty( $line ) ) {
+            if ( '' === $line ) {
                 continue;
             }
 
@@ -1205,6 +1272,71 @@ class BihrWI_Product_Sync {
             $callback( $row, $count );
             $count++;
         }
+
+        return $count;
+    }
+
+    /**
+     * Version robuste de iterate_csv_rows() utilisant fopen() + fgetcsv().
+     * Utilisée principalement pour cat-ref-full-*.csv afin de parser CategoryPath
+     * de manière fiable (BOM, CRLF, champs entre guillemets, etc.).
+     */
+    protected function iterate_csv_rows_stream( $file_path, callable $callback ) {
+        if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
+            return 0;
+        }
+
+        $handle = fopen( $file_path, 'r' );
+        if ( false === $handle ) {
+            return 0;
+        }
+
+        // Gestion éventuelle du BOM UTF-8
+        $bom = fread( $handle, 3 );
+        if ( $bom !== "\xEF\xBB\xBF" ) {
+            rewind( $handle );
+        }
+
+        // Détection du séparateur sur la première ligne lisible
+        $first_line = fgets( $handle );
+        rewind( $handle );
+        if ( $bom === "\xEF\xBB\xBF" ) {
+            fread( $handle, 3 ); // Skip BOM
+        }
+        $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+
+        // Lecture de l'en-tête
+        $header = fgetcsv( $handle, 0, $delimiter );
+        if ( false === $header ) {
+            fclose( $handle );
+            return 0;
+        }
+
+        $header = array_map(
+            function( $h ) {
+                return strtolower( trim( $h ) );
+            },
+            $header
+        );
+
+        $count = 0;
+
+        while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+            // Sauter les lignes vides ou mal formées
+            if ( empty( $data ) || count( $data ) !== count( $header ) ) {
+                continue;
+            }
+
+            $row = array();
+            foreach ( $header as $j => $key ) {
+                $row[ $key ] = isset( $data[ $j ] ) ? $data[ $j ] : '';
+            }
+
+            $callback( $row, $count );
+            $count++;
+        }
+
+        fclose( $handle );
 
         return $count;
     }
@@ -1236,12 +1368,14 @@ class BihrWI_Product_Sync {
     protected function parse_references_csv( $file_path ) {
         $this->logger->log( 'Parsing References CSV : ' . $file_path );
 
-        $result = array();
-        $first_logged = false;
+        $result               = array();
+        $first_logged         = false;
+        $cat_levels_filled    = 0;
+        $cat_levels_empty     = 0;
 
         $count = $this->iterate_csv_rows(
             $file_path,
-            function( $row ) use ( &$result, &$first_logged ) {
+            function( $row ) use ( &$result, &$first_logged, &$cat_levels_filled, &$cat_levels_empty ) {
                 $code = $this->get_product_code_from_row( $row );
                 if ( $code === '' ) {
                     return;
@@ -1277,10 +1411,23 @@ class BihrWI_Product_Sync {
 
                 // CategoryPath (si présent dans le CSV)
                 if ( isset( $row['categorypath'] ) && class_exists( 'BihrWI_Category_Path' ) ) {
-                    $levels = BihrWI_Category_Path::parse_category_path( $row['categorypath'] );
-                    $cat_l1 = $levels['l1'];
-                    $cat_l2 = $levels['l2'];
-                    $cat_l3 = $levels['l3'];
+                    $raw_categorypath = trim( (string) $row['categorypath'] );
+                    if ( $raw_categorypath !== '' ) {
+                        $levels = BihrWI_Category_Path::parse_category_path( $raw_categorypath );
+                        $cat_l1 = $levels['l1'];
+                        $cat_l2 = $levels['l2'];
+                        $cat_l3 = $levels['l3'];
+
+                        if ( $cat_l1 !== '' || $cat_l2 !== '' || $cat_l3 !== '' ) {
+                            $cat_levels_filled++;
+                        } else {
+                            // CategoryPath présent mais jugé invalide / placeholder par le parser
+                            $cat_levels_empty++;
+                        }
+                    } else {
+                        // CategoryPath vide
+                        $cat_levels_empty++;
+                    }
                 }
 
                 $result[ $code ] = array(
@@ -1296,6 +1443,10 @@ class BihrWI_Product_Sync {
         );
 
         $this->logger->log( 'Parsing References: ' . $count . ' lignes.' );
+        $this->logger->log( 'References: cat_l1/cat_l2/cat_l3 remplis pour ' . $cat_levels_filled . ' produits.' );
+        if ( $cat_levels_empty > 0 ) {
+            $this->logger->log( 'References: CategoryPath vide ou invalide pour ' . $cat_levels_empty . ' lignes (niveaux laissés vides).' );
+        }
 
         return $result;
     }
