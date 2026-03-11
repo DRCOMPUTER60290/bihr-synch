@@ -151,13 +151,24 @@
 
         // S'assurer que les valeurs cachées sont bien synchronisées avant l'envoi du formulaire "Filtrer"
         $('#bihr-products-filters').on('submit', function() {
-            var selectedL1 = $('.bihr-cat-l1-checkbox:checked').first().data('value') || '';
-            var selectedL2 = $('.bihr-cat-l2-checkbox:checked').first().data('value') || '';
-            var selectedL3 = $('.bihr-cat-l3-checkbox:checked').first().data('value') || '';
+            var selectedL1 = [];
+            $('.bihr-cat-l1-checkbox:checked').each(function() {
+                selectedL1.push($(this).data('value') + '');
+            });
 
-            $('#cat_l1_value').val(selectedL1 || '');
-            $('#cat_l2_value').val(selectedL2 || '');
-            $('#cat_l3_value').val(selectedL3 || '');
+            var selectedL2 = [];
+            $('.bihr-cat-l2-checkbox:checked').each(function() {
+                selectedL2.push($(this).data('value') + '');
+            });
+
+            var selectedL3 = [];
+            $('.bihr-cat-l3-checkbox:checked').each(function() {
+                selectedL3.push($(this).data('value') + '');
+            });
+
+            $('#cat_l1_value').val(selectedL1.join('||'));
+            $('#cat_l2_value').val(selectedL2.join('||'));
+            $('#cat_l3_value').val(selectedL3.join('||'));
         });
     }
 
