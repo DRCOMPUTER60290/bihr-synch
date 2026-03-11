@@ -254,9 +254,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <div class="bihr-section">
         <h3>Option B : Import manuel des fichiers CSV</h3>
         <p>
-            Place tous les fichiers CSV Bihr (<code>references</code>, <code>extendedreferences</code>, 
-            <code>prices</code>, <code>images</code>, <code>inventory</code>, <code>attributes</code>) dans
-            <code>wp-content/uploads/bihr-import/</code>, puis clique sur le bouton ci-dessous.
+            Place le fichier CSV Bihr du catalogue <code>Extended</code> (contenu de <code>cat-extended-full-*.zip</code>)
+            dans <code>wp-content/uploads/bihr-import/</code>, puis clique sur le bouton ci-dessous.
         </p>
 
         <form method="post" id="bihr-merge-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
