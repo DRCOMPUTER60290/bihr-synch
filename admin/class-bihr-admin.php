@@ -1120,14 +1120,10 @@ class BihrWI_Admin {
 			$this->logger->log( 'Téléchargement de tous les catalogues: démarrage' );
 
 			// Liste des catalogues à télécharger
-			// On garde Extended (cat-extended-full-*.csv) pour les catégories hiérarchiques
-			// et on supprime le téléchargement du zip "extref full" devenu inutile.
+			// Tu as choisi de ne conserver que le catalog "Extended" (cat-extended-full-*.zip)
+			// pour la hiérarchie produit. On ne génère plus ici les autres catalogues.
 			$catalogs = array(
-				'References'   => 'References',
                 'ExtendedFull' => 'Extended',
-				'Attributes'   => 'Attributes',
-				'Images'       => 'Images',
-				'Stocks'       => 'Stocks',
 			);
             $downloaded_files = array();
 
@@ -1233,13 +1229,9 @@ class BihrWI_Admin {
 			$this->logger->log( 'AJAX: Téléchargement de tous les catalogues' );
 
             // Liste des catalogues
-            // On conserve "Extended" (cat-extended-full-*.zip) et on arrête de télécharger le zip extref full.
+            // Ici aussi on ne télécharge plus que "Extended" (cat-extended-full-*.zip).
             $catalogs = array(
-                'References'   => 'References',
                 'ExtendedFull' => 'Extended',
-                'Attributes'   => 'Attributes',
-                'Images'       => 'Images',
-                'Stocks'       => 'Stocks',
             );
             $downloaded_files = array();
 		$failed_catalogs  = array();
