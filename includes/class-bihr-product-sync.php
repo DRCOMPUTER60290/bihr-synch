@@ -226,19 +226,41 @@ class BihrWI_Product_Sync {
         }
 
         // Filtres sur les niveaux CategoryPath (cat_l1 / cat_l2 / cat_l3) stockés dans wp_bihr_products.
+        // Supporte maintenant plusieurs valeurs par niveau, encodées sous forme "val1||val2||val3".
         if ( $cat_l1_filter !== '' ) {
-            $where_sql .= ' AND cat_l1 = %s';
-            $args[]     = $cat_l1_filter;
+            $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
+            if ( count( $values_l1 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
+                $where_sql   .= " AND cat_l1 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l1 );
+            } else {
+                $where_sql .= ' AND cat_l1 = %s';
+                $args[]     = reset( $values_l1 );
+            }
         }
 
         if ( $cat_l2_filter !== '' ) {
-            $where_sql .= ' AND cat_l2 = %s';
-            $args[]     = $cat_l2_filter;
+            $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
+            if ( count( $values_l2 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
+                $where_sql   .= " AND cat_l2 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l2 );
+            } else {
+                $where_sql .= ' AND cat_l2 = %s';
+                $args[]     = reset( $values_l2 );
+            }
         }
 
         if ( $cat_l3_filter !== '' ) {
-            $where_sql .= ' AND cat_l3 = %s';
-            $args[]     = $cat_l3_filter;
+            $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
+            if ( count( $values_l3 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
+                $where_sql   .= " AND cat_l3 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l3 );
+            } else {
+                $where_sql .= ' AND cat_l3 = %s';
+                $args[]     = reset( $values_l3 );
+            }
         }
 
         // Whitelist des colonnes autorisées pour ORDER BY
@@ -353,20 +375,41 @@ class BihrWI_Product_Sync {
             $args[] = $normalized_category;
         }
 
-        // Filtres sur les niveaux CategoryPath.
+        // Filtres sur les niveaux CategoryPath (support multi-valeurs "val1||val2")
         if ( $cat_l1_filter !== '' ) {
-            $where_sql .= ' AND cat_l1 = %s';
-            $args[]     = $cat_l1_filter;
+            $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
+            if ( count( $values_l1 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
+                $where_sql   .= " AND cat_l1 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l1 );
+            } else {
+                $where_sql .= ' AND cat_l1 = %s';
+                $args[]     = reset( $values_l1 );
+            }
         }
 
         if ( $cat_l2_filter !== '' ) {
-            $where_sql .= ' AND cat_l2 = %s';
-            $args[]     = $cat_l2_filter;
+            $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
+            if ( count( $values_l2 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
+                $where_sql   .= " AND cat_l2 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l2 );
+            } else {
+                $where_sql .= ' AND cat_l2 = %s';
+                $args[]     = reset( $values_l2 );
+            }
         }
 
         if ( $cat_l3_filter !== '' ) {
-            $where_sql .= ' AND cat_l3 = %s';
-            $args[]     = $cat_l3_filter;
+            $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
+            if ( count( $values_l3 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
+                $where_sql   .= " AND cat_l3 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l3 );
+            } else {
+                $where_sql .= ' AND cat_l3 = %s';
+                $args[]     = reset( $values_l3 );
+            }
         }
 
         // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
@@ -440,18 +483,39 @@ class BihrWI_Product_Sync {
             $args[] = $category_filter;
         }
 
-        // Filtres sur les niveaux CategoryPath
+        // Filtres sur les niveaux CategoryPath (support multi-valeurs "val1||val2")
         if ( $cat_l1_filter !== '' ) {
-            $where_sql .= ' AND cat_l1 = %s';
-            $args[] = $cat_l1_filter;
+            $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
+            if ( count( $values_l1 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
+                $where_sql   .= " AND cat_l1 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l1 );
+            } else {
+                $where_sql .= ' AND cat_l1 = %s';
+                $args[]     = reset( $values_l1 );
+            }
         }
         if ( $cat_l2_filter !== '' ) {
-            $where_sql .= ' AND cat_l2 = %s';
-            $args[] = $cat_l2_filter;
+            $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
+            if ( count( $values_l2 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
+                $where_sql   .= " AND cat_l2 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l2 );
+            } else {
+                $where_sql .= ' AND cat_l2 = %s';
+                $args[]     = reset( $values_l2 );
+            }
         }
         if ( $cat_l3_filter !== '' ) {
-            $where_sql .= ' AND cat_l3 = %s';
-            $args[] = $cat_l3_filter;
+            $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
+            if ( count( $values_l3 ) > 1 ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
+                $where_sql   .= " AND cat_l3 IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l3 );
+            } else {
+                $where_sql .= ' AND cat_l3 = %s';
+                $args[]     = reset( $values_l3 );
+            }
         }
 
         $table_name = esc_sql( $this->table_name );

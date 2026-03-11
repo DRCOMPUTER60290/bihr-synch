@@ -568,51 +568,70 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
                 <!-- Filtres hiérarchiques basés sur les niveaux CategoryPath (cat_l1 / cat_l2 / cat_l3) -->
                 <div class="bihr-filter-field">
-                    <label for="cat_l1">
+                    <label>
                         Niveau 1 (CategoryPath)
                     </label>
-                    <select name="cat_l1" id="cat_l1">
-                        <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
+                    <!-- Valeur réelle envoyée au backend (une seule valeur pour garder les performances actuelles) -->
+                    <input type="hidden" name="cat_l1" id="cat_l1_value" value="<?php echo esc_attr( $filter_cat_l1 ); ?>" />
+                    <div id="cat_l1_box" class="bihr-cat-checkbox-list" style="max-height: 160px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 6px; background: #fff;">
                         <?php if ( ! empty( $available_cat_l1 ) ) : ?>
                             <?php foreach ( $available_cat_l1 as $cat_l1_value ) : ?>
-                                <option value="<?php echo esc_attr( $cat_l1_value ); ?>" <?php selected( $filter_cat_l1, $cat_l1_value ); ?>>
+                                <label class="bihr-cat-checkbox-item" style="display:block; margin-bottom:2px;">
+                                    <input type="checkbox"
+                                           class="bihr-cat-l1-checkbox"
+                                           data-value="<?php echo esc_attr( $cat_l1_value ); ?>"
+                                           <?php checked( $filter_cat_l1, $cat_l1_value ); ?> />
                                     <?php echo esc_html( $cat_l1_value ); ?>
-                                </option>
+                                </label>
                             <?php endforeach; ?>
+                        <?php else : ?>
+                            <em style="color:#666;">Aucune catégorie disponible.</em>
                         <?php endif; ?>
-                    </select>
+                    </div>
                 </div>
 
                 <div class="bihr-filter-field">
-                    <label for="cat_l2">
+                    <label>
                         Niveau 2
                     </label>
-                    <select name="cat_l2" id="cat_l2" <?php echo empty( $available_cat_l2 ) ? 'disabled' : ''; ?>>
-                        <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
+                    <input type="hidden" name="cat_l2" id="cat_l2_value" value="<?php echo esc_attr( $filter_cat_l2 ); ?>" />
+                    <div id="cat_l2_box" class="bihr-cat-checkbox-list" style="max-height: 160px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 6px; background: #fff; <?php echo empty( $available_cat_l2 ) ? 'opacity:0.6;' : ''; ?>">
                         <?php if ( ! empty( $available_cat_l2 ) ) : ?>
                             <?php foreach ( $available_cat_l2 as $cat_l2_value ) : ?>
-                                <option value="<?php echo esc_attr( $cat_l2_value ); ?>" <?php selected( $filter_cat_l2, $cat_l2_value ); ?>>
+                                <label class="bihr-cat-checkbox-item" style="display:block; margin-bottom:2px;">
+                                    <input type="checkbox"
+                                           class="bihr-cat-l2-checkbox"
+                                           data-value="<?php echo esc_attr( $cat_l2_value ); ?>"
+                                           <?php checked( $filter_cat_l2, $cat_l2_value ); ?> />
                                     <?php echo esc_html( $cat_l2_value ); ?>
-                                </option>
+                                </label>
                             <?php endforeach; ?>
+                        <?php else : ?>
+                            <em style="color:#666;">Choisissez d'abord un Niveau 1.</em>
                         <?php endif; ?>
-                    </select>
+                    </div>
                 </div>
 
                 <div class="bihr-filter-field">
-                    <label for="cat_l3">
+                    <label>
                         Niveau 3
                     </label>
-                    <select name="cat_l3" id="cat_l3" <?php echo empty( $available_cat_l3 ) ? 'disabled' : ''; ?>>
-                        <option value=""><?php esc_html_e( 'Toutes', 'bihr-synch' ); ?></option>
+                    <input type="hidden" name="cat_l3" id="cat_l3_value" value="<?php echo esc_attr( $filter_cat_l3 ); ?>" />
+                    <div id="cat_l3_box" class="bihr-cat-checkbox-list" style="max-height: 160px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 6px; background: #fff; <?php echo empty( $available_cat_l3 ) ? 'opacity:0.6;' : ''; ?>">
                         <?php if ( ! empty( $available_cat_l3 ) ) : ?>
                             <?php foreach ( $available_cat_l3 as $cat_l3_value ) : ?>
-                                <option value="<?php echo esc_attr( $cat_l3_value ); ?>" <?php selected( $filter_cat_l3, $cat_l3_value ); ?>>
+                                <label class="bihr-cat-checkbox-item" style="display:block; margin-bottom:2px;">
+                                    <input type="checkbox"
+                                           class="bihr-cat-l3-checkbox"
+                                           data-value="<?php echo esc_attr( $cat_l3_value ); ?>"
+                                           <?php checked( $filter_cat_l3, $cat_l3_value ); ?> />
                                     <?php echo esc_html( $cat_l3_value ); ?>
-                                </option>
+                                </label>
                             <?php endforeach; ?>
+                        <?php else : ?>
+                            <em style="color:#666;">Choisissez d'abord un Niveau 2.</em>
                         <?php endif; ?>
-                    </select>
+                    </div>
                 </div>
 
                 <div class="bihr-filter-field">
