@@ -146,10 +146,36 @@ class BihrWI_Product_Sync {
         }
 
         $table_name = esc_sql( $this->table_name );
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL préparée juste après
-        $sql        = "SELECT DISTINCT TRIM(cat_l2) AS cat_l2 FROM `{$table_name}` WHERE cat_l1 = %s AND cat_l2 IS NOT NULL AND TRIM(cat_l2) <> '' ORDER BY cat_l2 ASC";
 
-        $prepared = $wpdb->prepare( $sql, $cat_l1 );
+        // Support multi-sélection : cat_l1 peut contenir "val1||val2||val3"
+        $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1 ) ) );
+        if ( empty( $values_l1 ) ) {
+            return array();
+        }
+
+        if ( count( $values_l1 ) > 1 ) {
+            $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL préparée juste après
+            $sql = "SELECT DISTINCT TRIM(cat_l2) AS cat_l2
+                    FROM `{$table_name}`
+                    WHERE TRIM(cat_l1) IN ({$placeholders})
+                      AND cat_l2 IS NOT NULL
+                      AND TRIM(cat_l2) <> ''
+                    ORDER BY cat_l2 ASC";
+
+            $prepared = $wpdb->prepare( $sql, $values_l1 );
+        } else {
+            // Cas simple: un seul Niveau 1 sélectionné
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL préparée juste après
+            $sql      = "SELECT DISTINCT TRIM(cat_l2) AS cat_l2
+                         FROM `{$table_name}`
+                         WHERE TRIM(cat_l1) = %s
+                           AND cat_l2 IS NOT NULL
+                           AND TRIM(cat_l2) <> ''
+                         ORDER BY cat_l2 ASC";
+            $prepared = $wpdb->prepare( $sql, reset( $values_l1 ) );
+        }
+
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         return $wpdb->get_col( $prepared );
     }
@@ -172,10 +198,28 @@ class BihrWI_Product_Sync {
         }
 
         $table_name = esc_sql( $this->table_name );
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL préparée juste après
-        $sql        = "SELECT DISTINCT TRIM(cat_l3) AS cat_l3 FROM `{$table_name}` WHERE cat_l1 = %s AND cat_l2 = %s AND cat_l3 IS NOT NULL AND TRIM(cat_l3) <> '' ORDER BY cat_l3 ASC";
 
-        $prepared = $wpdb->prepare( $sql, $cat_l1, $cat_l2 );
+        // Multi-sélection possible sur cat_l1 et cat_l2 : "val1||val2"
+        $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1 ) ) );
+        $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2 ) ) );
+
+        if ( empty( $values_l1 ) || empty( $values_l2 ) ) {
+            return array();
+        }
+
+        $placeholders_l1 = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
+        $placeholders_l2 = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL préparée juste après
+        $sql = "SELECT DISTINCT TRIM(cat_l3) AS cat_l3
+                FROM `{$table_name}`
+                WHERE TRIM(cat_l1) IN ({$placeholders_l1})
+                  AND TRIM(cat_l2) IN ({$placeholders_l2})
+                  AND cat_l3 IS NOT NULL
+                  AND TRIM(cat_l3) <> ''
+                ORDER BY cat_l3 ASC";
+
+        $prepared = $wpdb->prepare( $sql, array_merge( $values_l1, $values_l2 ) );
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         return $wpdb->get_col( $prepared );
     }
@@ -255,10 +299,11 @@ class BihrWI_Product_Sync {
             $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
             if ( count( $values_l1 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
-                $where_sql   .= " AND cat_l1 IN ({$placeholders})";
+                // Utiliser TRIM(cat_l1) pour éviter les problèmes d'espaces parasites en base.
+                $where_sql   .= " AND TRIM(cat_l1) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l1 );
             } else {
-                $where_sql .= ' AND cat_l1 = %s';
+                $where_sql .= ' AND TRIM(cat_l1) = %s';
                 $args[]     = reset( $values_l1 );
             }
         }
@@ -267,10 +312,10 @@ class BihrWI_Product_Sync {
             $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
             if ( count( $values_l2 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
-                $where_sql   .= " AND cat_l2 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l2) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l2 );
             } else {
-                $where_sql .= ' AND cat_l2 = %s';
+                $where_sql .= ' AND TRIM(cat_l2) = %s';
                 $args[]     = reset( $values_l2 );
             }
         }
@@ -279,10 +324,10 @@ class BihrWI_Product_Sync {
             $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
             if ( count( $values_l3 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
-                $where_sql   .= " AND cat_l3 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l3) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l3 );
             } else {
-                $where_sql .= ' AND cat_l3 = %s';
+                $where_sql .= ' AND TRIM(cat_l3) = %s';
                 $args[]     = reset( $values_l3 );
             }
         }
@@ -404,10 +449,10 @@ class BihrWI_Product_Sync {
             $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
             if ( count( $values_l1 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
-                $where_sql   .= " AND cat_l1 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l1) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l1 );
             } else {
-                $where_sql .= ' AND cat_l1 = %s';
+                $where_sql .= ' AND TRIM(cat_l1) = %s';
                 $args[]     = reset( $values_l1 );
             }
         }
@@ -416,10 +461,10 @@ class BihrWI_Product_Sync {
             $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
             if ( count( $values_l2 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
-                $where_sql   .= " AND cat_l2 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l2) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l2 );
             } else {
-                $where_sql .= ' AND cat_l2 = %s';
+                $where_sql .= ' AND TRIM(cat_l2) = %s';
                 $args[]     = reset( $values_l2 );
             }
         }
@@ -428,10 +473,10 @@ class BihrWI_Product_Sync {
             $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
             if ( count( $values_l3 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
-                $where_sql   .= " AND cat_l3 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l3) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l3 );
             } else {
-                $where_sql .= ' AND cat_l3 = %s';
+                $where_sql .= ' AND TRIM(cat_l3) = %s';
                 $args[]     = reset( $values_l3 );
             }
         }
@@ -512,10 +557,10 @@ class BihrWI_Product_Sync {
             $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
             if ( count( $values_l1 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
-                $where_sql   .= " AND cat_l1 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l1) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l1 );
             } else {
-                $where_sql .= ' AND cat_l1 = %s';
+                $where_sql .= ' AND TRIM(cat_l1) = %s';
                 $args[]     = reset( $values_l1 );
             }
         }
@@ -523,10 +568,10 @@ class BihrWI_Product_Sync {
             $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
             if ( count( $values_l2 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
-                $where_sql   .= " AND cat_l2 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l2) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l2 );
             } else {
-                $where_sql .= ' AND cat_l2 = %s';
+                $where_sql .= ' AND TRIM(cat_l2) = %s';
                 $args[]     = reset( $values_l2 );
             }
         }
@@ -534,10 +579,10 @@ class BihrWI_Product_Sync {
             $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
             if ( count( $values_l3 ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
-                $where_sql   .= " AND cat_l3 IN ({$placeholders})";
+                $where_sql   .= " AND TRIM(cat_l3) IN ({$placeholders})";
                 $args         = array_merge( $args, $values_l3 );
             } else {
-                $where_sql .= ' AND cat_l3 = %s';
+                $where_sql .= ' AND TRIM(cat_l3) = %s';
                 $args[]     = reset( $values_l3 );
             }
         }

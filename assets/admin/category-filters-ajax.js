@@ -94,68 +94,59 @@
             $catL3Hidden.val(selectedL3);
         }
 
-        // Gestion des clics sur Niveau 1 : comportement type "radio" avec case à cocher
+        // Gestion des clics sur Niveau 1 : multi-sélection possible
         $(document).on('change', '.bihr-cat-l1-checkbox', function() {
-            var $this = $(this);
-            var val   = $this.data('value') + '';
+            // Recalculer la liste complète des valeurs sélectionnées
+            var selectedL1 = [];
+            $('.bihr-cat-l1-checkbox:checked').each(function() {
+                selectedL1.push($(this).data('value') + '');
+            });
 
-            // Ne permettre qu'une seule valeur sélectionnée
-            $('.bihr-cat-l1-checkbox').not($this).prop('checked', false);
+            var joinedL1 = selectedL1.join('||');
+            $catL1Hidden.val(joinedL1);
 
-            if ($this.is(':checked')) {
-                $catL1Hidden.val(val);
-                // Reset N2 et N3
-                $catL2Hidden.val('');
-                $catL3Hidden.val('');
-                $('#cat_l2_box').html('<em style="color:#666;">Chargement...</em>').css('opacity', 0.6);
-                $('#cat_l3_box').html('<em style="color:#666;">Choisissez d\'abord un Niveau 2.</em>').css('opacity', 0.6);
-                loadCatChildren(2, val, '', '');
-            } else {
-                // Plus aucune valeur sélectionnée
-                $catL1Hidden.val('');
-                $catL2Hidden.val('');
-                $catL3Hidden.val('');
-                $('#cat_l2_box').html('<em style="color:#666;">Choisissez d\'abord un Niveau 1.</em>').css('opacity', 0.6);
-                $('#cat_l3_box').html('<em style="color:#666;">Choisissez d\'abord un Niveau 2.</em>').css('opacity', 0.6);
+            // Reset N2 et N3
+            $catL2Hidden.val('');
+            $catL3Hidden.val('');
+            $('#cat_l2_box').html('<em style="color:#666;">' + (joinedL1 ? 'Chargement...' : 'Choisissez d\'abord un Niveau 1.') + '</em>').css('opacity', joinedL1 ? 0.6 : 0.6);
+            $('#cat_l3_box').html('<em style="color:#666;">Choisissez d\'abord un Niveau 2.</em>').css('opacity', 0.6);
+
+            if (joinedL1) {
+                loadCatChildren(2, joinedL1, '', '');
             }
         });
 
-        // Gestion des clics sur Niveau 2
+        // Gestion des clics sur Niveau 2 (multi-sélection possible)
         $(document).on('change', '.bihr-cat-l2-checkbox', function() {
-            var $this = $(this);
-            var val   = $this.data('value') + '';
             var catL1 = $catL1Hidden.val() || '';
 
-            // Ne permettre qu'une seule valeur sélectionnée
-            $('.bihr-cat-l2-checkbox').not($this).prop('checked', false);
+            // Recalculer la liste complète des valeurs sélectionnées en N2
+            var selectedL2 = [];
+            $('.bihr-cat-l2-checkbox:checked').each(function() {
+                selectedL2.push($(this).data('value') + '');
+            });
 
-            if ($this.is(':checked')) {
-                $catL2Hidden.val(val);
-                $catL3Hidden.val('');
+            var joinedL2 = selectedL2.join('||');
+            $catL2Hidden.val(joinedL2);
+            $catL3Hidden.val('');
+
+            if (catL1 && joinedL2) {
                 $('#cat_l3_box').html('<em style="color:#666;">Chargement...</em>').css('opacity', 0.6);
-                if (catL1) {
-                    loadCatChildren(3, catL1, val, '');
-                }
+                loadCatChildren(3, catL1, joinedL2, '');
             } else {
-                $catL2Hidden.val('');
-                $catL3Hidden.val('');
                 $('#cat_l3_box').html('<em style="color:#666;">Choisissez d\'abord un Niveau 2.</em>').css('opacity', 0.6);
             }
         });
 
-        // Gestion des clics sur Niveau 3
+        // Gestion des clics sur Niveau 3 (multi-sélection possible)
         $(document).on('change', '.bihr-cat-l3-checkbox', function() {
-            var $this = $(this);
-            var val   = $this.data('value') + '';
+            var selectedL3 = [];
+            $('.bihr-cat-l3-checkbox:checked').each(function() {
+                selectedL3.push($(this).data('value') + '');
+            });
 
-            // Ne permettre qu'une seule valeur sélectionnée
-            $('.bihr-cat-l3-checkbox').not($this).prop('checked', false);
-
-            if ($this.is(':checked')) {
-                $catL3Hidden.val(val);
-            } else {
-                $catL3Hidden.val('');
-            }
+            var joinedL3 = selectedL3.join('||');
+            $catL3Hidden.val(joinedL3);
         });
 
         // S'assurer que les valeurs cachées sont bien synchronisées avant l'envoi du formulaire "Filtrer"
