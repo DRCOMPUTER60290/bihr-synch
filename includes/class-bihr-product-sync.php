@@ -2377,11 +2377,10 @@ class BihrWI_Product_Sync {
             $cat_l2 = ! empty( $levels['l2'] ) ? $levels['l2'] : null;
             $cat_l3 = ! empty( $levels['l3'] ) ? $levels['l3'] : null;
 
-            // Si tous les niveaux sont vides, on met NULL
+            // Si tous les niveaux sont vides, on NE TOUCHE PAS à la ligne existante
+            // (afin de ne pas écraser un éventuel fallback cat-extended-full déjà enregistré).
             if ( empty( $cat_l1 ) && empty( $cat_l2 ) && empty( $cat_l3 ) ) {
-                $cat_l1 = null;
-                $cat_l2 = null;
-                $cat_l3 = null;
+                continue;
             }
 
             // Trouver le produit dans wp_bihr_products
