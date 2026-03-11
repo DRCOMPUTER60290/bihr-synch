@@ -1119,14 +1119,17 @@ class BihrWI_Admin {
         try {
 			$this->logger->log( 'Téléchargement de tous les catalogues: démarrage' );
 
-            // Liste des catalogues à télécharger
-            $catalogs = array(
-                'References'         => 'References',
-                'ExtendedReferences' => 'ExtendedReferences',
-                'Attributes'         => 'Attributes',
-                'Images'             => 'Images',
-                'Stocks'             => 'Stocks',
-            );		$downloaded_files = array();
+			// Liste des catalogues à télécharger
+			// NOTE: on ajoute "Extended" (cat-extended-full-*.csv) pour récupérer les catégories hiérarchiques.
+			$catalogs = array(
+				'References'         => 'References',
+				'ExtendedReferences' => 'ExtendedReferences',
+                'ExtendedFull'       => 'Extended',
+				'Attributes'         => 'Attributes',
+				'Images'             => 'Images',
+				'Stocks'             => 'Stocks',
+			);
+            $downloaded_files = array();
 
 			foreach ( $catalogs as $name => $path ) {
 				$this->logger->log( "Téléchargement du catalogue: {$name}" );
@@ -1230,13 +1233,16 @@ class BihrWI_Admin {
 			$this->logger->log( 'AJAX: Téléchargement de tous les catalogues' );
 
             // Liste des catalogues
+            // Ajout de "Extended" pour récupérer le catalog cat-extended-full-*.zip (catégories hiérarchiques).
             $catalogs = array(
                 'References'         => 'References',
                 'ExtendedReferences' => 'ExtendedReferences',
+                'ExtendedFull'       => 'Extended',
                 'Attributes'         => 'Attributes',
                 'Images'             => 'Images',
                 'Stocks'             => 'Stocks',
-            );		$downloaded_files = array();
+            );
+            $downloaded_files = array();
 		$failed_catalogs  = array();
 		$max_retries      = 3; // Nombre de tentatives pour chaque catalogue
 
