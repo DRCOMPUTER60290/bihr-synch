@@ -495,7 +495,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <!-- Filtres -->
     <div class="bihr-section">
         <h3>🔍 Filtres de recherche</h3>
-        <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="bihr-filters-form">
+        <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="bihr-filters-form" id="bihr-products-filters">
             <input type="hidden" name="page" value="bihr-products" />
             <?php wp_nonce_field( 'bihrwi_filter_nonce', 'bihrwi_filter_nonce_field' ); ?>
             
