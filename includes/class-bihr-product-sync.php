@@ -101,10 +101,34 @@ class BihrWI_Product_Sync {
         global $wpdb;
 
         $table_name = esc_sql( $this->table_name );
-        $sql        = "SELECT DISTINCT TRIM(cat_l1) AS cat_l1 FROM `{$table_name}` WHERE cat_l1 IS NOT NULL AND TRIM(cat_l1) <> '' ORDER BY cat_l1 ASC";
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- pas de paramètres utilisateur
-        return $wpdb->get_col( $sql );
+        // Ne retourner que les cat_l1 qui ont au moins un cat_l2 non vide,
+        // afin d'éviter les catégories de niveau 1 "orphelines" dans le filtre.
+        $sql = "
+            SELECT DISTINCT TRIM(t1.cat_l1) AS cat_l1
+            FROM `{$table_name}` AS t1
+            WHERE
+                t1.cat_l1 IS NOT NULL
+                AND TRIM(t1.cat_l1) <> ''
+                AND EXISTS (
+                    SELECT 1
+                    FROM `{$table_name}` AS t2
+                    WHERE
+                        t2.cat_l1 = t1.cat_l1
+                        AND t2.cat_l2 IS NOT NULL
+                        AND TRIM(t2.cat_l2) <> ''
+                )
+            ORDER BY cat_l1 ASC
+        ";
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- pas de paramètres utilisateur, noms de table échappés
+        $categories = $wpdb->get_col( $sql );
+
+        if ( is_array( $categories ) ) {
+            $this->logger->log( '[Categories] Niveaux 1 exploitables (avec au moins un Niveau 2) : ' . count( $categories ) );
+        }
+
+        return $categories;
     }
 
     /**
