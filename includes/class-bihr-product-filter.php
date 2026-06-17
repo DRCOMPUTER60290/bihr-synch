@@ -9,9 +9,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BihrWI_Product_Filter {
 
     protected $product_sync;
+    protected $category_translator;
 
     public function __construct() {
-        $this->product_sync = new BihrWI_Product_Sync( new BihrWI_Logger() );
+        $this->product_sync         = new BihrWI_Product_Sync( new BihrWI_Logger() );
+        $this->category_translator  = new BihrWI_Category_Translator();
 
         // Hooks frontend
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
@@ -122,12 +124,13 @@ class BihrWI_Product_Filter {
     }
 
     /**
-     * AJAX: Récupère la liste des catégories niveau 1
+     * AJAX: Récupère la liste des catégories niveau 1 (avec traductions FR)
      */
     public function ajax_get_cat_level1() {
         check_ajax_referer( 'bihr_product_filter_nonce', 'nonce' );
 
-        $categories = $this->product_sync->get_distinct_cat_level1();
+        $raw        = $this->product_sync->get_distinct_cat_level1();
+        $categories = $this->category_translator->to_labeled_array( $raw );
 
         wp_send_json_success( array(
             'categories' => $categories,
@@ -135,7 +138,7 @@ class BihrWI_Product_Filter {
     }
 
     /**
-     * AJAX: Récupère les catégories niveau 2 pour un niveau 1 donné
+     * AJAX: Récupère les catégories niveau 2 pour un niveau 1 donné (avec traductions FR)
      */
     public function ajax_get_cat_level2() {
         check_ajax_referer( 'bihr_product_filter_nonce', 'nonce' );
@@ -146,7 +149,8 @@ class BihrWI_Product_Filter {
             wp_send_json_error( array( 'message' => 'Catégorie niveau 1 requise' ) );
         }
 
-        $categories = $this->product_sync->get_distinct_cat_level2( $cat_l1 );
+        $raw        = $this->product_sync->get_distinct_cat_level2( $cat_l1 );
+        $categories = $this->category_translator->to_labeled_array( $raw );
 
         wp_send_json_success( array(
             'categories' => $categories,
@@ -154,7 +158,7 @@ class BihrWI_Product_Filter {
     }
 
     /**
-     * AJAX: Récupère les catégories niveau 3 pour un couple (l1, l2)
+     * AJAX: Récupère les catégories niveau 3 pour un couple (l1, l2) (avec traductions FR)
      */
     public function ajax_get_cat_level3() {
         check_ajax_referer( 'bihr_product_filter_nonce', 'nonce' );
@@ -166,7 +170,8 @@ class BihrWI_Product_Filter {
             wp_send_json_error( array( 'message' => 'Catégories niveau 1 et 2 requises' ) );
         }
 
-        $categories = $this->product_sync->get_distinct_cat_level3( $cat_l1, $cat_l2 );
+        $raw        = $this->product_sync->get_distinct_cat_level3( $cat_l1, $cat_l2 );
+        $categories = $this->category_translator->to_labeled_array( $raw );
 
         wp_send_json_success( array(
             'categories' => $categories,

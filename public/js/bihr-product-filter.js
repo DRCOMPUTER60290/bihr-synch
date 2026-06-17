@@ -30,7 +30,9 @@
                 if (response.success && response.data.categories) {
                     var options = '<option value="">-- Toutes les catégories --</option>';
                     $.each(response.data.categories, function(i, cat) {
-                        options += '<option value="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</option>';
+                        var val   = escapeHtml(cat.value !== undefined ? cat.value : cat);
+                        var label = escapeHtml(cat.label !== undefined ? cat.label : cat);
+                        options += '<option value="' + val + '">' + label + '</option>';
                     });
                     $catL1.html(options);
                 }
@@ -66,7 +68,9 @@
                 if (response.success && response.data.categories && response.data.categories.length > 0) {
                     var options = '<option value="">-- Toutes --</option>';
                     $.each(response.data.categories, function(i, cat) {
-                        options += '<option value="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</option>';
+                        var val   = escapeHtml(cat.value !== undefined ? cat.value : cat);
+                        var label = escapeHtml(cat.label !== undefined ? cat.label : cat);
+                        options += '<option value="' + val + '">' + label + '</option>';
                     });
                     $catL2.html(options).prop('disabled', false);
                 } else {
@@ -103,7 +107,9 @@
                 if (response.success && response.data.categories && response.data.categories.length > 0) {
                     var options = '<option value="">-- Toutes --</option>';
                     $.each(response.data.categories, function(i, cat) {
-                        options += '<option value="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</option>';
+                        var val   = escapeHtml(cat.value !== undefined ? cat.value : cat);
+                        var label = escapeHtml(cat.label !== undefined ? cat.label : cat);
+                        options += '<option value="' + val + '">' + label + '</option>';
                     });
                     $catL3.html(options).prop('disabled', false);
                 } else {

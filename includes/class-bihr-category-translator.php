@@ -73,6 +73,40 @@ class BihrWI_Category_Translator {
     }
 
     /**
+     * Traduit un nom de catégorie BIHR en français.
+     * Retourne le nom original si aucune traduction trouvée.
+     *
+     * @param string $bihr_name Nom BIHR (anglais).
+     * @return string
+     */
+    public function translate_name( $bihr_name ) {
+        $mapping = $this->get_mapping();
+        $trimmed = trim( $bihr_name );
+        return isset( $mapping[ $trimmed ] ) && $mapping[ $trimmed ] !== '' ? $mapping[ $trimmed ] : $bihr_name;
+    }
+
+    /**
+     * Transforme un tableau de noms BIHR en tableau d'objets {value, label}.
+     * Préserve la clé BIHR comme valeur interne pour les requêtes.
+     *
+     * @param string[] $bihr_names
+     * @return array[] Chaque élément : ['value' => 'BIHR_KEY', 'label' => 'Traduction FR']
+     */
+    public function to_labeled_array( $bihr_names ) {
+        $mapping = $this->get_mapping();
+        $result  = array();
+        foreach ( $bihr_names as $name ) {
+            $trimmed  = trim( $name );
+            $label    = ( isset( $mapping[ $trimmed ] ) && $mapping[ $trimmed ] !== '' ) ? $mapping[ $trimmed ] : $name;
+            $result[] = array(
+                'value' => $name,
+                'label' => $label,
+            );
+        }
+        return $result;
+    }
+
+    /**
      * Scanne tous les fichiers cat-extended-full-*.csv et retourne les catégories uniques.
      *
      * @param callable|null $callback fn($type, $name_or_msg, $current, $total, $extra)

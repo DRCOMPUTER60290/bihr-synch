@@ -4,11 +4,11 @@
  * Description: Import des catalogues Bihr (Prix, Images, Attributs, Stocks) et création de produits dans votre boutique en ligne.
  * Author: DrComputer60290 - Albert Benjamin
  * Author URI: https://drcomputer60290.fr
- * Version: 1.4.0
+ * Version: 2.0.0
  * Text Domain: bihr-synch
  * Domain Path: /languages
  * License: GPLv2 or later
- * 
+ *
  * Développé par: DrComputer60290
  * Entreprise: DrComputer60290
  * Représentant: M. Albert Benjamin
@@ -16,6 +16,8 @@
  * Email: webmaster@drcomputer60290.fr
  * Téléphone: 07 86 99 08 35
  * Site web: https://drcomputer60290.fr
+ *
+ * Co-éditeur IA: Claude Sonnet 4.6 (Anthropic) — assistance à la conception et au développement
  */
 
 // Sécurité de base
@@ -66,7 +68,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     do_action( 'bwi_fs_loaded' );
 }
 // Constantes
-define( 'BIHRWI_VERSION', '1.4.0' );
+define( 'BIHRWI_VERSION', '2.0.0' );
 define( 'BIHRWI_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BIHRWI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BIHRWI_LOG_FILE', WP_CONTENT_DIR . '/uploads/bihr-import/bihr-import.log' );
