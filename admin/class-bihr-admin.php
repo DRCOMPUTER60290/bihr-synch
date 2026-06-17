@@ -1442,24 +1442,60 @@ class BihrWI_Admin {
 	 * Handler AJAX pour la fusion des catalogues
 	 */
 	public function ajax_merge_catalogs() {
-		check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+		check_ajax_referer( 'bihrwi_merge_catalogs_action', '_wpnonce' );
 
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+			$this->send_progress_json( 'error', 'Permission denied.', 0, 1 );
+			wp_die();
 		}
 
+		// Désactiver le cache de sortie pour permettre le streaming
+		if ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
+		header( 'Content-Type: text/event-stream' );
+		header( 'Cache-Control: no-cache' );
+		header( 'Connection: keep-alive' );
+
+		$this->logger->log( 'AJAX: Fusion des catalogues (streaming)' );
+
 		try {
-			$this->logger->log( 'AJAX: Fusion des catalogues' );
+			$this->send_progress_json( 'progress', 'Démarrage de la fusion des catalogues...', 0, 100 );
 
-			$count = $this->product_sync->merge_catalogs_from_directory();
+			$total_products = $this->product_sync->merge_catalogs_from_directory( function( $message, $current, $total ) {
+			    $this->send_progress_json( 'progress', $message, $current, $total );
+			} );
 
-			$this->logger->log( "AJAX: Fusion terminée - {$count} produits" );
-
-			wp_send_json_success( array( 'count' => $count ) );
+			$this->logger->log( "AJAX: Fusion terminée - {$total_products} produits" );
+			$redirect_url = add_query_arg(
+			    array(
+			        'page'               => 'bihr-products',
+			        'bihrwi_merge_success' => 1,
+			        'bihrwi_merge_count'   => $total_products,
+			    ),
+			    admin_url( 'admin.php' )
+			);
+			$this->send_progress_json( 'complete', "Fusion terminée. {$total_products} produits traités.", $total_products, $total_products, $redirect_url );
 
 		} catch ( Exception $e ) {
 			$this->logger->log( 'AJAX: Erreur fusion - ' . $e->getMessage() );
-			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			$this->send_progress_json( 'error', 'Erreur lors de la fusion : ' . $e->getMessage(), 0, 1 );
+		}
+		wp_die();
+	}
+
+	// Helper pour envoyer les données de progression en JSON
+	protected function send_progress_json( $type, $message, $current = 0, $total = 0, $redirect_url = '' ) {
+		echo json_encode( array(
+			'type'        => $type,
+			'message'     => $message,
+			'current'     => $current,
+			'total'       => $total,
+			'redirect_url' => $redirect_url,
+		) ) . "\n";
+		flush();
+		if ( function_exists( 'opcache_reset' ) ) {
+			opcache_reset();
 		}
 	}
 

@@ -251,8 +251,12 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
     
 
-    <div class="bihr-section">
-        <h3>Option B : Import manuel des fichiers CSV</h3>
+        <div id="bihr-merge-progress" class="bihr-progress-container">
+            <div class="bihr-progress-bar-wrapper">
+                <div id="bihr-merge-progress-bar" class="bihr-progress-bar"></div>
+            </div>
+            <div id="bihr-merge-progress-text" class="bihr-progress-text">Initialisation...</div>
+        </div>
         <p>
             Place tous les fichiers CSV Bihr nécessaires (<code>references</code>, <code>extended</code> 
             (contenu de <code>cat-extended-full-*.zip</code>), <code>prices</code>, <code>images</code>, 
@@ -263,8 +267,96 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         <form method="post" id="bihr-merge-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
             <?php wp_nonce_field( 'bihrwi_merge_catalogs_action', 'bihrwi_merge_catalogs_nonce' ); ?>
             <input type="hidden" name="action" value="bihrwi_merge_catalogs" />
-            <?php submit_button( 'Fusionner les catalogues', 'secondary', 'submit', false ); ?>
+            <?php submit_button( 'Fusionner les catalogues', 'secondary', 'bihr-merge-catalogs-button', false ); ?>
         </form>
+
+        <div id="bihr-merge-progress" class="bihr-progress-container" style="display:none; margin-top:15px;">
+            <div class="bihr-progress-bar-wrapper">
+                <div id="bihr-merge-progress-bar" class="bihr-progress-bar"></div>
+            </div>
+            <div id="bihr-merge-progress-text" class="bihr-progress-text">Initialisation...</div>
+            <pre id="bihr-merge-log" style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 10px;"></pre>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var mergeButton = $('#bihr-merge-catalogs-button');
+            var mergeProgressContainer = $('#bihr-merge-progress');
+            var mergeProgressBar = $('#bihr-merge-progress-bar');
+            var mergeProgressText = $('#bihr-merge-progress-text');
+            var mergeLog = $('#bihr-merge-log');
+
+            mergeButton.on('click', function(e) {
+                e.preventDefault(); // Empêche l'envoi normal du formulaire
+
+                mergeButton.prop('disabled', true).text('Fusion en cours...');
+                mergeProgressContainer.show();
+                mergeProgressBar.css({'width': '0%', 'background': '#2271b1'}).text('0%');
+                mergeProgressText.text('Démarrage de la fusion...');
+                mergeLog.empty(); // Vider les logs précédents
+
+                // Requête AJAX pour lancer la fusion
+                $.ajax({
+                    url: ajaxurl, // ajaxurl est défini par WordPress
+                    type: 'POST',
+                    data: {
+                        action: 'bihrwi_merge_catalogs_ajax', // Nouvelle action AJAX que nous allons créer
+                        _wpnonce: $('#bihr-merge-form input[name="bihrwi_merge_catalogs_nonce"]').val() // Utiliser le nonce du formulaire
+                    },
+                    xhrFields: {
+                        onprogress: function(e) {
+                            var response = e.currentTarget.responseText;
+                            var lines = response.split('\n');
+                            lines.forEach(function(line) {
+                                try {
+                                    if (line.trim() === '') return;
+                                    var data = JSON.parse(line);
+                                    if (data.type === 'progress') {
+                                        var percentage = (data.current / data.total) * 100;
+                                        mergeProgressBar.css('width', percentage + '%').text(Math.round(percentage) + '%');
+                                        mergeProgressText.text(data.message);
+                                        mergeLog.append(escHtml(data.message) + '\n');
+                                        mergeLog.scrollTop(mergeLog[0].scrollHeight); // Faire défiler vers le bas
+                                    } else if (data.type === 'complete') {
+                                        mergeProgressBar.css({'width': '100%', 'background': '#2271b1'}).text('100%');
+                                        mergeProgressText.text(data.message + ' Redirection...');
+                                        mergeLog.append(escHtml(data.message) + '\n');
+                                        mergeLog.scrollTop(mergeLog[0].scrollHeight);
+                                        setTimeout(function() {
+                                            window.location.href = data.redirect_url;
+                                        }, 1000);
+                                    } else if (data.type === 'error') {
+                                        mergeProgressBar.css({'width': '100%', 'background': '#dc3232'}).text('Erreur');
+                                        mergeProgressText.text('Erreur: ' + data.message);
+                                        mergeLog.append('<span style="color:red;">Erreur: ' + escHtml(data.message) + '</span>\n');
+                                        mergeLog.scrollTop(mergeLog[0].scrollHeight);
+                                        mergeButton.prop('disabled', false).text('Fusionner les catalogues'); // Réactiver le bouton
+                                    }
+                                } catch (e) {
+                                    console.log('Non-JSON response or partial line:', line);
+                                }
+                            });
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        mergeProgressBar.css({'width': '100%', 'background': '#dc3232'}).text('Erreur');
+                        mergeProgressText.text('Erreur AJAX: ' + error);
+                        mergeLog.append('<span style="color:red;">Erreur AJAX: ' + escHtml(error) + '</span>\n');
+                        mergeLog.scrollTop(mergeLog[0].scrollHeight);
+                        mergeButton.prop('disabled', false).text('Fusionner les catalogues');
+                    }
+                });
+            });
+
+            // Fonction utilitaire pour échapper le HTML
+            function escHtml(text) {
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(text));
+                return div.innerHTML;
+            }
+        });
+    </script>
 
         <div id="bihr-merge-progress" class="bihr-progress-container">
             <div class="bihr-progress-bar-wrapper">
