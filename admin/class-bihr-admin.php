@@ -1449,21 +1449,25 @@ class BihrWI_Admin {
 			wp_die();
 		}
 
+		// Pas de limite de temps ni d'interruption par le client pour cette opération longue
+		set_time_limit( 0 );
+		ignore_user_abort( true );
+
 		// Désactiver le cache de sortie pour permettre le streaming
 		if ( ob_get_level() > 0 ) {
 			ob_end_clean();
 		}
-		header( 'Content-Type: text/event-stream' );
+		header( 'Content-Type: text/plain; charset=utf-8' );
 		header( 'Cache-Control: no-cache' );
-		header( 'Connection: keep-alive' );
+		header( 'X-Accel-Buffering: no' );
 
 		$this->logger->log( 'AJAX: Fusion des catalogues (streaming)' );
 
 		try {
 			$this->send_progress_json( 'progress', 'Démarrage de la fusion des catalogues...', 0, 100 );
 
-			$total_products = $this->product_sync->merge_catalogs_from_directory( function( $message, $current, $total ) {
-			    $this->send_progress_json( 'progress', $message, $current, $total );
+			$total_products = $this->product_sync->merge_catalogs_from_directory( function( $type, $message, $current, $total, $extra = array() ) {
+			    $this->send_progress_json( $type, $message, $current, $total, '', $extra );
 			} );
 
 			$this->logger->log( "AJAX: Fusion terminée - {$total_products} produits" );
@@ -1485,18 +1489,19 @@ class BihrWI_Admin {
 	}
 
 	// Helper pour envoyer les données de progression en JSON
-	protected function send_progress_json( $type, $message, $current = 0, $total = 0, $redirect_url = '' ) {
-		echo json_encode( array(
-			'type'        => $type,
-			'message'     => $message,
-			'current'     => $current,
-			'total'       => $total,
+	protected function send_progress_json( $type, $message, $current = 0, $total = 0, $redirect_url = '', $extra = array() ) {
+		$data = array(
+			'type'         => $type,
+			'message'      => $message,
+			'current'      => $current,
+			'total'        => $total,
 			'redirect_url' => $redirect_url,
-		) ) . "\n";
-		flush();
-		if ( function_exists( 'opcache_reset' ) ) {
-			opcache_reset();
+		);
+		if ( ! empty( $extra ) ) {
+			$data = array_merge( $data, $extra );
 		}
+		echo json_encode( $data ) . "\n";
+		flush();
 	}
 
 	/**

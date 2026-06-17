@@ -271,99 +271,270 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         </form>
 
         <div id="bihr-merge-progress" class="bihr-progress-container" style="display:none; margin-top:15px;">
+
+            <!-- Indicateur de phase -->
+            <div id="bihr-merge-phase" style="
+                display: flex; align-items: center; gap: 12px;
+                margin-bottom: 10px; font-weight: 600; font-size: 13px; color: #1d2327;
+            ">
+                <span id="bihr-phase-icon" style="font-size:18px;">📂</span>
+                <span id="bihr-phase-label">Phase 1 / 2 — Lecture des catalogues CSV</span>
+                <span id="bihr-phase-counter" style="margin-left:auto; color:#666; font-weight:400;"></span>
+            </div>
+
+            <!-- Barre de progression -->
             <div class="bihr-progress-bar-wrapper">
                 <div id="bihr-merge-progress-bar" class="bihr-progress-bar"></div>
             </div>
-            <div id="bihr-merge-progress-text" class="bihr-progress-text">Initialisation...</div>
-            <pre id="bihr-merge-log" style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 10px;"></pre>
+            <div id="bihr-merge-progress-text" class="bihr-progress-text" style="margin-bottom:12px;">Initialisation...</div>
+
+            <!-- Tableau de fichiers style installeur -->
+            <div id="bihr-merge-file-list" style="
+                height: 260px; overflow-y: auto;
+                background: #0d1117; color: #c9d1d9;
+                border-radius: 6px; border: 1px solid #30363d;
+                font-family: 'Consolas', 'Monaco', monospace; font-size: 12px;
+                padding: 8px 12px; line-height: 1.7;
+            ">
+                <div style="color:#58a6ff; margin-bottom:6px; border-bottom:1px solid #21262d; padding-bottom:6px;">
+                    BIHR Catalog Merge — en attente de démarrage...
+                </div>
+            </div>
+
+            <!-- Statistiques résumé (visible après fin) -->
+            <div id="bihr-merge-summary" style="display:none; margin-top:12px; padding:10px 14px;
+                background:#f0f6fc; border-left:4px solid #0969da; border-radius:4px; font-size:13px;">
+            </div>
+
         </div>
     </div>
 
     <script type="text/javascript">
-        jQuery(document).ready(function($) {
-            var mergeButton = $('#bihr-merge-catalogs-button');
-            var mergeProgressContainer = $('#bihr-merge-progress');
-            var mergeProgressBar = $('#bihr-merge-progress-bar');
-            var mergeProgressText = $('#bihr-merge-progress-text');
-            var mergeLog = $('#bihr-merge-log');
+    jQuery(document).ready(function($) {
 
-            mergeButton.on('click', function(e) {
-                e.preventDefault(); // Empêche l'envoi normal du formulaire
+        var mergeButton          = $('#bihr-merge-catalogs-button');
+        var mergeProgressContainer = $('#bihr-merge-progress');
+        var mergeProgressBar     = $('#bihr-merge-progress-bar');
+        var mergeProgressText    = $('#bihr-merge-progress-text');
+        var mergePhaseIcon       = $('#bihr-phase-icon');
+        var mergePhaseLabel      = $('#bihr-phase-label');
+        var mergePhaseCounter    = $('#bihr-phase-counter');
+        var mergeFileList        = $('#bihr-merge-file-list');
+        var mergeSummary         = $('#bihr-merge-summary');
 
-                mergeButton.prop('disabled', true).text('Fusion en cours...');
-                mergeProgressContainer.show();
-                mergeProgressBar.css({'width': '0%', 'background': '#2271b1'}).text('0%');
-                mergeProgressText.text('Démarrage de la fusion...');
-                mergeLog.empty(); // Vider les logs précédents
+        // Compteurs
+        var totalFiles = 0, doneFiles = 0, totalProducts = 0;
 
-                // Requête AJAX pour lancer la fusion
-                $.ajax({
-                    url: ajaxurl, // ajaxurl est défini par WordPress
-                    type: 'POST',
-                    data: {
-                        action: 'bihrwi_merge_catalogs_ajax', // Nouvelle action AJAX que nous allons créer
-                        _wpnonce: $('#bihr-merge-form input[name="bihrwi_merge_catalogs_nonce"]').val() // Utiliser le nonce du formulaire
-                    },
-                    xhrFields: {
-                        onprogress: function(e) {
-                            var response = e.currentTarget.responseText;
-                            var lines = response.split('\n');
-                            lines.forEach(function(line) {
-                                try {
-                                    if (line.trim() === '') return;
-                                    var data = JSON.parse(line);
-                                    if (data.type === 'progress') {
-                                        var percentage = (data.current / data.total) * 100;
-                                        mergeProgressBar.css('width', percentage + '%').text(Math.round(percentage) + '%');
-                                        mergeProgressText.text(data.message);
-                                        mergeLog.append(escHtml(data.message) + '\n');
-                                        mergeLog.scrollTop(mergeLog[0].scrollHeight); // Faire défiler vers le bas
-                                    } else if (data.type === 'complete') {
-                                        mergeProgressBar.css({'width': '100%', 'background': '#2271b1'}).text('100%');
-                                        mergeProgressText.text(data.message + ' Redirection...');
-                                        mergeLog.append(escHtml(data.message) + '\n');
-                                        mergeLog.scrollTop(mergeLog[0].scrollHeight);
-                                        setTimeout(function() {
-                                            window.location.href = data.redirect_url;
-                                        }, 1000);
-                                    } else if (data.type === 'error') {
-                                        mergeProgressBar.css({'width': '100%', 'background': '#dc3232'}).text('Erreur');
-                                        mergeProgressText.text('Erreur: ' + data.message);
-                                        mergeLog.append('<span style="color:red;">Erreur: ' + escHtml(data.message) + '</span>\n');
-                                        mergeLog.scrollTop(mergeLog[0].scrollHeight);
-                                        mergeButton.prop('disabled', false).text('Fusionner les catalogues'); // Réactiver le bouton
-                                    }
-                                } catch (e) {
-                                    console.log('Non-JSON response or partial line:', line);
-                                }
-                            });
+        // Garder la trace du dernier texte traité (évite de re-traiter les mêmes lignes)
+        var lastResponseLength = 0;
+        var mergeCompleted = false;
+        var activeFileRow = null; // Référence à la ligne en cours
+
+        function escHtml(text) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(String(text || '')));
+            return div.innerHTML;
+        }
+
+        // Extrait le nom court du catalogue depuis le nom de fichier
+        // Ex: "cat-extended-full-FR01-...-ARAI.csv" → "ARAI"
+        function shortName(filename) {
+            var m = filename.match(/_([^_]+)\.csv$/i);
+            return m ? m[1] : filename;
+        }
+
+        function processMergeLines(fullText) {
+            // Traiter uniquement les nouvelles données
+            var newText = fullText.slice(lastResponseLength);
+            lastResponseLength = fullText.length;
+            if (!newText) return;
+
+            var lines = newText.split('\n');
+            lines.forEach(function(line) {
+                try {
+                    if (line.trim() === '') return;
+                    var d = JSON.parse(line);
+
+                    if (d.type === 'file_start') {
+                        // ── Phase 1 : lecture CSV ──
+                        totalFiles = d.total;
+                        doneFiles  = d.current - 1;
+
+                        // Mettre à jour le header de phase
+                        mergePhaseIcon.text('📂');
+                        mergePhaseLabel.text('Phase 1 / 2 — Lecture des catalogues CSV');
+                        mergePhaseCounter.text(d.current + ' / ' + d.total);
+
+                        // Barre de progression phase 1 (max 50% réservé à la sauvegarde)
+                        var pct = (d.current / d.total) * 50;
+                        mergeProgressBar.css({'width': pct + '%', 'background': '#2271b1'}).text(d.current + '/' + d.total);
+                        mergeProgressText.text('Lecture : ' + escHtml(d.filename));
+
+                        // Ajouter une ligne "en cours" dans le tableau
+                        var rowId = 'mf-' + d.current;
+                        var rowHtml = '<div id="' + rowId + '" style="display:flex;align-items:center;gap:8px;padding:2px 0;">'
+                            + '<span class="bihr-file-spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:bihrSpin .8s linear infinite;flex-shrink:0;"></span>'
+                            + '<span style="color:#e6edf3;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(d.filename) + '">'
+                            + escHtml(shortName(d.filename))
+                            + '</span>'
+                            + '<span style="color:#484f58;font-size:11px;">...</span>'
+                            + '</div>';
+                        mergeFileList.append(rowHtml);
+                        activeFileRow = $('#' + rowId);
+
+                        // Auto-scroll
+                        mergeFileList.scrollTop(mergeFileList[0].scrollHeight);
+
+                    } else if (d.type === 'file_done') {
+                        // ── Terminer la ligne en cours ──
+                        doneFiles++;
+                        totalProducts = d.count;
+
+                        if (activeFileRow) {
+                            activeFileRow.html(
+                                '<span style="color:#3fb950;flex-shrink:0;">✔</span>'
+                                + '<span style="color:#8b949e;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(d.filename) + '">'
+                                + escHtml(shortName(d.filename))
+                                + '</span>'
+                                + '<span style="color:#3fb950;font-size:11px;white-space:nowrap;">' + d.count.toLocaleString() + ' produits</span>'
+                            ).css('display', 'flex').css('align-items','center').css('gap','8px').css('padding','2px 0');
+                            activeFileRow = null;
                         }
-                    },
-                    error: function(xhr, status, error) {
-                        mergeProgressBar.css({'width': '100%', 'background': '#dc3232'}).text('Erreur');
-                        mergeProgressText.text('Erreur AJAX: ' + error);
-                        mergeLog.append('<span style="color:red;">Erreur AJAX: ' + escHtml(error) + '</span>\n');
-                        mergeLog.scrollTop(mergeLog[0].scrollHeight);
+
+                        mergeFileList.scrollTop(mergeFileList[0].scrollHeight);
+
+                    } else if (d.type === 'progress') {
+                        // ── Phase 2 : sauvegarde DB ──
+                        mergePhaseIcon.text('💾');
+                        mergePhaseLabel.text('Phase 2 / 2 — Sauvegarde en base de données');
+
+                        var savePct = d.total > 0 ? (d.current / d.total) * 50 : 0;
+                        var totalPct = 50 + savePct; // Phase 1 = 0-50%, Phase 2 = 50-100%
+                        mergeProgressBar.css({'width': totalPct + '%', 'background': '#0969da'})
+                            .text(Math.round(totalPct) + '%');
+
+                        mergePhaseCounter.text(d.current.toLocaleString() + ' / ' + d.total.toLocaleString());
+                        mergeProgressText.text(d.message);
+
+                        // Ajouter une ligne de sauvegarde dans le tableau (une seule fois)
+                        if (!$('#bihr-save-row').length) {
+                            mergeFileList.append(
+                                '<div style="border-top:1px solid #21262d;margin:6px 0 4px;"></div>'
+                                + '<div id="bihr-save-row" style="display:flex;align-items:center;gap:8px;padding:2px 0;">'
+                                + '<span class="bihr-file-spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#0969da;border-radius:50%;animation:bihrSpin .8s linear infinite;flex-shrink:0;"></span>'
+                                + '<span style="color:#79c0ff;flex:1;">Sauvegarde en base de données...</span>'
+                                + '<span id="bihr-save-count" style="color:#0969da;font-size:11px;white-space:nowrap;"></span>'
+                                + '</div>'
+                            );
+                            mergeFileList.scrollTop(mergeFileList[0].scrollHeight);
+                        }
+                        $('#bihr-save-count').text(d.current.toLocaleString() + ' / ' + d.total.toLocaleString());
+
+                    } else if (d.type === 'complete') {
+                        mergeCompleted = true;
+
+                        // Finaliser la ligne de sauvegarde
+                        $('#bihr-save-row').html(
+                            '<span style="color:#3fb950;flex-shrink:0;">✔</span>'
+                            + '<span style="color:#8b949e;flex:1;">Sauvegarde terminée</span>'
+                            + '<span style="color:#3fb950;font-size:11px;white-space:nowrap;">'
+                            + (d.current || totalProducts).toLocaleString() + ' produits</span>'
+                        ).css('display','flex').css('align-items','center').css('gap','8px').css('padding','2px 0');
+
+                        mergeProgressBar.css({'width': '100%', 'background': '#00a32a'}).text('100%');
+                        mergePhaseIcon.text('✅');
+                        mergePhaseLabel.text('Fusion terminée !');
+                        mergePhaseCounter.text('');
+                        mergeProgressText.text('Redirection en cours...');
+
+                        // Résumé final
+                        mergeSummary.html(
+                            '<strong>' + (d.current || totalProducts).toLocaleString() + ' produits</strong> fusionnés depuis '
+                            + doneFiles + ' fichiers CSV. Redirection...'
+                        ).show();
+
+                        setTimeout(function() {
+                            window.location.href = d.redirect_url;
+                        }, 1800);
+
+                    } else if (d.type === 'error') {
+                        mergeCompleted = true;
+                        mergeProgressBar.css({'width': '100%', 'background': '#da3633'}).text('Erreur');
+                        mergePhaseIcon.text('❌');
+                        mergePhaseLabel.text('Erreur lors de la fusion');
+                        mergeProgressText.text(d.message);
+                        mergeFileList.append(
+                            '<div style="color:#f85149;margin-top:8px;">❌ ' + escHtml(d.message) + '</div>'
+                        );
                         mergeButton.prop('disabled', false).text('Fusionner les catalogues');
                     }
-                });
-            });
 
-            // Fonction utilitaire pour échapper le HTML
-            function escHtml(text) {
-                var div = document.createElement('div');
-                div.appendChild(document.createTextNode(text));
-                return div.innerHTML;
-            }
+                } catch (parseErr) {
+                    // Ligne partielle ou non-JSON — normal en streaming
+                }
+            });
+        }
+
+        mergeButton.on('click', function(e) {
+            e.preventDefault();
+
+            // Réinitialiser l'état
+            mergeCompleted    = false;
+            lastResponseLength = 0;
+            totalFiles = doneFiles = totalProducts = 0;
+            activeFileRow = null;
+
+            mergeButton.prop('disabled', true).text('Fusion en cours...');
+            mergeProgressContainer.show();
+            mergeProgressBar.css({'width': '0%', 'background': '#2271b1'}).text('0%');
+            mergeProgressText.text('Démarrage...');
+            mergePhaseIcon.text('⏳');
+            mergePhaseLabel.text('Initialisation de la fusion...');
+            mergePhaseCounter.text('');
+            mergeFileList.html(
+                '<div style="color:#58a6ff;margin-bottom:6px;border-bottom:1px solid #21262d;padding-bottom:6px;">'
+                + '▶ BIHR Catalog Merge démarré</div>'
+            );
+            mergeSummary.hide().html('');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                dataType: 'text',
+                data: {
+                    action: 'bihrwi_merge_catalogs_ajax',
+                    _wpnonce: $('#bihr-merge-form input[name="bihrwi_merge_catalogs_nonce"]').val()
+                },
+                xhrFields: {
+                    onprogress: function(e) {
+                        processMergeLines(e.currentTarget.responseText);
+                    }
+                },
+                success: function(response) {
+                    processMergeLines(response);
+                },
+                error: function(xhr, status, error) {
+                    if (mergeCompleted) return;
+                    mergeProgressBar.css({'width': '100%', 'background': '#da3633'}).text('Erreur');
+                    mergePhaseIcon.text('❌');
+                    mergePhaseLabel.text('Connexion interrompue');
+                    mergeProgressText.text('Erreur AJAX : ' + (error || status || 'connexion perdue'));
+                    mergeFileList.append(
+                        '<div style="color:#f85149;margin-top:8px;">❌ Erreur AJAX : ' + escHtml(error || status) + '</div>'
+                    );
+                    mergeButton.prop('disabled', false).text('Fusionner les catalogues');
+                }
+            });
         });
+
+    });
     </script>
 
-        <div id="bihr-merge-progress" class="bihr-progress-container">
-            <div class="bihr-progress-bar-wrapper">
-                <div id="bihr-merge-progress-bar" class="bihr-progress-bar"></div>
-            </div>
-            <div id="bihr-merge-progress-text" class="bihr-progress-text">Initialisation...</div>
-        </div>
+    <style>
+    @keyframes bihrSpin {
+        to { transform: rotate(360deg); }
+    }
+    </style>
     </div>
 
     <div class="bihr-section" style="margin-top: 20px;">

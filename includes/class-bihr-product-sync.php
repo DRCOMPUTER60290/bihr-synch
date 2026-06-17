@@ -919,7 +919,7 @@ class BihrWI_Product_Sync {
     /**
      * Fusionne les différents catalogues CSV présents dans wp-content/uploads/bihr-import/
      */
-    public function merge_catalogs_from_directory() {
+    public function merge_catalogs_from_directory( $callback = null ) {
         $upload_dir = WP_CONTENT_DIR . '/uploads/bihr-import';
 
         if ( ! is_dir( $upload_dir ) ) {
@@ -934,11 +934,11 @@ class BihrWI_Product_Sync {
         // 1) Tentative "mode Extended seul" : si les fichiers cat-extended-full-*.csv
         // contiennent déjà toutes les données, on peut construire directement
         // la liste des produits sans dépendre des autres catalogues.
-        $extended_master_products = $this->build_products_from_extended_full( $upload_dir );
+        $extended_master_products = $this->build_products_from_extended_full( $upload_dir, $callback );
         if ( ! empty( $extended_master_products ) ) {
             $this->logger->log( 'Mode Extended seul: utilisation directe de cat-extended-full pour construire les produits.' );
 
-            $count = $this->save_merged_products( $extended_master_products );
+            $count = $this->save_merged_products( $extended_master_products, $callback );
 
             $this->logger->log( 'TOTAL FUSIONNÉ (Extended seul): ' . count( $extended_master_products ) . ' produits uniques' );
             $this->logger->log( 'Produits enregistrés: ' . $count );
@@ -1152,7 +1152,7 @@ class BihrWI_Product_Sync {
 
         // Écriture dans la table wp_bihr_products
         $this->logger->log( '--- Sauvegarde dans la base de données ---' );
-        $count = $this->save_merged_products( $merged );
+        $count = $this->save_merged_products( $merged, $callback );
 
         $this->logger->log( '========================================' );
         $this->logger->log( '✓ FUSION TERMINÉE: ' . $count . ' produits enregistrés' );
@@ -1384,7 +1384,7 @@ class BihrWI_Product_Sync {
      * Si aucun fichier n'est trouvé ou qu'aucune ligne exploitable
      * n'est présente, retourne un tableau vide.
      */
-    protected function build_products_from_extended_full( $dir ) {
+    protected function build_products_from_extended_full( $dir, $callback = null ) {
         $products = array();
 
         $pattern = trailingslashit( $dir ) . 'cat-extended-full-*.csv';
@@ -1395,14 +1395,21 @@ class BihrWI_Product_Sync {
             return $products;
         }
 
-        $total_rows   = 0;
-        $total_built  = 0;
+        $total_rows    = 0;
+        $total_built   = 0;
+        $total_files   = count( $files );
+        $file_index    = 0;
 
-        $this->logger->log( 'ExtendedFull Master: ' . count( $files ) . ' fichier(s) détecté(s).' );
+        $this->logger->log( 'ExtendedFull Master: ' . $total_files . ' fichier(s) détecté(s).' );
 
         foreach ( $files as $file_path ) {
+            $file_index++;
             $basename = basename( $file_path );
             $this->logger->log( 'ExtendedFull Master: parsing ' . $basename );
+
+            if ( $callback ) {
+                call_user_func( $callback, 'file_start', $basename, $file_index, $total_files, array( 'filename' => $basename ) );
+            }
 
             if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
                 $this->logger->log( 'ExtendedFull Master: fichier non lisible, ignoré: ' . $file_path );
@@ -1540,7 +1547,15 @@ class BihrWI_Product_Sync {
                 $total_built++;
             }
 
+            $file_product_count = count( $products ) - ( $total_built - 0 ); // produits ajoutés par ce fichier
             fclose( $handle );
+
+            if ( $callback ) {
+                call_user_func( $callback, 'file_done', $basename, $file_index, $total_files, array(
+                    'filename' => $basename,
+                    'count'    => $total_built,
+                ) );
+            }
         }
 
         $this->logger->log(
@@ -2133,121 +2148,107 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Enregistre la fusion finale dans la table wp_bihr_products
+     * Enregistre la fusion finale dans la table wp_bihr_products.
+     * Utilise TRUNCATE + INSERT batch pour des performances optimales.
      */
-    protected function save_merged_products( $merged ) {
+    protected function save_merged_products( $merged, $callback = null ) {
         global $wpdb;
 
-        $count = 0;
+        $total      = count( $merged );
+        $count      = 0;
+        $chunk_size = 200;
+        $chunk      = array();
+
+        // Vider la table puis réinsérer en masse (100x plus rapide que row-by-row)
+        $wpdb->query( "TRUNCATE TABLE `{$this->table_name}`" );
 
         foreach ( $merged as $code => $data ) {
             if ( empty( $code ) ) {
                 continue;
             }
 
-            // Description + ajout éventuel des attributs
             $description = '';
             if ( isset( $data['description'] ) && $data['description'] !== null ) {
                 $description = (string) $data['description'];
             }
-
             if ( isset( $data['attributes_text'] ) && $data['attributes_text'] !== null ) {
                 $description .= "\n\n" . $data['attributes_text'];
             }
 
-            // Vérifier si le produit existe déjà
-            // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
-            $table_name = esc_sql( $this->table_name );
-            $existing = $wpdb->get_row(
-                $wpdb->prepare(
-                    "SELECT * FROM `{$table_name}` WHERE product_code = %s",
-                    $code
-                ),
-                ARRAY_A
+            $chunk[] = array(
+                'product_code'      => $code,
+                'new_part_number'   => isset( $data['new_part_number'] ) ? $data['new_part_number'] : null,
+                'name'              => isset( $data['name'] ) ? $data['name'] : null,
+                'description'       => $description !== '' ? $description : null,
+                'image_url'         => isset( $data['image_url'] ) ? $data['image_url'] : null,
+                'dealer_price_ht'   => isset( $data['dealer_price_ht'] ) ? $data['dealer_price_ht'] : null,
+                'stock_level'       => isset( $data['stock_level'] ) ? $data['stock_level'] : null,
+                'stock_description' => isset( $data['stock_description'] ) ? $data['stock_description'] : null,
+                'category'          => isset( $data['category'] ) ? $data['category'] : null,
+                'cat_l1'            => isset( $data['cat_l1'] ) ? $data['cat_l1'] : null,
+                'cat_l2'            => isset( $data['cat_l2'] ) ? $data['cat_l2'] : null,
+                'cat_l3'            => isset( $data['cat_l3'] ) ? $data['cat_l3'] : null,
             );
-
-            // Construction des champs à enregistrer (seulement les champs présents dans $data)
-            $fields = array( 'product_code' => $code );
-            $formats = array( '%s' );
-
-            // Ne mettre à jour que les champs qui sont présents dans $data
-            if ( isset( $data['new_part_number'] ) ) {
-                $fields['new_part_number'] = $data['new_part_number'];
-                $formats[] = '%s';
-            }
-
-            if ( isset( $data['name'] ) ) {
-                $fields['name'] = $data['name'];
-                $formats[] = '%s';
-            }
-
-            if ( $description !== '' ) {
-                $fields['description'] = $description;
-                $formats[] = '%s';
-            }
-
-            if ( isset( $data['image_url'] ) ) {
-                $fields['image_url'] = $data['image_url'];
-                $formats[] = '%s';
-            }
-
-            if ( isset( $data['dealer_price_ht'] ) ) {
-                $fields['dealer_price_ht'] = $data['dealer_price_ht'];
-                $formats[] = '%f';
-            }
-
-            if ( isset( $data['stock_level'] ) ) {
-                $fields['stock_level'] = $data['stock_level'];
-                $formats[] = '%d';
-            }
-
-            if ( isset( $data['stock_description'] ) ) {
-                $fields['stock_description'] = $data['stock_description'];
-                $formats[] = '%s';
-            }
-
-            if ( isset( $data['category'] ) ) {
-                $fields['category'] = $data['category'];
-                $formats[]          = '%s';
-            }
-
-            // Niveaux de catégorie issus de CategoryPath (CSV References).
-            if ( isset( $data['cat_l1'] ) ) {
-                $fields['cat_l1'] = $data['cat_l1'];
-                $formats[]        = '%s';
-            }
-
-            if ( isset( $data['cat_l2'] ) ) {
-                $fields['cat_l2'] = $data['cat_l2'];
-                $formats[]        = '%s';
-            }
-
-            if ( isset( $data['cat_l3'] ) ) {
-                $fields['cat_l3'] = $data['cat_l3'];
-                $formats[]        = '%s';
-            }
-
-            if ( $existing ) {
-                // UPDATE : ne mettre à jour que les champs fournis
-                $where = array( 'product_code' => $code );
-                $where_format = array( '%s' );
-                
-                // Retirer product_code des champs à mettre à jour
-                unset( $fields['product_code'] );
-                array_shift( $formats );
-                
-                if ( ! empty( $fields ) ) {
-                    $wpdb->update( $this->table_name, $fields, $where, $formats, $where_format );
-                }
-            } else {
-                // INSERT : nouveau produit
-                $wpdb->insert( $this->table_name, $fields, $formats );
-            }
-            
             $count++;
+
+            if ( count( $chunk ) >= $chunk_size ) {
+                $this->insert_products_chunk( $chunk );
+                $chunk = array();
+
+                if ( $callback ) {
+                    call_user_func( $callback, 'progress', "Sauvegarde en base: {$count}/{$total} produits...", $count, $total );
+                }
+            }
+        }
+
+        if ( ! empty( $chunk ) ) {
+            $this->insert_products_chunk( $chunk );
+            if ( $callback ) {
+                call_user_func( $callback, 'progress', "Sauvegarde en base: {$count}/{$total} produits...", $count, $total );
+            }
         }
 
         return $count;
+    }
+
+    /**
+     * Insère un tableau de produits en une seule requête SQL (batch INSERT).
+     */
+    private function insert_products_chunk( $rows ) {
+        global $wpdb;
+
+        if ( empty( $rows ) ) {
+            return;
+        }
+
+        $columns = array(
+            'product_code', 'new_part_number', 'name', 'description', 'image_url',
+            'dealer_price_ht', 'stock_level', 'stock_description', 'category',
+            'cat_l1', 'cat_l2', 'cat_l3',
+        );
+
+        $value_strings = array();
+
+        foreach ( $rows as $row ) {
+            $row_parts = array();
+            foreach ( $columns as $col ) {
+                $val = isset( $row[ $col ] ) ? $row[ $col ] : null;
+                if ( $val === null ) {
+                    $row_parts[] = 'NULL';
+                } elseif ( $col === 'stock_level' ) {
+                    $row_parts[] = intval( $val );
+                } elseif ( $col === 'dealer_price_ht' ) {
+                    $row_parts[] = floatval( $val );
+                } else {
+                    $row_parts[] = "'" . esc_sql( (string) $val ) . "'";
+                }
+            }
+            $value_strings[] = '(' . implode( ', ', $row_parts ) . ')';
+        }
+
+        $col_list = '`' . implode( '`, `', $columns ) . '`';
+        $sql = "INSERT INTO `{$this->table_name}` ({$col_list}) VALUES " . implode( ', ', $value_strings );
+        $wpdb->query( $sql );
     }
 
     /**
