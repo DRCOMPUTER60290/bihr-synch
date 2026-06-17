@@ -249,17 +249,10 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         </div>
     </div>
 
-    
-
-        <div id="bihr-merge-progress" class="bihr-progress-container">
-            <div class="bihr-progress-bar-wrapper">
-                <div id="bihr-merge-progress-bar" class="bihr-progress-bar"></div>
-            </div>
-            <div id="bihr-merge-progress-text" class="bihr-progress-text">Initialisation...</div>
-        </div>
+    <div class="bihr-section">
         <p>
-            Place tous les fichiers CSV Bihr nécessaires (<code>references</code>, <code>extended</code> 
-            (contenu de <code>cat-extended-full-*.zip</code>), <code>prices</code>, <code>images</code>, 
+            Place tous les fichiers CSV Bihr nécessaires (<code>references</code>, <code>extended</code>
+            (contenu de <code>cat-extended-full-*.zip</code>), <code>prices</code>, <code>images</code>,
             <code>inventory</code>, <code>attributes</code>) dans
             <code>wp-content/uploads/bihr-import/</code>, puis clique sur le bouton ci-dessous.
         </p>
@@ -535,7 +528,6 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         to { transform: rotate(360deg); }
     }
     </style>
-    </div>
 
     <div class="bihr-section" style="margin-top: 20px;">
         <h3>Recalculer les catégories depuis cat-ref-full</h3>
