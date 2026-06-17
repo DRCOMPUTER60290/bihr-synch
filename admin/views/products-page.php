@@ -559,6 +559,322 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <hr />
 
     <!-- =========================================================
+         1.5 TRADUCTION DES CATÉGORIES BIHR → FRANÇAIS
+    ========================================================== -->
+    <h2>1.5 Traduction des catégories</h2>
+
+    <div class="bihr-section">
+        <p>
+            Analyse les fichiers <code>cat-extended-full-*.csv</code>, extrait toutes les catégories uniques,
+            génère les traductions françaises via l'IA et crée l'arborescence WooCommerce correspondante.
+            <br><strong>⚠️ Une clé OpenAI est requise pour la traduction automatique. Sans clé, seules les catégories du cache sont utilisées.</strong>
+        </p>
+
+        <button type="button" id="bihr-analyze-categories-btn" class="button button-primary">
+            🏷️ Analyser et traduire les catégories
+        </button>
+        &nbsp;
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-categories-fr' ) ); ?>" class="button button-secondary">
+            👁️ Voir les traductions
+        </a>
+
+        <div id="bihr-analyze-progress" class="bihr-progress-container" style="display:none; margin-top:15px;">
+
+            <div id="bihr-analyze-phase" style="
+                display:flex; align-items:center; gap:12px;
+                margin-bottom:10px; font-weight:600; font-size:13px; color:#1d2327;
+            ">
+                <span id="bihr-analyze-icon" style="font-size:18px;">📂</span>
+                <span id="bihr-analyze-label">Démarrage...</span>
+                <span id="bihr-analyze-counter" style="margin-left:auto; color:#666; font-weight:400;"></span>
+            </div>
+
+            <div class="bihr-progress-bar-wrapper">
+                <div id="bihr-analyze-bar" class="bihr-progress-bar"></div>
+            </div>
+            <div id="bihr-analyze-text" class="bihr-progress-text" style="margin-bottom:12px;">Initialisation...</div>
+
+            <div id="bihr-analyze-log" style="
+                height:220px; overflow-y:auto;
+                background:#0d1117; color:#c9d1d9;
+                border-radius:6px; border:1px solid #30363d;
+                font-family:'Consolas','Monaco',monospace; font-size:12px;
+                padding:8px 12px; line-height:1.7;
+            ">
+                <div style="color:#58a6ff; border-bottom:1px solid #21262d; padding-bottom:6px; margin-bottom:4px;">
+                    BIHR Category Translator — en attente...
+                </div>
+            </div>
+
+            <div id="bihr-analyze-summary" style="display:none; margin-top:12px; padding:10px 14px;
+                background:#f0f6fc; border-left:4px solid #0969da; border-radius:4px; font-size:13px;">
+            </div>
+        </div>
+    </div>
+
+    <div class="bihr-section" style="margin-top:16px;">
+        <p>
+            Applique les traductions françaises à tous les produits WooCommerce BIHR existants.
+            Met à jour les métadonnées <code>_bihr_category1_fr</code> et affecte les catégories WooCommerce françaises.
+        </p>
+
+        <button type="button" id="bihr-apply-french-btn" class="button button-secondary">
+            ✅ Appliquer les catégories françaises aux produits
+        </button>
+
+        <div id="bihr-apply-progress" class="bihr-progress-container" style="display:none; margin-top:15px;">
+
+            <div id="bihr-apply-phase" style="
+                display:flex; align-items:center; gap:12px;
+                margin-bottom:10px; font-weight:600; font-size:13px; color:#1d2327;
+            ">
+                <span id="bihr-apply-icon" style="font-size:18px;">⚙️</span>
+                <span id="bihr-apply-label">Démarrage...</span>
+                <span id="bihr-apply-counter" style="margin-left:auto; color:#666; font-weight:400;"></span>
+            </div>
+
+            <div class="bihr-progress-bar-wrapper">
+                <div id="bihr-apply-bar" class="bihr-progress-bar"></div>
+            </div>
+            <div id="bihr-apply-text" class="bihr-progress-text" style="margin-bottom:12px;">Initialisation...</div>
+
+            <div id="bihr-apply-summary" style="display:none; margin-top:12px; padding:10px 14px;
+                background:#f0f6fc; border-left:4px solid #0969da; border-radius:4px; font-size:13px;">
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    jQuery(document).ready(function($) {
+
+        var analyzeNonce = '<?php echo esc_js( wp_create_nonce( 'bihrwi_analyze_categories_action' ) ); ?>';
+        var applyNonce   = '<?php echo esc_js( wp_create_nonce( 'bihrwi_apply_french_categories_action' ) ); ?>';
+        var ajaxUrl      = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
+
+        function escHtml(text) {
+            var d = document.createElement('div');
+            d.appendChild(document.createTextNode(String(text || '')));
+            return d.innerHTML;
+        }
+
+        // ─── Analyser et traduire ───────────────────────────────────────────
+
+        var analyzeBtn       = $('#bihr-analyze-categories-btn');
+        var analyzeContainer = $('#bihr-analyze-progress');
+        var analyzeBar       = $('#bihr-analyze-bar');
+        var analyzeText      = $('#bihr-analyze-text');
+        var analyzeIcon      = $('#bihr-analyze-icon');
+        var analyzeLabel     = $('#bihr-analyze-label');
+        var analyzeCounter   = $('#bihr-analyze-counter');
+        var analyzeLog       = $('#bihr-analyze-log');
+        var analyzeSummary   = $('#bihr-analyze-summary');
+
+        var analyzeLastLen = 0;
+
+        function processAnalyzeLines(fullText) {
+            var newText = fullText.slice(analyzeLastLen);
+            analyzeLastLen = fullText.length;
+            if (!newText) return;
+
+            newText.split('\n').forEach(function(line) {
+                try {
+                    if (!line.trim()) return;
+                    var d = JSON.parse(line);
+
+                    if (d.type === 'file_start') {
+                        analyzeIcon.text('📂');
+                        analyzeLabel.text('Lecture des fichiers CSV');
+                        analyzeCounter.text(d.current + ' / ' + d.total);
+                        analyzeBar.css({width: (d.current / d.total * 30) + '%', background: '#2271b1'})
+                            .text(d.current + '/' + d.total);
+                        analyzeText.text('Lecture : ' + escHtml(d.message));
+                        analyzeLog.append(
+                            '<div style="display:flex;gap:8px;padding:2px 0;">'
+                            + '<span class="bihr-file-spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:bihrSpin .8s linear infinite;flex-shrink:0;"></span>'
+                            + '<span style="color:#e6edf3;">' + escHtml(d.message) + '</span>'
+                            + '</div>'
+                        );
+                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+
+                    } else if (d.type === 'file_done') {
+                        analyzeLog.find('.bihr-file-spinner').last().replaceWith('<span style="color:#3fb950;flex-shrink:0;">✔</span>');
+
+                    } else if (d.type === 'status') {
+                        analyzeIcon.text('🔄');
+                        analyzeLabel.text(d.message);
+                        analyzeBar.css({width: (d.current / d.total * 100) + '%', background:'#0969da'})
+                            .text(Math.round(d.current / d.total * 100) + '%');
+                        analyzeLog.append('<div style="color:#79c0ff;padding:2px 0;">ℹ ' + escHtml(d.message) + '</div>');
+                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+
+                    } else if (d.type === 'translate_progress') {
+                        analyzeIcon.text('🤖');
+                        analyzeLabel.text('Traduction IA en cours');
+                        analyzeCounter.text(d.current + ' / ' + d.total);
+                        analyzeBar.css({width: (30 + (d.current / d.total * 40)) + '%', background:'#8250df'}).text('');
+                        analyzeText.text(d.message);
+                        analyzeLog.append('<div style="color:#d2a8ff;padding:2px 0;">🤖 ' + escHtml(d.message) + '</div>');
+                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+
+                    } else if (d.type === 'wc_progress') {
+                        analyzeIcon.text('🗂️');
+                        analyzeLabel.text('Catégories WooCommerce');
+                        analyzeBar.css({width: (70 + (d.current / d.total * 30)) + '%', background:'#1a7f37'}).text('');
+                        analyzeText.text(d.message);
+
+                    } else if (d.type === 'warning') {
+                        analyzeLog.append('<div style="color:#e3b341;padding:2px 0;">⚠ ' + escHtml(d.message) + '</div>');
+                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+
+                    } else if (d.type === 'complete') {
+                        analyzeBar.css({width:'100%', background:'#00a32a'}).text('100%');
+                        analyzeIcon.text('✅');
+                        analyzeLabel.text('Terminé !');
+                        analyzeCounter.text('');
+                        analyzeText.text(d.message);
+                        analyzeBtn.prop('disabled', false).text('🏷️ Analyser et traduire les catégories');
+
+                        if (d.extra) {
+                            var e = d.extra;
+                            analyzeSummary.html(
+                                '<strong>Catégories BIHR détectées :</strong> ' + (e.categories_detected || 0) + '<br>'
+                                + '<strong>Chaînes uniques :</strong> ' + (e.unique_strings || 0) + '<br>'
+                                + '<strong>Nouvelles traductions :</strong> ' + (e.new_translations || 0) + '<br>'
+                                + '<strong>Traductions du cache :</strong> ' + (e.cached_translations || 0) + '<br>'
+                                + '<strong>Catégories WooCommerce créées :</strong> ' + (e.wc_categories || 0) + '<br>'
+                                + '<strong>Durée :</strong> ' + (e.elapsed || '?') + 's'
+                            ).show();
+                        }
+
+                    } else if (d.type === 'error') {
+                        analyzeBar.css({width:'100%', background:'#da3633'}).text('Erreur');
+                        analyzeIcon.text('❌');
+                        analyzeLabel.text('Erreur');
+                        analyzeText.text(d.message);
+                        analyzeBtn.prop('disabled', false).text('🏷️ Analyser et traduire les catégories');
+                        analyzeLog.append('<div style="color:#f85149;margin-top:4px;">❌ ' + escHtml(d.message) + '</div>');
+                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+                    }
+                } catch(e) {}
+            });
+        }
+
+        analyzeBtn.on('click', function() {
+            analyzeLastLen = 0;
+            analyzeContainer.show();
+            analyzeLog.html('<div style="color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:6px;margin-bottom:4px;">BIHR Category Translator — démarrage...</div>');
+            analyzeSummary.hide();
+            analyzeBtn.prop('disabled', true).text('⏳ Analyse en cours...');
+            analyzeBar.css({width:'2%', background:'#2271b1'}).text('');
+            analyzeCounter.text('');
+
+            $.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: { action: 'bihrwi_analyze_categories', _wpnonce: analyzeNonce },
+                xhrFields: {
+                    onprogress: function() {
+                        processAnalyzeLines(this.responseText);
+                    }
+                },
+                complete: function(xhr) {
+                    processAnalyzeLines(xhr.responseText);
+                    analyzeBtn.prop('disabled', false);
+                }
+            });
+        });
+
+        // ─── Appliquer les catégories françaises ───────────────────────────
+
+        var applyBtn       = $('#bihr-apply-french-btn');
+        var applyContainer = $('#bihr-apply-progress');
+        var applyBar       = $('#bihr-apply-bar');
+        var applyText      = $('#bihr-apply-text');
+        var applyIcon      = $('#bihr-apply-icon');
+        var applyLabel     = $('#bihr-apply-label');
+        var applyCounter   = $('#bihr-apply-counter');
+        var applySummary   = $('#bihr-apply-summary');
+        var applyLastLen   = 0;
+
+        function processApplyLines(fullText) {
+            var newText = fullText.slice(applyLastLen);
+            applyLastLen = fullText.length;
+            if (!newText) return;
+
+            newText.split('\n').forEach(function(line) {
+                try {
+                    if (!line.trim()) return;
+                    var d = JSON.parse(line);
+
+                    if (d.type === 'status') {
+                        applyIcon.text('⚙️');
+                        applyLabel.text(d.message);
+                        applyText.text(d.message);
+
+                    } else if (d.type === 'progress') {
+                        var pct = d.total > 0 ? Math.round(d.current / d.total * 100) : 0;
+                        applyBar.css({width: pct + '%', background:'#0969da'}).text(pct + '%');
+                        applyCounter.text(d.current.toLocaleString() + ' / ' + d.total.toLocaleString());
+                        applyText.text(d.message);
+
+                    } else if (d.type === 'complete') {
+                        applyBar.css({width:'100%', background:'#00a32a'}).text('100%');
+                        applyIcon.text('✅');
+                        applyLabel.text('Terminé !');
+                        applyCounter.text('');
+                        applyText.text(d.message);
+                        applyBtn.prop('disabled', false).text('✅ Appliquer les catégories françaises aux produits');
+
+                        if (d.extra) {
+                            var e = d.extra;
+                            applySummary.html(
+                                '<strong>Produits traités :</strong> ' + (e.total || 0) + '<br>'
+                                + '<strong>Produits mis à jour :</strong> ' + (e.updated || 0) + '<br>'
+                                + '<strong>Durée :</strong> ' + (e.elapsed || '?') + 's'
+                            ).show();
+                        }
+
+                    } else if (d.type === 'error') {
+                        applyBar.css({width:'100%', background:'#da3633'}).text('Erreur');
+                        applyIcon.text('❌');
+                        applyLabel.text('Erreur');
+                        applyText.text(d.message);
+                        applyBtn.prop('disabled', false);
+                    }
+                } catch(e) {}
+            });
+        }
+
+        applyBtn.on('click', function() {
+            applyLastLen = 0;
+            applyContainer.show();
+            applySummary.hide();
+            applyBtn.prop('disabled', true).text('⏳ Application en cours...');
+            applyBar.css({width:'2%', background:'#2271b1'}).text('');
+            applyCounter.text('');
+
+            $.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: { action: 'bihrwi_apply_french_categories', _wpnonce: applyNonce },
+                xhrFields: {
+                    onprogress: function() {
+                        processApplyLines(this.responseText);
+                    }
+                },
+                complete: function(xhr) {
+                    processApplyLines(xhr.responseText);
+                    applyBtn.prop('disabled', false);
+                }
+            });
+        });
+
+    });
+    </script>
+
+    <hr />
+
+    <!-- =========================================================
          2. CATALOG PRICES (ASYNC)
     ========================================================== -->
     <h2>2. Catalog Prices (gestion asynchrone)</h2>

@@ -83,6 +83,7 @@ require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-filter.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-filter.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-path.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-filters.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-translator.php';
 require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
 
 // Enregistrement des commandes WP-CLI (import massif en ligne de commande)
