@@ -1604,6 +1604,9 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Permission denied.' ) );
         }
 
+        // Éviter le timeout PHP sur les gros batches
+        @set_time_limit( 300 );
+
         $product_ids = isset( $_POST['product_ids'] ) ? (array) $_POST['product_ids'] : array();
         $product_ids = array_map( 'intval', $product_ids );
         $product_ids = array_filter( $product_ids );
@@ -1612,22 +1615,20 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Aucun ID de produit valide fourni.' ) );
         }
 
-        // Sécurité serveur : limiter la taille du batch côté PHP également (au cas où)
-        $max_per_batch = 100; // On pourra monter plus haut si le serveur le supporte
-        if ( count( $product_ids ) > $max_per_batch ) {
-            $product_ids = array_slice( $product_ids, 0, $max_per_batch );
+        if ( count( $product_ids ) > 100 ) {
+            $product_ids = array_slice( $product_ids, 0, 100 );
         }
+
+        // Désactiver le recomptage WooCommerce pendant le batch (gain ~30%)
+        wc_defer_product_counting( true );
 
         $results = array();
 
         foreach ( $product_ids as $product_id ) {
             try {
-                $this->logger->log( "AJAX: Import (batch) du produit ID {$product_id}" );
-
                 $wc_id = $this->product_sync->import_to_woocommerce( $product_id );
 
                 if ( $wc_id ) {
-                    $this->logger->log( "AJAX: Produit {$product_id} importé avec succès en batch (WC ID: {$wc_id})" );
                     $results[] = array(
                         'product_id' => $product_id,
                         'wc_id'      => $wc_id,
@@ -1635,7 +1636,6 @@ class BihrWI_Admin {
                         'message'    => 'Produit importé avec succès.',
                     );
                 } else {
-                    $this->logger->log( "AJAX: Échec de l'import en batch du produit {$product_id}" );
                     $results[] = array(
                         'product_id' => $product_id,
                         'success'    => false,
@@ -1643,7 +1643,6 @@ class BihrWI_Admin {
                     );
                 }
             } catch ( Exception $e ) {
-                $this->logger->log( "AJAX: Erreur import batch produit {$product_id} - " . $e->getMessage() );
                 $results[] = array(
                     'product_id' => $product_id,
                     'success'    => false,
@@ -1652,11 +1651,12 @@ class BihrWI_Admin {
             }
         }
 
-        wp_send_json_success(
-            array(
-                'results' => $results,
-            )
-        );
+        // Réactiver le recomptage et déclencher une mise à jour finale
+        wc_defer_product_counting( false );
+
+        $this->logger->log( sprintf( 'Batch terminé : %d produits traités.', count( $results ) ) );
+
+        wp_send_json_success( array( 'results' => $results ) );
     }
 
     /**
@@ -1803,9 +1803,9 @@ class BihrWI_Admin {
         $queue['errors']   = $errors;
         update_option( 'bihrwi_mass_import_queue', $queue );
 
-        // Replanifier un prochain batch si nécessaire
+        // Replanifier un prochain batch si nécessaire (5s au lieu de 60s)
         if ( $end < $total ) {
-            wp_schedule_single_event( time() + 60, 'bihrwi_mass_import_event' );
+            wp_schedule_single_event( time() + 5, 'bihrwi_mass_import_event' );
         } else {
             $this->logger->log( '[Mass Import] Tous les produits ont été traités.' );
         }
