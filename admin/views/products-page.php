@@ -1403,7 +1403,30 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 <span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span>
                 Importer tous les produits filtrés
             </button>
+            <label style="margin-left: 15px; font-weight: 600; cursor: pointer;" title="Importe les données produit sans télécharger les images — ×3 plus rapide. Téléchargez les images ensuite.">
+                <input type="checkbox" id="bihr-skip-images" style="margin-right: 4px;">
+                Sans images <span style="color:#2271b1;">(×3 plus rapide)</span>
+            </label>
         </div>
+
+        <?php
+        $pending_img_count = (int) count( get_posts( array(
+            'post_type'      => 'product',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'meta_query'     => array(
+                array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
+            ),
+        ) ) );
+        if ( $pending_img_count > 0 ) : ?>
+        <div id="bihr-pending-images-banner" style="margin: 10px 0; padding: 10px 15px; background: #fff3cd; border-left: 4px solid #f0ad4e; border-radius: 2px;">
+            <strong><?php echo intval( $pending_img_count ); ?> produit(s)</strong> sans image en attente de téléchargement.
+            <button id="bihr-download-pending-images" class="button button-secondary" style="margin-left: 10px;">
+                <span class="dashicons dashicons-format-image" style="vertical-align: middle;"></span>
+                Télécharger les images manquantes
+            </button>
+        </div>
+        <?php endif; ?>
 
         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-left:auto; display:flex; align-items:center; gap:8px;">
             <input type="hidden" name="action" value="bihrwi_start_mass_import" />

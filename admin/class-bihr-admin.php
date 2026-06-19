@@ -44,8 +44,8 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_download_all_catalogs_ajax', array( $this, 'ajax_download_all_catalogs' ) );
         add_action( 'wp_ajax_bihrwi_merge_catalogs_ajax', array( $this, 'ajax_merge_catalogs' ) );
         add_action( 'wp_ajax_bihrwi_import_single_product', array( $this, 'ajax_import_single_product' ) );
-        // Import en batch (jusqu'à 50–100 produits par requête pour accélérer fortement l'import)
         add_action( 'wp_ajax_bihrwi_import_products_batch', array( $this, 'ajax_import_products_batch' ) );
+        add_action( 'wp_ajax_bihrwi_download_pending_images', array( $this, 'ajax_download_pending_images' ) );
         add_action( 'wp_ajax_bihr_refresh_stock', array( $this, 'ajax_refresh_stock' ) );
         add_action( 'wp_ajax_bihrwi_import_vehicles', array( $this, 'ajax_import_vehicles' ) );
         if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
@@ -120,12 +120,22 @@ class BihrWI_Admin {
 			true
 		);
 
+        $pending_images = (int) count( get_posts( array(
+            'post_type'      => 'product',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'meta_query'     => array(
+                array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
+            ),
+        ) ) );
+
 		wp_localize_script(
 			'bihr-progress-js',
 			'bihrProgressData',
 			array(
-				'nonce' => wp_create_nonce( 'bihrwi_ajax_nonce' ),
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonce'          => wp_create_nonce( 'bihrwi_ajax_nonce' ),
+				'ajaxurl'        => admin_url( 'admin-ajax.php' ),
+				'pendingImages'  => $pending_images,
 			)
 		);
 
@@ -1619,6 +1629,8 @@ class BihrWI_Admin {
             $product_ids = array_slice( $product_ids, 0, 100 );
         }
 
+        $skip_images = ! empty( $_POST['skip_images'] ) && '1' === $_POST['skip_images'];
+
         // Désactiver le recomptage WooCommerce pendant le batch (gain ~30%)
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( true );
@@ -1628,7 +1640,7 @@ class BihrWI_Admin {
 
         foreach ( $product_ids as $product_id ) {
             try {
-                $wc_id = $this->product_sync->import_to_woocommerce( $product_id );
+                $wc_id = $this->product_sync->import_to_woocommerce( $product_id, $skip_images );
 
                 if ( $wc_id ) {
                     $results[] = array(
@@ -1661,6 +1673,22 @@ class BihrWI_Admin {
         $this->logger->log( sprintf( 'Batch terminé : %d produits traités.', count( $results ) ) );
 
         wp_send_json_success( array( 'results' => $results ) );
+    }
+
+    /**
+     * AJAX : télécharge un lot d'images en attente (_bihr_pending_image_url).
+     * Appelé en boucle par le JS jusqu'à ce que remaining == 0.
+     */
+    public function ajax_download_pending_images() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        $remaining = $this->product_sync->download_pending_images_batch( 20 );
+
+        wp_send_json_success( array( 'remaining' => $remaining ) );
     }
 
     /**

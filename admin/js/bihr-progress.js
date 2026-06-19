@@ -170,6 +170,8 @@ jQuery(document).ready(function($) {
             // Scroll vers le bas
             $progressDetails.scrollTop($progressDetails[0].scrollHeight);
 
+            var skipImages = $('#bihr-skip-images').is(':checked') ? '1' : '0';
+
             // Appel AJAX pour importer le batch de produits
             $.ajax({
                 url: ajaxurl,
@@ -177,19 +179,18 @@ jQuery(document).ready(function($) {
                 data: {
                     action: 'bihrwi_import_products_batch',
                     product_ids: batchIds,
+                    skip_images: skipImages,
                     nonce: bihrProgressData.nonce
                 },
                 success: function(response) {
                     if (response.success && response.data && response.data.results) {
-                        // Parcourir les résultats renvoyés par le serveur
                         for (var j = 0; j < response.data.results.length; j++) {
                             var res = response.data.results[j];
                             var lineId = '#bihr-import-' + res.product_id;
-
                             if (res.success) {
                                 $(lineId).html(
                                     '<span id="bihr-success-' + res.product_id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
-                                    '<strong>Produit ID ' + res.product_id + '</strong> - Importé avec succès (WC ID: ' + res.wc_id + ')'
+                                    '<strong>Produit ID ' + res.product_id + '</strong> - Importé (WC ID: ' + res.wc_id + ')'
                                 );
                                 successCount++;
                             } else {
@@ -201,7 +202,6 @@ jQuery(document).ready(function($) {
                             }
                         }
                     } else {
-                        // Si la réponse n'est pas valide, marquer tout le batch en erreur
                         for (var k = 0; k < batch.length; k++) {
                             var p = batch[k];
                             $('#bihr-import-' + p.id).html(
@@ -213,7 +213,6 @@ jQuery(document).ready(function($) {
                     }
                 },
                 error: function() {
-                    // Erreur de connexion pour tout le batch
                     for (var k = 0; k < batch.length; k++) {
                         var p = batch[k];
                         $('#bihr-import-' + p.id).html(
@@ -224,19 +223,15 @@ jQuery(document).ready(function($) {
                     }
                 },
                 complete: function() {
-                    // Avancer l'index du nombre d'éléments traités dans ce batch
                     currentIndex += batch.length;
-
                     var percent = Math.round((currentIndex / selectedProducts.length) * 100);
                     $progressBar.css('width', percent + '%').text(percent + '%');
                     $progressText.text(currentIndex + ' / ' + selectedProducts.length + ' produits importés');
-
-                    // Petit délai pour éviter de surcharger le serveur
                     setTimeout(importNextProductBatch, 500);
                 }
             });
         }
-        
+
         // Démarrer l'import par batch
         importNextProductBatch();
     });
@@ -358,6 +353,8 @@ jQuery(document).ready(function($) {
                         // Scroll vers le bas
                         $progressDetails.scrollTop($progressDetails[0].scrollHeight);
 
+                        var skipImagesFiltered = $('#bihr-skip-images').is(':checked') ? '1' : '0';
+
                         // Appel AJAX pour importer le batch de produits
                         $.ajax({
                             url: ajaxurl,
@@ -365,19 +362,18 @@ jQuery(document).ready(function($) {
                             data: {
                                 action: 'bihrwi_import_products_batch',
                                 product_ids: batchIds,
+                                skip_images: skipImagesFiltered,
                                 nonce: bihrProgressData.nonce
                             },
                             success: function(response) {
                                 if (response.success && response.data && response.data.results) {
-                                    // Parcourir les résultats renvoyés par le serveur
                                     for (var j = 0; j < response.data.results.length; j++) {
                                         var res = response.data.results[j];
                                         var lineId = '#bihr-import-' + res.product_id;
-
                                         if (res.success) {
                                             $(lineId).html(
                                                 '<span id="bihr-success-' + res.product_id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
-                                                '<strong>Produit ID ' + res.product_id + '</strong> - Importé avec succès (WC ID: ' + res.wc_id + ')'
+                                                '<strong>Produit ID ' + res.product_id + '</strong> - Importé (WC ID: ' + res.wc_id + ')'
                                             );
                                             successCount++;
                                         } else {
@@ -389,7 +385,6 @@ jQuery(document).ready(function($) {
                                         }
                                     }
                                 } else {
-                                    // Si la réponse n'est pas valide, marquer tout le batch en erreur
                                     for (var k = 0; k < batch.length; k++) {
                                         var p = batch[k];
                                         $('#bihr-import-' + p.id).html(
@@ -401,7 +396,6 @@ jQuery(document).ready(function($) {
                                 }
                             },
                             error: function() {
-                                // Erreur de connexion pour tout le batch
                                 for (var k = 0; k < batch.length; k++) {
                                     var p = batch[k];
                                     $('#bihr-import-' + p.id).html(
@@ -412,19 +406,15 @@ jQuery(document).ready(function($) {
                                 }
                             },
                             complete: function() {
-                                // Avancer l'index du nombre d'éléments traités dans ce batch
                                 currentIndex += batch.length;
-
                                 var percent = Math.round((currentIndex / allProducts.length) * 100);
                                 $progressBar.css('width', percent + '%').text(percent + '%');
                                 $progressText.text(currentIndex + ' / ' + allProducts.length + ' produits importés');
-
-                                // Petit délai pour éviter de surcharger le serveur
                                 setTimeout(importNextFilteredProductBatch, 500);
                             }
                         });
                     }
-                    
+
                     // Démarrer l'import par batch
                     importNextFilteredProductBatch();
                     
@@ -440,6 +430,44 @@ jQuery(document).ready(function($) {
         });
     });
     
+    // ============================================
+    // TÉLÉCHARGEMENT DES IMAGES EN ATTENTE
+    // ============================================
+
+    function downloadPendingImagesLoop($btn, $status) {
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'bihrwi_download_pending_images', nonce: bihrProgressData.nonce },
+            success: function(response) {
+                if (response.success) {
+                    var remaining = response.data.remaining;
+                    $status.text('Images restantes : ' + remaining);
+                    if (remaining > 0) {
+                        setTimeout(function() { downloadPendingImagesLoop($btn, $status); }, 1000);
+                    } else {
+                        $status.html('<strong style="color:green;">✓ Toutes les images ont été téléchargées !</strong>');
+                        $btn.prop('disabled', false).text('Télécharger les images manquantes');
+                        $('#bihr-pending-images-banner').slideUp();
+                    }
+                }
+            },
+            error: function() {
+                $status.html('<span style="color:red;">Erreur de connexion. Réessayez.</span>');
+                $btn.prop('disabled', false).text('Télécharger les images manquantes');
+            }
+        });
+    }
+
+    $(document).on('click', '#bihr-download-pending-images', function(e) {
+        e.preventDefault();
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('⏳ Téléchargement en cours...');
+        var $status = $('<span style="margin-left:10px;"></span>');
+        $btn.after($status);
+        downloadPendingImagesLoop($btn, $status);
+    });
+
     // ============================================
     // TEST DE LA CLÉ OPENAI
     // ============================================

@@ -641,7 +641,7 @@ class BihrWI_Product_Sync {
     /**
      * Importe un produit Bihr (ligne de wp_bihr_products) vers WooCommerce
      */
-    public function import_to_woocommerce( $product_id ) {
+    public function import_to_woocommerce( $product_id, $skip_images = false ) {
         global $wpdb;
 
         // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
@@ -816,12 +816,17 @@ class BihrWI_Product_Sync {
             }
         }
 
-        // Image principale (si URL disponible)
+        // Image principale
         if ( ! empty( $row->image_url ) ) {
-            $attachment_id = $this->download_and_attach_image( $row->image_url, $product_id_wc );
-            if ( $attachment_id ) {
-                $product->set_image_id( $attachment_id );
-                $product->save();
+            if ( $skip_images ) {
+                // Mode rapide : on mémorise l'URL pour téléchargement ultérieur
+                update_post_meta( $product_id_wc, '_bihr_pending_image_url', $row->image_url );
+            } else {
+                $attachment_id = $this->download_and_attach_image( $row->image_url, $product_id_wc );
+                if ( $attachment_id ) {
+                    $product->set_image_id( $attachment_id );
+                    $product->save();
+                }
             }
         }
 
@@ -830,6 +835,54 @@ class BihrWI_Product_Sync {
         );
 
         return $product_id_wc;
+    }
+
+    /**
+     * Télécharge les images en attente (_bihr_pending_image_url) par lot.
+     * Retourne le nombre d'images restantes après traitement.
+     */
+    public function download_pending_images_batch( $limit = 20 ) {
+        @set_time_limit( 300 );
+
+        $post_ids = get_posts( array(
+            'post_type'      => 'product',
+            'posts_per_page' => $limit,
+            'fields'         => 'ids',
+            'meta_query'     => array(
+                array(
+                    'key'     => '_bihr_pending_image_url',
+                    'compare' => 'EXISTS',
+                ),
+            ),
+        ) );
+
+        foreach ( $post_ids as $post_id ) {
+            $image_url = get_post_meta( $post_id, '_bihr_pending_image_url', true );
+            if ( empty( $image_url ) ) {
+                delete_post_meta( $post_id, '_bihr_pending_image_url' );
+                continue;
+            }
+
+            $attachment_id = $this->download_and_attach_image( $image_url, $post_id );
+            if ( $attachment_id ) {
+                $product = wc_get_product( $post_id );
+                if ( $product ) {
+                    $product->set_image_id( $attachment_id );
+                    $product->save();
+                }
+            }
+            delete_post_meta( $post_id, '_bihr_pending_image_url' );
+        }
+
+        // Retourner le nombre restant
+        return (int) get_posts( array(
+            'post_type'      => 'product',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'meta_query'     => array(
+                array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
+            ),
+        ) );
     }
 
     /**
