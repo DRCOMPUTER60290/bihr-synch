@@ -238,7 +238,7 @@ class BihrWI_Product_Sync {
      * @param string $cat_l2_filter             Filtre niveau 2 (CategoryPath).
      * @param string $cat_l3_filter             Filtre niveau 3 (CategoryPath).
      */
-    public function get_products( $page = 1, $per_page = 20, $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $sort_by = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '' ) {
+    public function get_products( $page = 1, $per_page = 20, $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $sort_by = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '', $cat_l2_not = '' ) {
         global $wpdb;
 
         $page     = max( 1, (int) $page );
@@ -254,11 +254,12 @@ class BihrWI_Product_Sync {
         $cat_l1_filter   = sanitize_text_field( (string) $cat_l1_filter );
         $cat_l2_filter   = sanitize_text_field( (string) $cat_l2_filter );
         $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
+        $cat_l2_not      = sanitize_text_field( (string) $cat_l2_not );
 
         // Construire les conditions WHERE directement dans la chaîne SQL principale
         // Construire la requête SQL directement sans utiliser de tableau pour éviter les problèmes avec Plugin Check
         $where_sql = '1=1';
-        
+
         if ( $search !== '' ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
             $where_sql .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
@@ -332,6 +333,16 @@ class BihrWI_Product_Sync {
             }
         }
 
+        // Exclusion de cat_l2 (liste noire, support multi-valeurs "val1||val2")
+        if ( $cat_l2_not !== '' ) {
+            $values_l2_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
+            if ( ! empty( $values_l2_not ) ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l2_not ), '%s' ) );
+                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l2_not );
+            }
+        }
+
         // Whitelist des colonnes autorisées pour ORDER BY
         $allowed_columns = array( 'id', 'product_code', 'name', 'dealer_price_ht', 'stock_level', 'category' );
         $allowed_sorts = array(
@@ -391,7 +402,7 @@ class BihrWI_Product_Sync {
      * @param string $cat_l2_filter       Filtre niveau 2 (CategoryPath).
      * @param string $cat_l3_filter       Filtre niveau 3 (CategoryPath).
      */
-    public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '' ) {
+    public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '', $cat_l2_not = '' ) {
         global $wpdb;
 
         $where = array();
@@ -405,11 +416,11 @@ class BihrWI_Product_Sync {
         $cat_l1_filter   = sanitize_text_field( (string) $cat_l1_filter );
         $cat_l2_filter   = sanitize_text_field( (string) $cat_l2_filter );
         $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
+        $cat_l2_not      = sanitize_text_field( (string) $cat_l2_not );
 
         // Construire les conditions WHERE directement dans la chaîne SQL principale
-        // Construire la requête SQL directement sans utiliser de tableau pour éviter les problèmes avec Plugin Check
         $where_sql = '1=1';
-        
+
         if ( $search !== '' ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
             $where_sql .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
@@ -438,7 +449,6 @@ class BihrWI_Product_Sync {
         if ( $category_filter !== '' ) {
             $normalized_category = str_replace( "\xc2\xa0", ' ', $category_filter );
             $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
-            // Valider et échapper le nom de colonne category (whitelist)
             $category_column = esc_sql( 'category' );
             $where_sql .= " AND REPLACE(TRIM(`{$category_column}`), CHAR(160), ' ') = %s";
             $args[] = $normalized_category;
@@ -481,6 +491,16 @@ class BihrWI_Product_Sync {
             }
         }
 
+        // Exclusion de cat_l2 (liste noire)
+        if ( $cat_l2_not !== '' ) {
+            $values_l2_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
+            if ( ! empty( $values_l2_not ) ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l2_not ), '%s' ) );
+                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l2_not );
+            }
+        }
+
         // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
         $table_name = esc_sql( $this->table_name );
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where_sql contains only placeholders and constant strings, all values are passed to prepare()
@@ -508,7 +528,7 @@ class BihrWI_Product_Sync {
      * @param string $cat_l3_filter
      * @return array Tableau d'IDs (int[])
      */
-    public function get_all_filtered_product_ids( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '' ) {
+    public function get_all_filtered_product_ids( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '', $cat_l2_not = '' ) {
         global $wpdb;
 
         $args = array();
@@ -519,9 +539,10 @@ class BihrWI_Product_Sync {
         $cat_l1_filter   = sanitize_text_field( (string) $cat_l1_filter );
         $cat_l2_filter   = sanitize_text_field( (string) $cat_l2_filter );
         $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
+        $cat_l2_not      = sanitize_text_field( (string) $cat_l2_not );
 
         $where_sql = '1=1';
-        
+
         if ( $search !== '' ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
             $where_sql .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
@@ -584,6 +605,16 @@ class BihrWI_Product_Sync {
             } else {
                 $where_sql .= ' AND TRIM(cat_l3) = %s';
                 $args[]     = reset( $values_l3 );
+            }
+        }
+
+        // Exclusion de cat_l2 (liste noire)
+        if ( $cat_l2_not !== '' ) {
+            $values_l2_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
+            if ( ! empty( $values_l2_not ) ) {
+                $placeholders = implode( ',', array_fill( 0, count( $values_l2_not ), '%s' ) );
+                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
+                $args         = array_merge( $args, $values_l2_not );
             }
         }
 
@@ -2153,6 +2184,25 @@ class BihrWI_Product_Sync {
      */
     protected function save_merged_products( $merged, $callback = null ) {
         global $wpdb;
+
+        // Filtre whitelist cat_l1 : si l'option est renseignée, on n'importe que les catégories autorisées.
+        $whitelist = get_option( 'bihrwi_cat_l1_whitelist', array() );
+        if ( ! is_array( $whitelist ) ) {
+            $whitelist = array();
+        }
+        $whitelist = array_filter( array_map( 'trim', $whitelist ) );
+
+        if ( ! empty( $whitelist ) ) {
+            $filtered = array();
+            foreach ( $merged as $code => $data ) {
+                $cat_l1 = isset( $data['cat_l1'] ) ? trim( (string) $data['cat_l1'] ) : '';
+                if ( in_array( $cat_l1, $whitelist, true ) ) {
+                    $filtered[ $code ] = $data;
+                }
+            }
+            $this->logger->log( 'Filtre catégories actif: ' . count( $filtered ) . '/' . count( $merged ) . ' produits retenus (cat_l1: ' . implode( ', ', $whitelist ) . ')' );
+            $merged = $filtered;
+        }
 
         $total      = count( $merged );
         $count      = 0;

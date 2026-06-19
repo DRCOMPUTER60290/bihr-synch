@@ -222,6 +222,61 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
 
     <!-- =========================================================
+         0. FILTRE CATÉGORIES — Whitelist des catégories à importer
+    ========================================================== -->
+
+    <?php
+    $bihrwi_whitelist_saved = filter_input( INPUT_GET, 'bihrwi_whitelist_saved', FILTER_SANITIZE_NUMBER_INT );
+    if ( ! empty( $bihrwi_whitelist_saved ) ) : ?>
+        <div class="notice notice-success"><p>Filtre de catégories sauvegardé. Relancez une fusion pour appliquer.</p></div>
+    <?php endif; ?>
+
+    <h2>0. Filtre des catégories à importer</h2>
+
+    <div class="bihr-section">
+        <p>
+            Limitez l'import aux catégories BIHR de niveau 1 souhaitées. Si <strong>aucune case n'est cochée</strong>,
+            toutes les catégories sont importées. Après modification, <strong>relancez une fusion des catalogues</strong>
+            pour appliquer le filtre.
+        </p>
+
+        <?php if ( empty( $available_cat_l1 ) ) : ?>
+            <p><em>Aucune catégorie disponible. Effectuez d'abord une fusion de catalogues.</em></p>
+        <?php else : ?>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <input type="hidden" name="action" value="bihrwi_save_cat_whitelist">
+                <?php wp_nonce_field( 'bihrwi_cat_whitelist_action', 'bihrwi_cat_whitelist_nonce' ); ?>
+
+                <div style="display:flex; flex-wrap:wrap; gap:8px 24px; margin-bottom:16px;">
+                    <?php foreach ( $available_cat_l1 as $cat_row ) :
+                        $cat_val = is_array( $cat_row ) ? reset( $cat_row ) : $cat_row;
+                        $cat_val = trim( (string) $cat_val );
+                        if ( $cat_val === '' ) continue;
+                        $checked = in_array( $cat_val, $cat_l1_whitelist, true ) ? 'checked' : '';
+                    ?>
+                        <label style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+                            <input type="checkbox" name="bihrwi_cat_l1_whitelist[]"
+                                   value="<?php echo esc_attr( $cat_val ); ?>" <?php echo $checked; ?>>
+                            <?php echo esc_html( $cat_val ); ?>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+
+                <p class="submit" style="margin:0;">
+                    <button type="submit" class="button button-primary">Enregistrer le filtre</button>
+                    <?php if ( ! empty( $cat_l1_whitelist ) ) : ?>
+                        <span style="margin-left:12px; color:#666; font-size:13px;">
+                            Filtre actif : <?php echo esc_html( count( $cat_l1_whitelist ) ); ?> catégorie(s) sélectionnée(s)
+                        </span>
+                    <?php else : ?>
+                        <span style="margin-left:12px; color:#666; font-size:13px;">Tout importer (aucun filtre)</span>
+                    <?php endif; ?>
+                </p>
+            </form>
+        <?php endif; ?>
+    </div>
+
+    <!-- =========================================================
          1. FUSION DES CATALOGUES CSV
     ========================================================== -->
 
@@ -1067,8 +1122,98 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <!-- Filtres -->
     <div class="bihr-section">
         <h3>🔍 Filtres de recherche</h3>
+
+        <!-- BOUTONS PRESET 2 ROUES -->
+        <?php
+        $base_url = admin_url( 'admin.php' );
+        $vpa = 'VEHICLE PARTS & ACCESSORIES';
+        $ta  = 'TIRES & ACCESSORIES';
+        $ll  = 'LIQUIDS & LUBRICANTS';
+        $bic_not = 'BICYCLE PARTS & ACCESSORIES||BICYCLE';
+
+        $presets = array(
+            array(
+                'label'      => '🏍 Tout 2 roues',
+                'cat_l1'     => $vpa . '||' . $ta . '||' . $ll,
+                'cat_l2'     => '',
+                'cat_l2_not' => $bic_not,
+                'color'      => '#0073aa',
+            ),
+            array(
+                'label'      => '🏍 Pneus Moto',
+                'cat_l1'     => $ta,
+                'cat_l2'     => 'MOTORCYCLE',
+                'cat_l2_not' => '',
+                'color'      => '#0073aa',
+            ),
+            array(
+                'label'      => '🛵 Pneus Scooter',
+                'cat_l1'     => $ta,
+                'cat_l2'     => 'SCOOTER',
+                'cat_l2_not' => '',
+                'color'      => '#0073aa',
+            ),
+            array(
+                'label'      => '🚵 Pneus Quad/ATV',
+                'cat_l1'     => $ta,
+                'cat_l2'     => 'ATV',
+                'cat_l2_not' => '',
+                'color'      => '#0073aa',
+            ),
+            array(
+                'label'      => '🔧 Pièces mécaniques',
+                'cat_l1'     => $vpa,
+                'cat_l2'     => '',
+                'cat_l2_not' => 'BICYCLE PARTS & ACCESSORIES',
+                'color'      => '#46b450',
+            ),
+            array(
+                'label'      => '🛢 Huiles & Liquides',
+                'cat_l1'     => $ll,
+                'cat_l2'     => '',
+                'cat_l2_not' => '',
+                'color'      => '#46b450',
+            ),
+        );
+
+        $active_preset = '';
+        foreach ( $presets as $p ) {
+            if ( $p['cat_l1'] === $filter_cat_l1 && $p['cat_l2'] === $filter_cat_l2 && $p['cat_l2_not'] === $filter_cat_l2_not ) {
+                $active_preset = $p['label'];
+            }
+        }
+        ?>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;">
+            <strong style="margin-right:4px; font-size:13px; color:#444;">Raccourcis :</strong>
+            <?php foreach ( $presets as $p ) :
+                $url = add_query_arg( array(
+                    'page'                    => 'bihr-products',
+                    'cat_l1'                  => rawurlencode( $p['cat_l1'] ),
+                    'cat_l2'                  => rawurlencode( $p['cat_l2'] ),
+                    'cat_l3'                  => '',
+                    'cat_l2_not'              => rawurlencode( $p['cat_l2_not'] ),
+                    'bihrwi_filter_nonce_field' => wp_create_nonce( 'bihrwi_filter_nonce' ),
+                ), admin_url( 'admin.php' ) );
+                $is_active = ( $active_preset === $p['label'] );
+            ?>
+                <a href="<?php echo esc_url( $url ); ?>"
+                   style="display:inline-block; padding:5px 12px; border-radius:4px; font-size:13px; text-decoration:none; border:2px solid <?php echo esc_attr( $p['color'] ); ?>;
+                          background:<?php echo $is_active ? esc_attr( $p['color'] ) : '#fff'; ?>;
+                          color:<?php echo $is_active ? '#fff' : esc_attr( $p['color'] ); ?>; font-weight:600;">
+                    <?php echo esc_html( $p['label'] ); ?>
+                </a>
+            <?php endforeach; ?>
+            <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-products' ) ); ?>"
+               style="display:inline-block; padding:5px 12px; border-radius:4px; font-size:13px; text-decoration:none; border:2px solid #999;
+                      background:<?php echo empty( $active_preset ) && empty( $filter_cat_l1 ) && empty( $filter_cat_l2 ) ? '#999' : '#fff'; ?>;
+                      color:<?php echo empty( $active_preset ) && empty( $filter_cat_l1 ) && empty( $filter_cat_l2 ) ? '#fff' : '#666'; ?>; font-weight:600;">
+                ✕ Tout afficher
+            </a>
+        </div>
+
         <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="bihr-filters-form" id="bihr-products-filters">
             <input type="hidden" name="page" value="bihr-products" />
+            <input type="hidden" name="cat_l2_not" id="cat_l2_not_value" value="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>" />
             <?php wp_nonce_field( 'bihrwi_filter_nonce', 'bihrwi_filter_nonce_field' ); ?>
             
             <!-- Recherche (largeur complète) -->
@@ -1225,7 +1370,9 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             <!-- Boutons d'action -->
             <div class="bihr-filters-actions">
                 <?php submit_button( 'Filtrer', 'secondary', 'submit', false ); ?>
-                <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price_min ) || ! empty( $filter_price_max ) || ! empty( $filter_category ) || ! empty( $sort_by ) || ! empty( $filter_cat_l1 ) || ! empty( $filter_cat_l2 ) || ! empty( $filter_cat_l3 ) ) : ?>
+                <?php
+                $has_active_filter = ! empty( $filter_search ) || ! empty( $filter_stock ) || ! empty( $filter_price_min ) || ! empty( $filter_price_max ) || ! empty( $filter_category ) || ! empty( $sort_by ) || ! empty( $filter_cat_l1 ) || ! empty( $filter_cat_l2 ) || ! empty( $filter_cat_l3 ) || ! empty( $filter_cat_l2_not );
+                if ( $has_active_filter ) : ?>
                     <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-products' ) ); ?>" class="button">
                         Réinitialiser
                     </a>
@@ -1270,6 +1417,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             <input type="hidden" name="cat_l1" value="<?php echo esc_attr( $filter_cat_l1 ); ?>" />
             <input type="hidden" name="cat_l2" value="<?php echo esc_attr( $filter_cat_l2 ); ?>" />
             <input type="hidden" name="cat_l3" value="<?php echo esc_attr( $filter_cat_l3 ); ?>" />
+            <input type="hidden" name="cat_l2_not" value="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>" />
 
             <button type="submit" class="button button-secondary" style="border-color:#2271b1; color:#2271b1;">
                 <span class="dashicons dashicons-clock" style="vertical-align: middle;"></span>

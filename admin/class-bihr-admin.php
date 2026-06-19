@@ -34,6 +34,7 @@ class BihrWI_Admin {
             add_action( 'admin_post_bihrwi_import_compatibility', array( $this, 'handle_import_compatibility' ) );
             add_action( 'admin_post_bihrwi_import_all_compatibility', array( $this, 'handle_import_all_compatibility' ) );
         }
+        add_action( 'admin_post_bihrwi_save_cat_whitelist', array( $this, 'handle_save_cat_whitelist' ) );
         add_action( 'admin_post_bihrwi_save_prices_schedule', array( $this, 'handle_save_prices_schedule' ) );
         add_action( 'admin_post_bihrwi_run_prices_cron_now', array( $this, 'handle_run_prices_cron_now' ) );
         // Import massif en tâche de fond (type "WP-CLI" mais lancé depuis l'admin)
@@ -639,9 +640,10 @@ class BihrWI_Admin {
         $filter_cat_l1 = isset( $_GET['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_GET['cat_l1'] ) ) : '';
         $filter_cat_l2 = isset( $_GET['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_GET['cat_l2'] ) ) : '';
         $filter_cat_l3 = isset( $_GET['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_GET['cat_l3'] ) ) : '';
+        $filter_cat_l2_not = isset( $_GET['cat_l2_not'] ) ? sanitize_text_field( wp_unslash( $_GET['cat_l2_not'] ) ) : '';
 
         // Calculer d'abord le total pour pouvoir borner la pagination (évite les pages vides)
-        $total                  = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3 );
+        $total                  = $this->product_sync->get_products_count( $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3, $filter_cat_l2_not );
         $debug_count_last_query = $wpdb->last_query;
         $debug_count_last_error = $wpdb->last_error;
         $total_pages            = max( 1, (int) ceil( $total / $per_page ) );
@@ -651,7 +653,7 @@ class BihrWI_Admin {
             $current_page = $total_pages;
         }
 
-        $products                  = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3 );
+        $products                  = $this->product_sync->get_products( $current_page, $per_page, $filter_search, $filter_stock, $filter_price_min, $filter_price_max, $filter_category, $sort_by, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3, $filter_cat_l2_not );
         $debug_products_last_query = $wpdb->last_query;
         $debug_products_last_error = $wpdb->last_error;
 
@@ -668,6 +670,16 @@ class BihrWI_Admin {
 
         // On transmet à la vue si l'utilisateur a accès aux fonctionnalités Pro (licence active ou essai)
         $is_premium = bwi_fs()->can_use_premium_code();
+
+        // Whitelist des catégories autorisées à l'import
+        $cat_l1_whitelist = get_option( 'bihrwi_cat_l1_whitelist', array() );
+        if ( ! is_array( $cat_l1_whitelist ) ) {
+            $cat_l1_whitelist = array();
+        }
+
+        // Passer cat_l2_not à la vue pour conserver l'état du preset actif
+        $filter_cat_l2_not = isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '';
+
         include BIHRWI_PLUGIN_DIR . 'admin/views/products-page.php';
     }
 
@@ -928,6 +940,25 @@ class BihrWI_Admin {
         }
 
         wp_safe_redirect( $redirect_url );
+        exit;
+    }
+
+    /**
+     * Handler POST: sauvegarde de la whitelist des catégories autorisées à l'import.
+     */
+    public function handle_save_cat_whitelist() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( 'Permission denied.' );
+        }
+        check_admin_referer( 'bihrwi_cat_whitelist_action', 'bihrwi_cat_whitelist_nonce' );
+
+        $raw = isset( $_POST['bihrwi_cat_l1_whitelist'] ) ? (array) $_POST['bihrwi_cat_l1_whitelist'] : array();
+        $whitelist = array_map( 'sanitize_text_field', array_map( 'wp_unslash', $raw ) );
+        $whitelist = array_values( array_filter( $whitelist ) );
+
+        update_option( 'bihrwi_cat_l1_whitelist', $whitelist );
+
+        wp_redirect( add_query_arg( array( 'page' => 'bihr-products', 'bihrwi_whitelist_saved' => 1 ), admin_url( 'admin.php' ) ) );
         exit;
     }
 
@@ -1650,6 +1681,7 @@ class BihrWI_Admin {
         $filter_cat_l1    = isset( $_POST['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l1'] ) ) : '';
         $filter_cat_l2    = isset( $_POST['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2'] ) ) : '';
         $filter_cat_l3    = isset( $_POST['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
+        $filter_cat_l2_not = isset( $_POST['cat_l2_not'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2_not'] ) ) : '';
 
         // Récupérer tous les IDs correspondant à ces filtres
         $ids = $this->product_sync->get_all_filtered_product_ids(
@@ -1660,7 +1692,8 @@ class BihrWI_Admin {
             $filter_category,
             $filter_cat_l1,
             $filter_cat_l2,
-            $filter_cat_l3
+            $filter_cat_l3,
+            $filter_cat_l2_not
         );
 
         if ( empty( $ids ) ) {
@@ -2731,9 +2764,10 @@ class BihrWI_Admin {
         $price_min       = isset( $_POST['price_min'] ) ? sanitize_text_field( wp_unslash( $_POST['price_min'] ) ) : '';
         $price_max       = isset( $_POST['price_max'] ) ? sanitize_text_field( wp_unslash( $_POST['price_max'] ) ) : '';
         $category_filter = isset( $_POST['category_filter'] ) ? sanitize_text_field( wp_unslash( $_POST['category_filter'] ) ) : '';
-        $cat_l1          = isset( $_POST['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l1'] ) ) : '';
-        $cat_l2          = isset( $_POST['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2'] ) ) : '';
-        $cat_l3          = isset( $_POST['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
+        $cat_l1      = isset( $_POST['cat_l1'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l1'] ) ) : '';
+        $cat_l2      = isset( $_POST['cat_l2'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2'] ) ) : '';
+        $cat_l3      = isset( $_POST['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
+        $cat_l2_not  = isset( $_POST['cat_l2_not'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2_not'] ) ) : '';
 
         $ids = $this->product_sync->get_all_filtered_product_ids(
             $search,
@@ -2743,7 +2777,8 @@ class BihrWI_Admin {
             $category_filter,
             $cat_l1,
             $cat_l2,
-            $cat_l3
+            $cat_l3,
+            $cat_l2_not
         );
 
         wp_send_json_success( array( 'ids' => $ids, 'count' => count( $ids ) ) );

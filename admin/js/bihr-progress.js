@@ -255,7 +255,8 @@ jQuery(document).ready(function($) {
             category_filter: urlParams.get('category_filter') || '',
             cat_l1: urlParams.get('cat_l1') || '',
             cat_l2: urlParams.get('cat_l2') || '',
-            cat_l3: urlParams.get('cat_l3') || ''
+            cat_l3: urlParams.get('cat_l3') || '',
+            cat_l2_not: urlParams.get('cat_l2_not') || ''
         };
         
         // Désactiver le bouton
@@ -276,7 +277,8 @@ jQuery(document).ready(function($) {
                 category_filter: filters.category_filter,
                 cat_l1: filters.cat_l1,
                 cat_l2: filters.cat_l2,
-                cat_l3: filters.cat_l3
+                cat_l3: filters.cat_l3,
+                cat_l2_not: filters.cat_l2_not
             },
             success: function(response) {
                 if (response.success && response.data.ids && response.data.ids.length > 0) {
