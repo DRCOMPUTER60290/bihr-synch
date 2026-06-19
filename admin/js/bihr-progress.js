@@ -122,7 +122,7 @@ jQuery(document).ready(function($) {
         var currentIndex = 0;
         var successCount = 0;
         var errorCount = 0;
-        var batchSize = 100; // Taille de batch cible (100 produits par requête)
+        var batchSize = 50; // Taille de batch cible (50 produits par requête)
 
         function importNextProductBatch() {
             if (currentIndex >= selectedProducts.length) {
@@ -318,7 +318,7 @@ jQuery(document).ready(function($) {
                     var currentIndex = 0;
                     var successCount = 0;
                     var errorCount = 0;
-                    var batchSize = 100; // Taille de batch cible (100 produits par requête)
+                    var batchSize = 50; // Taille de batch cible (50 produits par requête)
 
                     function importNextFilteredProductBatch() {
                         if (currentIndex >= allProducts.length) {

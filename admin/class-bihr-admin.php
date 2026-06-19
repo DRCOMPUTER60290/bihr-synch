@@ -1620,7 +1620,9 @@ class BihrWI_Admin {
         }
 
         // Désactiver le recomptage WooCommerce pendant le batch (gain ~30%)
-        wc_defer_product_counting( true );
+        if ( function_exists( 'wc_defer_product_counting' ) ) {
+            wc_defer_product_counting( true );
+        }
 
         $results = array();
 
@@ -1652,7 +1654,9 @@ class BihrWI_Admin {
         }
 
         // Réactiver le recomptage et déclencher une mise à jour finale
-        wc_defer_product_counting( false );
+        if ( function_exists( 'wc_defer_product_counting' ) ) {
+            wc_defer_product_counting( false );
+        }
 
         $this->logger->log( sprintf( 'Batch terminé : %d produits traités.', count( $results ) ) );
 
