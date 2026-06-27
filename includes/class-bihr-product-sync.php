@@ -592,7 +592,7 @@ class BihrWI_Product_Sync {
         }
 
         if ( ! class_exists( 'WC_Product_Simple' ) ) {
-            throw new Exception( 'WooCommerce n'est pas chargé.' );
+            throw new Exception( "WooCommerce n'est pas chargé." );
         }
 
         $wpdb->query( 'START TRANSACTION' );
