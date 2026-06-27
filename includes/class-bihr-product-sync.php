@@ -786,21 +786,19 @@ class BihrWI_Product_Sync {
      * Retourne le nombre d'images restantes après traitement.
      */
     public function download_pending_images_batch( $limit = 20 ) {
+        global $wpdb;
         @set_time_limit( 300 );
 
-        $post_ids = get_posts( array(
-            'post_type'      => 'product',
-            'posts_per_page' => $limit,
-            'fields'         => 'ids',
-            'meta_query'     => array(
-                array(
-                    'key'     => '_bihr_pending_image_url',
-                    'compare' => 'EXISTS',
-                ),
-            ),
+        // Requête directe SQL : évite get_posts() qui charge les objets post en mémoire
+        $post_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT post_id FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'
+             LIMIT %d",
+            $limit
         ) );
 
         foreach ( $post_ids as $post_id ) {
+            $post_id   = (int) $post_id;
             $image_url = get_post_meta( $post_id, '_bihr_pending_image_url', true );
             if ( empty( $image_url ) ) {
                 delete_post_meta( $post_id, '_bihr_pending_image_url' );
@@ -809,24 +807,37 @@ class BihrWI_Product_Sync {
 
             $attachment_id = $this->download_and_attach_image( $image_url, $post_id );
             if ( $attachment_id ) {
-                $product = wc_get_product( $post_id );
-                if ( $product ) {
-                    $product->set_image_id( $attachment_id );
-                    $product->save();
-                }
+                // set_post_thumbnail est plus léger que wc_get_product()->save()
+                set_post_thumbnail( $post_id, $attachment_id );
             }
             delete_post_meta( $post_id, '_bihr_pending_image_url' );
         }
 
-        // Retourner le nombre restant
-        return (int) get_posts( array(
-            'post_type'      => 'product',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'meta_query'     => array(
-                array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
-            ),
-        ) );
+        // COUNT direct : évite le get_posts(posts_per_page=-1) qui chargeait tous les IDs
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'"
+        );
+    }
+
+    /**
+     * Télécharge et attache l'image en attente pour un post donné.
+     * Utilisé par le cron image dédié (run_mass_image_batch).
+     */
+    public function process_pending_image( int $post_id ): bool {
+        $image_url = get_post_meta( $post_id, '_bihr_pending_image_url', true );
+        if ( empty( $image_url ) ) {
+            delete_post_meta( $post_id, '_bihr_pending_image_url' );
+            return false;
+        }
+
+        $attachment_id = $this->download_and_attach_image( $image_url, $post_id );
+        if ( $attachment_id ) {
+            set_post_thumbnail( $post_id, $attachment_id );
+        }
+        delete_post_meta( $post_id, '_bihr_pending_image_url' );
+
+        return (bool) $attachment_id;
     }
 
     /**

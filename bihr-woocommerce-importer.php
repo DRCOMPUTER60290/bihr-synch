@@ -225,7 +225,19 @@ function bihrwi_activate_plugin() {
     ) $charset_collate;";
 
     dbDelta( $sql );
-    
+
+    // Table de queue pour l'import massif (évite de stocker 83 000 IDs dans wp_options)
+    $queue_table = $wpdb->prefix . 'bihr_import_queue';
+    $sql_queue   = "CREATE TABLE $queue_table (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        bihr_id BIGINT UNSIGNED NOT NULL,
+        status ENUM('pending','done','error') NOT NULL DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        KEY idx_status (status)
+    ) $charset_collate;";
+    dbDelta( $sql_queue );
+
     // Tables pour la compatibilité véhicules
     require_once( dirname( __FILE__ ) . '/includes/class-bihr-vehicle-compatibility.php' );
     $vc = new BihrWI_Vehicle_Compatibility( new BihrWI_Logger() );

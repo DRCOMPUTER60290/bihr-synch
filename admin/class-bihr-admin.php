@@ -82,8 +82,10 @@ class BihrWI_Admin {
         // WP-Cron hooks pour synchronisation automatique
         add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
         add_action( 'bihrwi_auto_prices_generation', array( $this, 'run_auto_prices_generation' ), 10, 0 );
-        // Cron personnalisé pour l'import massif de produits
+        // Cron produits (skip images)
         add_action( 'bihrwi_mass_import_event', array( $this, 'run_mass_import_batch' ) );
+        // Cron images séparé, throttlé pour o2switch mutualisé
+        add_action( 'bihrwi_mass_image_event', array( $this, 'run_mass_image_batch' ) );
         
         // Initialiser le WP-Cron si activé
         add_action( 'init', array( $this, 'setup_stock_sync_cron' ) );
@@ -1893,20 +1895,34 @@ class BihrWI_Admin {
             exit;
         }
 
-        $queue = array(
-            'ids'        => array_map( 'intval', $ids ),
-            'position'   => 0,
+        global $wpdb;
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+
+        // Vider la queue précédente
+        $wpdb->query( "TRUNCATE TABLE `{$queue_table}`" );
+
+        // Insérer les IDs en bulk par lots de 500 pour ne pas dépasser les limites SQL
+        foreach ( array_chunk( array_map( 'intval', $ids ), 500 ) as $chunk ) {
+            $values = implode( ',', array_map( function ( $id ) { return "(${id},'pending')"; }, $chunk ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query( "INSERT INTO `{$queue_table}` (bihr_id, status) VALUES {$values}" );
+        }
+
+        // Stats légères (pas les 83 000 IDs) dans wp_options
+        update_option( 'bihrwi_mass_import_stats', array(
             'total'      => count( $ids ),
             'started_at' => time(),
             'success'    => 0,
             'errors'     => 0,
-        );
+        ) );
 
-        update_option( 'bihrwi_mass_import_queue', $queue );
-
-        // Planifier le premier batch si aucun n'est en attente
+        // Planifier le premier batch produits
         if ( ! wp_next_scheduled( 'bihrwi_mass_import_event' ) ) {
             wp_schedule_single_event( time() + 10, 'bihrwi_mass_import_event' );
+        }
+        // Planifier le cron image en parallèle (démarre 30s après)
+        if ( ! wp_next_scheduled( 'bihrwi_mass_image_event' ) ) {
+            wp_schedule_single_event( time() + 30, 'bihrwi_mass_image_event' );
         }
 
         wp_safe_redirect(
@@ -1922,75 +1938,152 @@ class BihrWI_Admin {
     }
 
     /**
-     * Tâche WP‑Cron : traite un batch de produits depuis la queue stockée en option.
+     * Tâche WP‑Cron : traite un batch de produits depuis wp_bihr_import_queue.
+     * - Skip images (téléchargées par bihrwi_mass_image_event en parallèle).
+     * - Batch de 30 produits pour tenir dans 60s sur o2switch mutualisé.
+     * - Logs réduits : un seul log de jalon par batch + les erreurs seulement.
      */
     public function run_mass_import_batch() {
-        $queue = get_option( 'bihrwi_mass_import_queue' );
+        global $wpdb;
+        @set_time_limit( 270 );
 
-        if ( empty( $queue ) || empty( $queue['ids'] ) ) {
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+        $batch_size  = 30;
+
+        // Nombre de produits restants (requête légère)
+        $pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
+
+        if ( 0 === $pending ) {
+            $stats = get_option( 'bihrwi_mass_import_stats', array() );
+            $this->logger->log( sprintf(
+                '[Mass Import] Terminé. Succès: %d / Erreurs: %d',
+                $stats['success'] ?? 0,
+                $stats['errors'] ?? 0
+            ) );
+            delete_option( 'bihrwi_mass_import_stats' );
             return;
         }
 
-        $ids        = isset( $queue['ids'] ) ? (array) $queue['ids'] : array();
-        $position   = isset( $queue['position'] ) ? (int) $queue['position'] : 0;
-        $total      = isset( $queue['total'] ) ? (int) $queue['total'] : count( $ids );
-        $success    = isset( $queue['success'] ) ? (int) $queue['success'] : 0;
-        $errors     = isset( $queue['errors'] ) ? (int) $queue['errors'] : 0;
-        $batch_size = 100; // Nombre de produits importés par exécution de cron
+        // Sélectionner le prochain batch (ORDER BY id ASC garantit la progression FIFO)
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT id, bihr_id FROM `{$queue_table}` WHERE status = 'pending' ORDER BY id ASC LIMIT %d",
+            $batch_size
+        ) );
 
-        if ( $position >= $total ) {
-            // Plus rien à faire
-            $this->logger->log( '[Mass Import] Queue terminée. Succès: ' . $success . ' / Erreurs: ' . $errors );
-            delete_option( 'bihrwi_mass_import_queue' );
+        if ( empty( $rows ) ) {
             return;
         }
 
-        $end = min( $position + $batch_size, $total );
+        $stats   = get_option( 'bihrwi_mass_import_stats', array( 'total' => 0, 'success' => 0, 'errors' => 0 ) );
+        $success = (int) ( $stats['success'] ?? 0 );
+        $errors  = (int) ( $stats['errors'] ?? 0 );
+        $total   = (int) ( $stats['total'] ?? 0 );
+        $done    = $total - $pending;
 
-        $this->logger->log(
-            sprintf(
-                '[Mass Import] Traitement du batch %d-%d sur %d produits (succès=%d, erreurs=%d)',
-                $position + 1,
-                $end,
-                $total,
-                $success,
-                $errors
-            )
-        );
+        $this->logger->log( sprintf(
+            '[Mass Import] Batch %d–%d / %d (succès=%d, erreurs=%d)',
+            $done + 1,
+            $done + count( $rows ),
+            $total,
+            $success,
+            $errors
+        ) );
 
-        for ( $i = $position; $i < $end; $i++ ) {
-            $product_id = isset( $ids[ $i ] ) ? (int) $ids[ $i ] : 0;
+        // Désactiver le recomptage WooCommerce pendant le batch
+        if ( function_exists( 'wc_defer_product_counting' ) ) {
+            wc_defer_product_counting( true );
+        }
 
-            if ( ! $product_id ) {
-                continue;
-            }
+        foreach ( $rows as $row ) {
+            $queue_id   = (int) $row->id;
+            $product_id = (int) $row->bihr_id;
 
             try {
-                $wc_id = $this->product_sync->import_to_woocommerce( $product_id );
+                // true = skip_images : les images sont téléchargées par le cron dédié
+                $wc_id = $this->product_sync->import_to_woocommerce( $product_id, true );
                 if ( $wc_id ) {
                     $success++;
-                    $this->logger->log( "[Mass Import] Produit {$product_id} importé (WC ID: {$wc_id})" );
+                    $wpdb->update( $queue_table, array( 'status' => 'done' ), array( 'id' => $queue_id ) );
                 } else {
                     $errors++;
-                    $this->logger->log( "[Mass Import] Échec de l'import du produit {$product_id}" );
+                    $wpdb->update( $queue_table, array( 'status' => 'error' ), array( 'id' => $queue_id ) );
+                    $this->logger->log( "[Mass Import] Échec bihr_id={$product_id}" );
                 }
             } catch ( Exception $e ) {
                 $errors++;
-                $this->logger->log( "[Mass Import] Erreur produit {$product_id} : " . $e->getMessage() );
+                $wpdb->update( $queue_table, array( 'status' => 'error' ), array( 'id' => $queue_id ) );
+                $this->logger->log( "[Mass Import] Erreur bihr_id={$product_id} : " . $e->getMessage() );
             }
         }
 
-        // Mettre à jour la queue
-        $queue['position'] = $end;
-        $queue['success']  = $success;
-        $queue['errors']   = $errors;
-        update_option( 'bihrwi_mass_import_queue', $queue );
+        if ( function_exists( 'wc_defer_product_counting' ) ) {
+            wc_defer_product_counting( false );
+        }
 
-        // Replanifier un prochain batch si nécessaire (5s au lieu de 60s)
-        if ( $end < $total ) {
-            wp_schedule_single_event( time() + 5, 'bihrwi_mass_import_event' );
+        // Sauvegarder les stats (petit tableau, pas de sérialisation de 83 000 IDs)
+        $stats['success'] = $success;
+        $stats['errors']  = $errors;
+        update_option( 'bihrwi_mass_import_stats', $stats );
+
+        // Replanifier à +60s (minimum du vrai cron o2switch)
+        $remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
+        if ( $remaining > 0 ) {
+            wp_schedule_single_event( time() + 60, 'bihrwi_mass_import_event' );
         } else {
             $this->logger->log( '[Mass Import] Tous les produits ont été traités.' );
+        }
+    }
+
+    /**
+     * Tâche WP‑Cron : télécharge un lot d'images en attente (_bihr_pending_image_url).
+     * Séparé du cron produits pour ne pas saturer les I/O o2switch mutualisé.
+     * 8 images par minute max, avec 300ms de pause entre chaque téléchargement.
+     */
+    public function run_mass_image_batch() {
+        global $wpdb;
+        @set_time_limit( 270 );
+
+        $limit = 8;
+
+        // COUNT direct : pas de get_posts() qui chargerait tous les IDs
+        $pending = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'"
+        );
+
+        if ( 0 === $pending ) {
+            $this->logger->log( '[Mass Image] Toutes les images ont été téléchargées.' );
+            return;
+        }
+
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT DISTINCT post_id FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'
+             LIMIT %d",
+            $limit
+        ) );
+
+        $this->logger->log( sprintf(
+            '[Mass Image] Téléchargement de %d images (%d restantes)',
+            count( $rows ),
+            $pending
+        ) );
+
+        foreach ( $rows as $row ) {
+            $this->product_sync->process_pending_image( (int) $row->post_id );
+            usleep( 300000 ); // 300ms entre chaque image pour ménager les I/O o2switch
+        }
+
+        // Replanifier si des images restent
+        $remaining = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'"
+        );
+
+        if ( $remaining > 0 ) {
+            wp_schedule_single_event( time() + 60, 'bihrwi_mass_image_event' );
+        } else {
+            $this->logger->log( '[Mass Image] Toutes les images téléchargées.' );
         }
     }
 
