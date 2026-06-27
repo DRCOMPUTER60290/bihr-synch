@@ -65,6 +65,87 @@ class BihrWI_Product_Sync {
         return 0;
     }
 
+    /**
+     * Construit la clause WHERE et les arguments préparés communs aux méthodes de filtrage.
+     *
+     * @return array{ where: string, args: array }
+     */
+    private function build_product_filter_clause(
+        string $search,
+        string $stock_filter,
+        string $price_min,
+        string $price_max,
+        string $category_filter,
+        string $cat_l1_filter,
+        string $cat_l2_filter,
+        string $cat_l3_filter,
+        string $cat_l2_not
+    ): array {
+        global $wpdb;
+
+        $args      = array();
+        $where_sql = ‘1=1’;
+
+        if ( ‘’ !== $search ) {
+            $search_like = ‘%’ . $wpdb->esc_like( $search ) . ‘%’;
+            $where_sql  .= ‘ AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)’;
+            $args[]      = $search_like;
+            $args[]      = $search_like;
+            $args[]      = $search_like;
+            $args[]      = $search_like;
+        }
+
+        if ( ‘in_stock’ === $stock_filter ) {
+            $where_sql .= ‘ AND stock_level > 0’;
+        } elseif ( ‘out_of_stock’ === $stock_filter ) {
+            $where_sql .= ‘ AND (stock_level = 0 OR stock_level IS NULL)’;
+        }
+
+        if ( ‘’ !== $price_min && is_numeric( $price_min ) ) {
+            $where_sql .= ‘ AND dealer_price_ht >= %f’;
+            $args[]     = (float) $price_min;
+        }
+
+        if ( ‘’ !== $price_max && is_numeric( $price_max ) ) {
+            $where_sql .= ‘ AND dealer_price_ht <= %f’;
+            $args[]     = (float) $price_max;
+        }
+
+        if ( ‘’ !== $category_filter ) {
+            $normalized_category = str_replace( "\xc2\xa0", ‘ ‘, $category_filter );
+            $normalized_category = preg_replace( ‘/\s+/u’, ‘ ‘, trim( $normalized_category ) );
+            $category_column     = esc_sql( ‘category’ );
+            $where_sql          .= " AND REPLACE(TRIM(`{$category_column}`), CHAR(160), ‘ ‘) = %s";
+            $args[]              = $normalized_category;
+        }
+
+        foreach ( array( ‘cat_l1’ => $cat_l1_filter, ‘cat_l2’ => $cat_l2_filter, ‘cat_l3’ => $cat_l3_filter ) as $col => $val ) {
+            if ( ‘’ === $val ) {
+                continue;
+            }
+            $values = array_filter( array_map( ‘trim’, explode( ‘||’, $val ) ) );
+            if ( count( $values ) > 1 ) {
+                $placeholders = implode( ‘,’, array_fill( 0, count( $values ), ‘%s’ ) );
+                $where_sql   .= " AND TRIM({$col}) IN ({$placeholders})";
+                $args         = array_merge( $args, $values );
+            } else {
+                $where_sql .= " AND TRIM({$col}) = %s";
+                $args[]     = reset( $values );
+            }
+        }
+
+        if ( ‘’ !== $cat_l2_not ) {
+            $values_not = array_filter( array_map( ‘trim’, explode( ‘||’, $cat_l2_not ) ) );
+            if ( ! empty( $values_not ) ) {
+                $placeholders = implode( ‘,’, array_fill( 0, count( $values_not ), ‘%s’ ) );
+                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
+                $args         = array_merge( $args, $values_not );
+            }
+        }
+
+        return array( ‘where’ => $where_sql, ‘args’ => $args );
+    }
+
     /* =========================================================
      *   LECTURE / LISTE DES PRODUITS (pour la page d’admin)
      * ======================================================= */
@@ -98,6 +179,11 @@ class BihrWI_Product_Sync {
      * Récupère la liste des niveaux 1 distincts (cat_l1) depuis wp_bihr_products.
      */
     public function get_distinct_cat_level1() {
+        $cached = get_transient( 'bihrwi_cat_l1_list' );
+        if ( false !== $cached ) {
+            return $cached;
+        }
+
         global $wpdb;
 
         $table_name = esc_sql( $this->table_name );
@@ -126,6 +212,7 @@ class BihrWI_Product_Sync {
 
         if ( is_array( $categories ) ) {
             $this->logger->log( '[Categories] Niveaux 1 exploitables (avec au moins un Niveau 2) : ' . count( $categories ) );
+            set_transient( 'bihrwi_cat_l1_list', $categories, HOUR_IN_SECONDS );
         }
 
         return $categories;
@@ -256,92 +343,12 @@ class BihrWI_Product_Sync {
         $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
         $cat_l2_not      = sanitize_text_field( (string) $cat_l2_not );
 
-        // Construire les conditions WHERE directement dans la chaîne SQL principale
-        // Construire la requête SQL directement sans utiliser de tableau pour éviter les problèmes avec Plugin Check
-        $where_sql = '1=1';
-
-        if ( $search !== '' ) {
-            $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where_sql .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
-            $args[] = $search_like;
-            $args[] = $search_like;
-            $args[] = $search_like;
-            $args[] = $search_like;
-        }
-
-        if ( $stock_filter === 'in_stock' ) {
-            $where_sql .= ' AND stock_level > 0';
-        } elseif ( $stock_filter === 'out_of_stock' ) {
-            $where_sql .= ' AND (stock_level = 0 OR stock_level IS NULL)';
-        }
-
-        if ( $price_min !== '' && is_numeric( $price_min ) ) {
-            $where_sql .= ' AND dealer_price_ht >= %f';
-            $args[] = (float) $price_min;
-        }
-
-        if ( $price_max !== '' && is_numeric( $price_max ) ) {
-            $where_sql .= ' AND dealer_price_ht <= %f';
-            $args[] = (float) $price_max;
-        }
-
-        if ( $category_filter !== '' ) {
-            $normalized_category = str_replace( "\xc2\xa0", ' ', $category_filter );
-            $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
-            // Valider et échapper le nom de colonne category (whitelist)
-            $category_column = esc_sql( 'category' );
-            $where_sql .= " AND REPLACE(TRIM(`{$category_column}`), CHAR(160), ' ') = %s";
-            $args[] = $normalized_category;
-        }
-
-        // Filtres sur les niveaux CategoryPath (cat_l1 / cat_l2 / cat_l3) stockés dans wp_bihr_products.
-        // Supporte maintenant plusieurs valeurs par niveau, encodées sous forme "val1||val2||val3".
-        if ( $cat_l1_filter !== '' ) {
-            $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
-            if ( count( $values_l1 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
-                // Utiliser TRIM(cat_l1) pour éviter les problèmes d'espaces parasites en base.
-                $where_sql   .= " AND TRIM(cat_l1) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l1 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l1) = %s';
-                $args[]     = reset( $values_l1 );
-            }
-        }
-
-        if ( $cat_l2_filter !== '' ) {
-            $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
-            if ( count( $values_l2 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l2) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l2 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l2) = %s';
-                $args[]     = reset( $values_l2 );
-            }
-        }
-
-        if ( $cat_l3_filter !== '' ) {
-            $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
-            if ( count( $values_l3 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l3) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l3 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l3) = %s';
-                $args[]     = reset( $values_l3 );
-            }
-        }
-
-        // Exclusion de cat_l2 (liste noire, support multi-valeurs "val1||val2")
-        if ( $cat_l2_not !== '' ) {
-            $values_l2_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
-            if ( ! empty( $values_l2_not ) ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l2_not ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l2_not );
-            }
-        }
+        $filter    = $this->build_product_filter_clause(
+            $search, $stock_filter, $price_min, $price_max,
+            $category_filter, $cat_l1_filter, $cat_l2_filter, $cat_l3_filter, $cat_l2_not
+        );
+        $where_sql = $filter['where'];
+        $args      = $filter['args'];
 
         // Whitelist des colonnes autorisées pour ORDER BY
         $allowed_columns = array( 'id', 'product_code', 'name', 'dealer_price_ht', 'stock_level', 'category' );
@@ -405,11 +412,6 @@ class BihrWI_Product_Sync {
     public function get_products_count( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '', $cat_l2_not = '' ) {
         global $wpdb;
 
-        $where = array();
-        $args  = array();
-
-        $args = array();
-
         $search          = sanitize_text_field( (string) $search );
         $stock_filter    = sanitize_text_field( (string) $stock_filter );
         $category_filter = sanitize_text_field( (string) $category_filter );
@@ -418,98 +420,18 @@ class BihrWI_Product_Sync {
         $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
         $cat_l2_not      = sanitize_text_field( (string) $cat_l2_not );
 
-        // Construire les conditions WHERE directement dans la chaîne SQL principale
-        $where_sql = '1=1';
+        $filter    = $this->build_product_filter_clause(
+            $search, $stock_filter, $price_min, $price_max,
+            $category_filter, $cat_l1_filter, $cat_l2_filter, $cat_l3_filter, $cat_l2_not
+        );
+        $where_sql = $filter['where'];
+        $args      = $filter['args'];
 
-        if ( $search !== '' ) {
-            $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where_sql .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
-            $args[] = $search_like;
-            $args[] = $search_like;
-            $args[] = $search_like;
-            $args[] = $search_like;
-        }
-
-        if ( $stock_filter === 'in_stock' ) {
-            $where_sql .= ' AND stock_level > 0';
-        } elseif ( $stock_filter === 'out_of_stock' ) {
-            $where_sql .= ' AND (stock_level = 0 OR stock_level IS NULL)';
-        }
-
-        if ( $price_min !== '' && is_numeric( $price_min ) ) {
-            $where_sql .= ' AND dealer_price_ht >= %f';
-            $args[] = (float) $price_min;
-        }
-
-        if ( $price_max !== '' && is_numeric( $price_max ) ) {
-            $where_sql .= ' AND dealer_price_ht <= %f';
-            $args[] = (float) $price_max;
-        }
-
-        if ( $category_filter !== '' ) {
-            $normalized_category = str_replace( "\xc2\xa0", ' ', $category_filter );
-            $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
-            $category_column = esc_sql( 'category' );
-            $where_sql .= " AND REPLACE(TRIM(`{$category_column}`), CHAR(160), ' ') = %s";
-            $args[] = $normalized_category;
-        }
-
-        // Filtres sur les niveaux CategoryPath (support multi-valeurs "val1||val2")
-        if ( $cat_l1_filter !== '' ) {
-            $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
-            if ( count( $values_l1 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l1) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l1 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l1) = %s';
-                $args[]     = reset( $values_l1 );
-            }
-        }
-
-        if ( $cat_l2_filter !== '' ) {
-            $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
-            if ( count( $values_l2 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l2) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l2 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l2) = %s';
-                $args[]     = reset( $values_l2 );
-            }
-        }
-
-        if ( $cat_l3_filter !== '' ) {
-            $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
-            if ( count( $values_l3 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l3) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l3 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l3) = %s';
-                $args[]     = reset( $values_l3 );
-            }
-        }
-
-        // Exclusion de cat_l2 (liste noire)
-        if ( $cat_l2_not !== '' ) {
-            $values_l2_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
-            if ( ! empty( $values_l2_not ) ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l2_not ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l2_not );
-            }
-        }
-
-        // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
         $table_name = esc_sql( $this->table_name );
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where_sql contains only placeholders and constant strings, all values are passed to prepare()
-        $sql = "SELECT COUNT(*) FROM `{$table_name}` WHERE {$where_sql}";
-
-        // Préparer la requête avec tous les arguments (toujours utiliser prepare même si args est vide)
+        $sql        = "SELECT COUNT(*) FROM `{$table_name}` WHERE {$where_sql}";
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared with all placeholders
-        $prepared = $wpdb->prepare( $sql, $args );
-
+        $prepared   = $wpdb->prepare( $sql, $args );
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Query is prepared above with all placeholders
         return (int) $wpdb->get_var( $prepared );
     }
@@ -531,8 +453,6 @@ class BihrWI_Product_Sync {
     public function get_all_filtered_product_ids( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '', $cat_l2_not = '' ) {
         global $wpdb;
 
-        $args = array();
-
         $search          = sanitize_text_field( (string) $search );
         $stock_filter    = sanitize_text_field( (string) $stock_filter );
         $category_filter = sanitize_text_field( (string) $category_filter );
@@ -541,95 +461,20 @@ class BihrWI_Product_Sync {
         $cat_l3_filter   = sanitize_text_field( (string) $cat_l3_filter );
         $cat_l2_not      = sanitize_text_field( (string) $cat_l2_not );
 
-        $where_sql = '1=1';
-
-        if ( $search !== '' ) {
-            $search_like = '%' . $wpdb->esc_like( $search ) . '%';
-            $where_sql .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
-            $args[] = $search_like;
-            $args[] = $search_like;
-            $args[] = $search_like;
-            $args[] = $search_like;
-        }
-
-        if ( $stock_filter === 'in_stock' ) {
-            $where_sql .= ' AND stock_level > 0';
-        } elseif ( $stock_filter === 'out_of_stock' ) {
-            $where_sql .= ' AND (stock_level = 0 OR stock_level IS NULL)';
-        }
-
-        if ( $price_min !== '' && is_numeric( $price_min ) ) {
-            $where_sql .= ' AND dealer_price_ht >= %f';
-            $args[] = (float) $price_min;
-        }
-
-        if ( $price_max !== '' && is_numeric( $price_max ) ) {
-            $where_sql .= ' AND dealer_price_ht <= %f';
-            $args[] = (float) $price_max;
-        }
-
-        if ( $category_filter !== '' ) {
-            $where_sql .= ' AND category = %s';
-            $args[] = $category_filter;
-        }
-
-        // Filtres sur les niveaux CategoryPath (support multi-valeurs "val1||val2")
-        if ( $cat_l1_filter !== '' ) {
-            $values_l1 = array_filter( array_map( 'trim', explode( '||', $cat_l1_filter ) ) );
-            if ( count( $values_l1 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l1 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l1) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l1 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l1) = %s';
-                $args[]     = reset( $values_l1 );
-            }
-        }
-        if ( $cat_l2_filter !== '' ) {
-            $values_l2 = array_filter( array_map( 'trim', explode( '||', $cat_l2_filter ) ) );
-            if ( count( $values_l2 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l2 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l2) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l2 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l2) = %s';
-                $args[]     = reset( $values_l2 );
-            }
-        }
-        if ( $cat_l3_filter !== '' ) {
-            $values_l3 = array_filter( array_map( 'trim', explode( '||', $cat_l3_filter ) ) );
-            if ( count( $values_l3 ) > 1 ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l3 ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l3) IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l3 );
-            } else {
-                $where_sql .= ' AND TRIM(cat_l3) = %s';
-                $args[]     = reset( $values_l3 );
-            }
-        }
-
-        // Exclusion de cat_l2 (liste noire)
-        if ( $cat_l2_not !== '' ) {
-            $values_l2_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
-            if ( ! empty( $values_l2_not ) ) {
-                $placeholders = implode( ',', array_fill( 0, count( $values_l2_not ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
-                $args         = array_merge( $args, $values_l2_not );
-            }
-        }
+        $filter    = $this->build_product_filter_clause(
+            $search, $stock_filter, $price_min, $price_max,
+            $category_filter, $cat_l1_filter, $cat_l2_filter, $cat_l3_filter, $cat_l2_not
+        );
+        $where_sql = $filter['where'];
+        $args      = $filter['args'];
 
         $table_name = esc_sql( $this->table_name );
-        $sql = "SELECT id FROM `{$table_name}` WHERE {$where_sql} ORDER BY id ASC";
-
-        if ( ! empty( $args ) ) {
-            $prepared = $wpdb->prepare( $sql, $args );
-        } else {
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- pas de paramètres utilisateur
-            $prepared = $sql;
-        }
-
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
+        $sql        = "SELECT id FROM `{$table_name}` WHERE {$where_sql} ORDER BY id ASC";
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
-        $ids = $wpdb->get_col( $prepared );
+        $prepared   = empty( $args ) ? $sql : $wpdb->prepare( $sql, $args );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
+        $ids        = $wpdb->get_col( $prepared );
 
         return array_map( 'intval', $ids );
     }
@@ -2310,6 +2155,8 @@ class BihrWI_Product_Sync {
                 call_user_func( $callback, 'progress', "Sauvegarde en base: {$count}/{$total} produits...", $count, $total );
             }
         }
+
+        delete_transient( 'bihrwi_cat_l1_list' );
 
         return $count;
     }

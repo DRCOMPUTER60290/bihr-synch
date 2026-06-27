@@ -3,6 +3,40 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+if ( ! function_exists( 'bihrwi_encrypt_credential' ) ) {
+    function bihrwi_encrypt_credential( string $value ): string {
+        if ( '' === $value ) {
+            return '';
+        }
+        $key = substr( hash( 'sha256', wp_salt( 'auth' ), true ), 0, 32 );
+        $iv  = random_bytes( 16 );
+        $enc = openssl_encrypt( $value, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv );
+        if ( false === $enc ) {
+            return $value;
+        }
+        return 'enc:' . base64_encode( $iv . $enc );
+    }
+}
+
+if ( ! function_exists( 'bihrwi_decrypt_credential' ) ) {
+    function bihrwi_decrypt_credential( string $value ): string {
+        if ( '' === $value ) {
+            return '';
+        }
+        if ( 0 !== strpos( $value, 'enc:' ) ) {
+            return $value; // Valeur en clair (avant migration) : retourner tel quel
+        }
+        $decoded = base64_decode( substr( $value, 4 ), true );
+        if ( false === $decoded || strlen( $decoded ) < 17 ) {
+            return $value;
+        }
+        $key = substr( hash( 'sha256', wp_salt( 'auth' ), true ), 0, 32 );
+        $iv  = substr( $decoded, 0, 16 );
+        $dec = openssl_decrypt( substr( $decoded, 16 ), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv );
+        return ( false === $dec ) ? $value : $dec;
+    }
+}
+
 class BihrWI_API_Client {
 
     protected $logger;
@@ -17,12 +51,26 @@ class BihrWI_API_Client {
      */
     protected function get_credentials() {
         $username = get_option( 'bihrwi_username', '' );
-        $password = get_option( 'bihrwi_password', '' );
+        $password = bihrwi_decrypt_credential( get_option( 'bihrwi_password', '' ) );
 
         return array(
             'username' => $username,
             'password' => $password,
         );
+    }
+
+    private function post_with_retry( string $url, array $args, int $max_attempts = 3 ) {
+        $last_response = null;
+        for ( $i = 0; $i < $max_attempts; $i++ ) {
+            $last_response = wp_remote_post( $url, $args );
+            if ( ! is_wp_error( $last_response ) ) {
+                return $last_response;
+            }
+            if ( $i < $max_attempts - 1 ) {
+                usleep( 100000 * ( 2 ** $i ) ); // 100ms, 200ms
+            }
+        }
+        return $last_response;
     }
 
     /**
@@ -44,7 +92,7 @@ class BihrWI_API_Client {
         $this->logger->log( 'Auth: demande d’un nouveau token.' );
 
         // D'après la doc : POST /Authentication/Token avec UserName & PassWord
-        $response = wp_remote_post(
+        $response = $this->post_with_retry(
             $this->base_url . '/Authentication/Token',
             array(
                 'timeout' => 30,
@@ -66,7 +114,7 @@ class BihrWI_API_Client {
         $code = wp_remote_retrieve_response_code( $response );
         $body = wp_remote_retrieve_body( $response );
 
-        $this->logger->log( 'Auth: code ' . $code . ' – réponse : ' . $body );
+        $this->logger->log( 'Auth: code ' . $code . ' – token reçu.' );
 
         if ( $code < 200 || $code >= 300 ) {
             throw new Exception( 'Erreur API Bihr lors de la récupération du token.' );
@@ -96,7 +144,7 @@ class BihrWI_API_Client {
         $url = $this->base_url . '/Catalog/ZIP/CSV/' . ltrim( $catalog_path, '/' ) . '/Full';
         $this->logger->log( 'Catalog: démarrage génération -> ' . $url );
 
-        $response = wp_remote_post(
+        $response = $this->post_with_retry(
             $url,
             array(
                 'timeout' => 30,

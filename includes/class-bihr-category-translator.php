@@ -16,7 +16,7 @@ class BihrWI_Category_Translator {
 
     public function __construct( $logger = null ) {
         $this->logger       = $logger;
-        $this->api_key      = get_option( 'bihrwi_openai_key', '' );
+        $this->api_key      = bihrwi_decrypt_credential( get_option( 'bihrwi_openai_key', '' ) );
         $upload_dir         = wp_upload_dir();
         $base               = trailingslashit( $upload_dir['basedir'] );
         $this->output_dir   = $base . self::OUTPUT_SUBDIR;

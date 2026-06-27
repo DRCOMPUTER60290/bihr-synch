@@ -172,19 +172,19 @@ class BihrWI_Admin {
         check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+            wp_send_json_error( array( 'message' => __( 'Permission refusée.', 'bihr-synch' ) ) );
         }
 
         $order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
         $force    = ! empty( $_POST['force'] );
 
         if ( ! $order_id ) {
-            wp_send_json_error( array( 'message' => 'Missing order_id.' ) );
+            wp_send_json_error( array( 'message' => __( 'Paramètre order_id manquant.', 'bihr-synch' ) ) );
         }
 
         $order = wc_get_order( $order_id );
         if ( ! $order ) {
-            wp_send_json_error( array( 'message' => 'Order not found.' ) );
+            wp_send_json_error( array( 'message' => __( 'Commande introuvable.', 'bihr-synch' ) ) );
         }
 
         $bihr_ticket_id = get_post_meta( $order_id, '_bihr_api_ticket_id', true );
@@ -559,8 +559,8 @@ class BihrWI_Admin {
 
     public function render_auth_page() {
         $username   = get_option( 'bihrwi_username', '' );
-        $password   = get_option( 'bihrwi_password', '' );
-        $openai_key = get_option( 'bihrwi_openai_key', '' );
+        $password   = bihrwi_decrypt_credential( get_option( 'bihrwi_password', '' ) );
+        $openai_key = bihrwi_decrypt_credential( get_option( 'bihrwi_openai_key', '' ) );
         $last_token = get_transient( 'bihrwi_api_token' );
 
         include BIHRWI_PLUGIN_DIR . 'admin/views/auth-page.php';
@@ -747,8 +747,8 @@ class BihrWI_Admin {
         $openai_key = isset( $_POST['bihrwi_openai_key'] ) ? sanitize_text_field( wp_unslash( $_POST['bihrwi_openai_key'] ) ) : '';
 
         update_option( 'bihrwi_username', $username );
-        update_option( 'bihrwi_password', $password );
-        update_option( 'bihrwi_openai_key', $openai_key );
+        update_option( 'bihrwi_password', bihrwi_encrypt_credential( $password ) );
+        update_option( 'bihrwi_openai_key', bihrwi_encrypt_credential( $openai_key ) );
 
         $redirect_dashboard = add_query_arg( array( 'page' => 'bihr-dashboard' ), admin_url( 'admin.php' ) );
         $redirect_auth      = add_query_arg( array( 'page' => 'bihr-auth' ), admin_url( 'admin.php' ) );
@@ -2072,6 +2072,10 @@ class BihrWI_Admin {
      * AJAX: Import véhicules (alias async)
      */
     public function ajax_import_vehicles_async() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Permission refusée.', 'bihr-synch' ) ) );
+        }
         $this->ajax_import_vehicles();
     }
 
