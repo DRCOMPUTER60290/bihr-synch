@@ -1780,8 +1780,8 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Aucun ID de produit valide fourni.' ) );
         }
 
-        if ( count( $product_ids ) > 100 ) {
-            $product_ids = array_slice( $product_ids, 0, 100 );
+        if ( count( $product_ids ) > 150 ) {
+            $product_ids = array_slice( $product_ids, 0, 150 );
         }
 
         $skip_images = ! empty( $_POST['skip_images'] ) && '1' === $_POST['skip_images'];
@@ -1844,7 +1844,7 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Permission denied.' ) );
         }
 
-        $remaining = $this->product_sync->download_pending_images_batch( 20 );
+        $remaining = $this->product_sync->download_pending_images_parallel( 50, 5 );
 
         wp_send_json_success( array( 'remaining' => $remaining ) );
     }

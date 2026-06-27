@@ -820,6 +820,169 @@ class BihrWI_Product_Sync {
         );
     }
 
+    public function download_pending_images_parallel( $limit = 50, $concurrent = 5 ) {
+        global $wpdb;
+        @set_time_limit( 300 );
+
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+
+        $post_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT post_id FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'
+             LIMIT %d",
+            $limit
+        ) );
+
+        if ( empty( $post_ids ) ) {
+            return 0;
+        }
+
+        $items = array();
+        foreach ( $post_ids as $post_id ) {
+            $post_id   = (int) $post_id;
+            $image_url = get_post_meta( $post_id, '_bihr_pending_image_url', true );
+            if ( empty( $image_url ) ) {
+                delete_post_meta( $post_id, '_bihr_pending_image_url' );
+                continue;
+            }
+
+            if ( ! preg_match( '#^https?://#i', $image_url ) ) {
+                $image_url = rtrim( BIHRWI_IMAGE_BASE_URL, '/' ) . '/' . ltrim( $image_url, '/' );
+            }
+
+            $existing_id = $this->find_existing_attachment_by_url( $image_url );
+            if ( $existing_id ) {
+                set_post_thumbnail( $post_id, $existing_id );
+                delete_post_meta( $post_id, '_bihr_pending_image_url' );
+                continue;
+            }
+
+            $items[] = array(
+                'post_id'   => $post_id,
+                'image_url' => $image_url,
+            );
+        }
+
+        if ( empty( $items ) ) {
+            return (int) $wpdb->get_var(
+                "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
+                 WHERE meta_key = '_bihr_pending_image_url'"
+            );
+        }
+
+        $processed = 0;
+        $chunks = array_chunk( $items, $concurrent );
+
+        foreach ( $chunks as $chunk ) {
+            $mh = curl_multi_init();
+            $curl_handles = array();
+
+            foreach ( $chunk as $i => $item ) {
+                $ch = curl_init();
+                curl_setopt_array( $ch, array(
+                    CURLOPT_URL            => $item['image_url'],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 30,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS      => 3,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                ) );
+                curl_multi_add_handle( $mh, $ch );
+                $curl_handles[ $i ] = $ch;
+            }
+
+            $running = null;
+            do {
+                curl_multi_exec( $mh, $running );
+                curl_multi_select( $mh, 0.5 );
+            } while ( $running > 0 );
+
+            foreach ( $chunk as $i => $item ) {
+                $ch = $curl_handles[ $i ];
+                $http_code = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+                $data = curl_multi_getcontent( $ch );
+                $error = curl_error( $ch );
+                curl_multi_remove_handle( $mh, $ch );
+                curl_close( $ch );
+
+                if ( $error || $http_code >= 400 || empty( $data ) ) {
+                    $this->logger->log( sprintf(
+                        'Erreur download parallèle [%d] %s - %s',
+                        $http_code,
+                        $item['image_url'],
+                        $error
+                    ) );
+                    continue;
+                }
+
+                $tmp = wp_tempnam( basename( parse_url( $item['image_url'], PHP_URL_PATH ) ) );
+                if ( false === $tmp ) {
+                    continue;
+                }
+                file_put_contents( $tmp, $data );
+
+                $parsed_url = wp_parse_url( $item['image_url'] );
+                $file_type = wp_check_filetype_and_ext( $tmp, basename( $parsed_url['path'] ) );
+
+                if ( ! $file_type['ext'] && function_exists( 'mime_content_type' ) ) {
+                    $mime = mime_content_type( $tmp );
+                    $mime_to_ext = array(
+                        'image/jpeg' => 'jpg',
+                        'image/jpg'  => 'jpg',
+                        'image/png'  => 'png',
+                        'image/gif'  => 'gif',
+                        'image/webp' => 'webp',
+                    );
+                    if ( isset( $mime_to_ext[ $mime ] ) ) {
+                        $file_type['ext']  = $mime_to_ext[ $mime ];
+                        $file_type['type'] = $mime;
+                    }
+                }
+
+                $filename = basename( $parsed_url['path'] );
+                if ( ! empty( $file_type['ext'] ) ) {
+                    $path_info = pathinfo( $filename );
+                    if ( empty( $path_info['extension'] ) || ! in_array( strtolower( $path_info['extension'] ), array( 'jpg', 'jpeg', 'png', 'gif', 'webp' ) ) ) {
+                        $filename = $path_info['filename'] . '.' . $file_type['ext'];
+                    }
+                }
+
+                delete_post_meta( $item['post_id'], '_bihr_pending_image_url' );
+
+                $file_array = array(
+                    'name'     => $filename,
+                    'tmp_name' => $tmp,
+                    'type'     => $file_type['type'],
+                );
+
+                $attachment_id = media_handle_sideload( $file_array, $item['post_id'] );
+                if ( is_wp_error( $attachment_id ) ) {
+                    $this->logger->log( 'Erreur media_handle_sideload parallèle : ' . $attachment_id->get_error_message() );
+                    if ( file_exists( $tmp ) ) {
+                        wp_delete_file( $tmp );
+                    }
+                    continue;
+                }
+
+                set_post_thumbnail( $item['post_id'], $attachment_id );
+                update_post_meta( $attachment_id, '_bihr_image_source', esc_url_raw( $item['image_url'] ) );
+                $processed++;
+            }
+
+            curl_multi_close( $mh );
+        }
+
+        $this->logger->log( sprintf( 'Images téléchargées (parallèle) : %d traitées sur %d.', $processed, count( $items ) ) );
+
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'"
+        );
+    }
+
     /**
      * Télécharge et attache l'image en attente pour un post donné.
      * Utilisé par le cron image dédié (run_mass_image_batch).

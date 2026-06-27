@@ -122,7 +122,7 @@ jQuery(document).ready(function($) {
         var currentIndex = 0;
         var successCount = 0;
         var errorCount = 0;
-        var batchSize = 50; // Taille de batch cible (50 produits par requête)
+        var batchSize = 150; // Taille de batch cible
 
         function importNextProductBatch() {
             if (currentIndex >= selectedProducts.length) {
@@ -238,7 +238,7 @@ jQuery(document).ready(function($) {
                     var percent = Math.round((currentIndex / selectedProducts.length) * 100);
                     $progressBar.css('width', percent + '%').text(percent + '%');
                     $progressText.text(currentIndex + ' / ' + selectedProducts.length + ' produits importés');
-                    setTimeout(importNextProductBatch, 500);
+                    setTimeout(importNextProductBatch, 300);
                 }
             });
         }
@@ -324,7 +324,7 @@ jQuery(document).ready(function($) {
                     var currentIndex = 0;
                     var successCount = 0;
                     var errorCount = 0;
-                    var batchSize = 50; // Taille de batch cible (50 produits par requête)
+                    var batchSize = 150; // Taille de batch cible
 
                     function importNextFilteredProductBatch() {
                         if (currentIndex >= allProducts.length) {
@@ -436,7 +436,7 @@ jQuery(document).ready(function($) {
                                 var percent = Math.round((currentIndex / allProducts.length) * 100);
                                 $progressBar.css('width', percent + '%').text(percent + '%');
                                 $progressText.text(currentIndex + ' / ' + allProducts.length + ' produits importés');
-                                setTimeout(importNextFilteredProductBatch, 500);
+                                setTimeout(importNextFilteredProductBatch, 300);
                             }
                         });
                     }
@@ -528,7 +528,7 @@ jQuery(document).ready(function($) {
                                     $imageText.text(downloaded + ' / ' + initialCount + ' images téléchargées');
 
                                     if (remaining > 0) {
-                                        setTimeout(imageDownloadLoop, 1000);
+                                        setTimeout(imageDownloadLoop, 500);
                                     } else {
                                         $imageBar.css('width', '100%').text('100%');
                                         $imageText.html('<strong style="color: green;">✓ Toutes les images ont été téléchargées</strong>');
