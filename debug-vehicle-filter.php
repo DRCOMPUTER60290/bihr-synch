@@ -1,24 +1,15 @@
 <?php
 /**
  * Script de debug pour vérifier les données des véhicules
- * À placer à la racine du plugin et exécuter via URL
+ * @deprecated Utilisez l'outil dans l'admin: BiHR Synch > Debug véhicule
  */
 
-// Charger WordPress si nécessaire
 if ( ! defined( 'ABSPATH' ) ) {
-    $wp_load_path = dirname( __FILE__, 3 ) . '/wp-load.php';
-
-    if ( ! file_exists( $wp_load_path ) ) {
-        exit( 'wp-load.php introuvable.' );
-    }
-
-    require_once $wp_load_path;
+    exit;
 }
 
-// Restreindre l'accès à l'admin
-if ( ! current_user_can( 'manage_options' ) ) {
-    wp_die( esc_html__( 'Vous n\'avez pas la permission d\'accéder à ce script.', 'bihr-synch' ) );
-}
+wp_safe_redirect( admin_url( 'admin.php?page=bihr-debug-vehicle' ) );
+exit;
 
 global $wpdb;
 

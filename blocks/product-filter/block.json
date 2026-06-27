@@ -1,0 +1,30 @@
+{
+    "apiVersion": 3,
+    "name": "bihr/product-filter",
+    "title": "Filtre Produits BIHR",
+    "category": "widgets",
+    "icon": "products",
+    "description": "Affiche le filtre de catégories produits (L1 → L2 → L3 → Produits).",
+    "keywords": [ "bihr", "produit", "filtre", "catégorie" ],
+    "textdomain": "bihr-synch",
+    "attributes": {
+        "title": {
+            "type": "string",
+            "default": "Filtrez nos produits"
+        },
+        "showButton": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "supports": {
+        "align": [ "wide", "full" ],
+        "html": false,
+        "spacing": {
+            "padding": true,
+            "margin": true
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

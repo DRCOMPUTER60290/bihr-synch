@@ -1,0 +1,30 @@
+{
+    "apiVersion": 3,
+    "name": "bihr/vehicle-filter",
+    "title": "Filtre Véhicule BIHR",
+    "category": "widgets",
+    "icon": "car",
+    "description": "Affiche le filtre de compatibilité véhicule (Marque → Modèle → Année → Produits compatibles).",
+    "keywords": [ "bihr", "véhicule", "filtre", "compatibilité" ],
+    "textdomain": "bihr-synch",
+    "attributes": {
+        "title": {
+            "type": "string",
+            "default": "Trouvez vos pièces"
+        },
+        "showButton": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "supports": {
+        "align": [ "wide", "full" ],
+        "html": false,
+        "spacing": {
+            "padding": true,
+            "margin": true
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

@@ -25,7 +25,17 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
- if ( ! function_exists( 'bwi_fs' ) ) {
+// Charger la config sensible si elle existe (config.php doit être .gitignoré)
+$config_file = dirname( __FILE__ ) . '/config.php';
+if ( file_exists( $config_file ) ) {
+    require_once $config_file;
+}
+
+if ( ! defined( 'BIHRWI_FREEMIUS_GATEKEEPER' ) ) {
+    define( 'BIHRWI_FREEMIUS_GATEKEEPER', '' );
+}
+
+if ( ! function_exists( 'bwi_fs' ) ) {
     // Create a helper function for easy SDK access.
     function bwi_fs() {
         global $bwi_fs;
@@ -41,13 +51,10 @@ if ( ! defined( 'ABSPATH' ) ) {
                 'public_key'          => 'pk_9339663c54962dd345ba8f2dfd5bd',
                 'is_premium'          => true,
                 'premium_suffix'      => 'Professional',
-                // If your plugin is a serviceware, set this option to false.
                 'has_premium_version' => true,
                 'has_addons'          => false,
                 'has_paid_plans'      => true,
-                // Automatically removed in the free version. If you're not using the
-                // auto-generated free version, delete this line before uploading to wp.org.
-                'wp_org_gatekeeper'   => 'OA7#BoRiBNqdf52FvzEf!!074aRLPs8fspif$7K1#4u4Csys1fQlCecVcUTOs2mcpeVHi#C2j9d09fOTvbC0HloPT7fFee5WdS3G',
+                'wp_org_gatekeeper'   => BIHRWI_FREEMIUS_GATEKEEPER,
                 'trial'               => array(
                     'days'               => 7,
                     'is_require_payment' => false,
@@ -82,22 +89,30 @@ define( 'BIHRWI_TOKEN_CACHE_MINUTES', 25 );
 // Autoloader via Composer (si disponible) ou fallback manuel
 if ( file_exists( BIHRWI_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
     require_once BIHRWI_PLUGIN_DIR . 'vendor/autoload.php';
-} else {
-    // Fallback pour les installations sans Composer
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-logger.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-api-client.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-ai-enrichment.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-sync.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-order-sync.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-compatibility.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-filter.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-filter.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-path.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-filters.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-translator.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-validator.php';
-    require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-rate-limiter.php';
-    require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
+}
+
+// Charger les classes legacy (includes/) pour compatibilité ascendante
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-logger.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-api-client.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-ai-enrichment.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-sync.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-order-sync.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-compatibility.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-vehicle-filter.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-filter.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-path.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-filters.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-translator.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-validator.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-rate-limiter.php';
+require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
+require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-tools.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-rest-controller.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-schema.php';
+
+// Charger les alias de compatibilité des namespaces
+if ( file_exists( BIHRWI_PLUGIN_DIR . 'src/class-alias-loader.php' ) ) {
+    require_once BIHRWI_PLUGIN_DIR . 'src/class-alias-loader.php';
 }
 
 // Enregistrement des commandes WP-CLI (import massif en ligne de commande)
@@ -110,8 +125,6 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 register_activation_hook( __FILE__, 'bihrwi_activate_plugin' );
 
 function bihrwi_activate_plugin() {
-    global $wpdb;
-
     // Dossier logs
     $log_dir = dirname( BIHRWI_LOG_FILE );
     if ( ! file_exists( $log_dir ) ) {
@@ -124,48 +137,8 @@ function bihrwi_activate_plugin() {
         $wp_filesystem->put_contents( BIHRWI_LOG_FILE, '' );
     }
 
-    // Table wp_bihr_products
-    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-
-    $table_name      = $wpdb->prefix . 'bihr_products';
-    $charset_collate = $wpdb->get_charset_collate();
-
-    $sql = "CREATE TABLE $table_name (
-        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-        product_code VARCHAR(100) NOT NULL,
-        new_part_number VARCHAR(100) NULL,
-        name TEXT NULL,
-        description LONGTEXT NULL,
-        image_url TEXT NULL,
-        dealer_price_ht DECIMAL(15,4) NULL,
-        stock_level INT NULL,
-        stock_description TEXT NULL,
-        category VARCHAR(255) NULL,
-        cat_l1 VARCHAR(255) NULL,
-        cat_l2 VARCHAR(255) NULL,
-        cat_l3 VARCHAR(255) NULL,
-        PRIMARY KEY  (id),
-        KEY product_code (product_code)
-    ) $charset_collate;";
-
-    dbDelta( $sql );
-
-    // Table de queue pour l'import massif (évite de stocker 83 000 IDs dans wp_options)
-    $queue_table = $wpdb->prefix . 'bihr_import_queue';
-    $sql_queue   = "CREATE TABLE $queue_table (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        bihr_id BIGINT UNSIGNED NOT NULL,
-        status ENUM('pending','done','error') NOT NULL DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY idx_status (status)
-    ) $charset_collate;";
-    dbDelta( $sql_queue );
-
-    // Tables pour la compatibilité véhicules
-    require_once( dirname( __FILE__ ) . '/includes/class-bihr-vehicle-compatibility.php' );
-    $vc = new BihrWI_Vehicle_Compatibility( new BihrWI_Logger() );
-    $vc->create_tables();
+    // Exécuter les migrations de schéma
+    BihrWI_Schema::init();
 }
 
 // Charge les traductions du domaine bihr-synch
@@ -331,10 +304,32 @@ function bihrwi_migrate_credentials() {
     }
 }
 
+// Initialisation de la REST API
+new BihrWI_REST_Controller();
+
+// Vérification et mise à jour du schéma de base de données
+add_action( 'plugins_loaded', array( 'BihrWI_Schema', 'init' ), 1 );
+
+// Enregistrement des blocs Gutenberg
+add_action( 'init', function() {
+    $blocks = array(
+        'vehicle-filter',
+        'product-filter',
+    );
+
+    foreach ( $blocks as $block ) {
+        $json = BIHRWI_PLUGIN_DIR . 'blocks/' . $block . '/block.json';
+        if ( file_exists( $json ) ) {
+            register_block_type( $json );
+        }
+    }
+} );
+
 // Initialisation de l'admin
 add_action( 'plugins_loaded', function() {
     if ( is_admin() ) {
         new BihrWI_Admin();
+        new BihrWI_Tools();
         // Filtres de catégories WooCommerce pour la page bihr-products.
         $bihr_category_filters = new BihrWI_Category_Filters();
         $bihr_category_filters->init();

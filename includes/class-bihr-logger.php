@@ -3,6 +3,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+define( 'BIHRWI_LOG_MAX_SIZE', 50 * 1024 * 1024 ); // 50 Mo
+
 class BihrWI_Logger {
 
     const LEVEL_DEBUG = 0;
@@ -12,6 +14,11 @@ class BihrWI_Logger {
 
     private $min_level = self::LEVEL_DEBUG;
     private $silent    = false;
+    private $log_file;
+
+    public function __construct( ?string $log_file = null ) {
+        $this->log_file = $log_file ?? BIHRWI_LOG_FILE;
+    }
 
     public function set_silent( bool $silent ): void {
         $this->silent = $silent;
@@ -44,49 +51,64 @@ class BihrWI_Logger {
         $this->log( $message );
     }
 
-    private function get_wp_filesystem() {
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        WP_Filesystem();
-        global $wp_filesystem;
-        return $wp_filesystem;
+    private function ensure_log_dir(): bool {
+        $dir = dirname( $this->log_file );
+        if ( ! is_dir( $dir ) ) {
+            wp_mkdir_p( $dir );
+        }
+        return is_dir( $dir );
     }
 
-    public function log( $message ) {
-        $wp_filesystem = $this->get_wp_filesystem();
-        
-        // Utilise le fuseau horaire du site WordPress
+    public function log( $message ): void {
         $date = function_exists( 'wp_date' ) ? wp_date( 'Y-m-d H:i:s' ) : current_time( 'mysql' );
         $line = "[$date] $message" . PHP_EOL;
 
-        if ( ! $wp_filesystem->exists( BIHRWI_LOG_FILE ) ) {
-            $dir = dirname( BIHRWI_LOG_FILE );
-            if ( ! $wp_filesystem->exists( $dir ) ) {
-                wp_mkdir_p( $dir );
+        if ( ! $this->ensure_log_dir() ) {
+            return;
+        }
+
+        $this->rotate_if_needed();
+
+        file_put_contents( $this->log_file, $line, FILE_APPEND | LOCK_EX );
+    }
+
+    private function rotate_if_needed(): void {
+        if ( ! file_exists( $this->log_file ) ) {
+            return;
+        }
+
+        if ( filesize( $this->log_file ) < BIHRWI_LOG_MAX_SIZE ) {
+            return;
+        }
+
+        $rotated = $this->log_file . '.' . gmdate( 'Ymd-His' ) . '.rotated';
+        rename( $this->log_file, $rotated );
+
+        $pattern = dirname( $this->log_file ) . DIRECTORY_SEPARATOR
+                 . pathinfo( $this->log_file, PATHINFO_FILENAME )
+                 . '.????-??-??-*.*';
+
+        $rotated_files = glob( $pattern );
+        if ( is_array( $rotated_files ) && count( $rotated_files ) > 5 ) {
+            usort( $rotated_files, 'strcmp' );
+            $to_delete = array_slice( $rotated_files, 0, count( $rotated_files ) - 5 );
+            foreach ( $to_delete as $old ) {
+                @unlink( $old );
             }
-            $wp_filesystem->put_contents( BIHRWI_LOG_FILE, '' );
         }
-
-        $current_content = $wp_filesystem->get_contents( BIHRWI_LOG_FILE );
-        if ( false === $current_content ) {
-            $current_content = '';
-        }
-        $wp_filesystem->put_contents( BIHRWI_LOG_FILE, $current_content . $line );
     }
 
-    public function get_log_contents() {
-        $wp_filesystem = $this->get_wp_filesystem();
-        
-        if ( $wp_filesystem->exists( BIHRWI_LOG_FILE ) ) {
-            return $wp_filesystem->get_contents( BIHRWI_LOG_FILE );
+    public function get_log_contents(): string {
+        if ( ! file_exists( $this->log_file ) ) {
+            return '';
         }
-        return '';
+        $content = file_get_contents( $this->log_file );
+        return false === $content ? '' : $content;
     }
 
-    public function clear_logs() {
-        $wp_filesystem = $this->get_wp_filesystem();
-        
-        if ( $wp_filesystem->exists( BIHRWI_LOG_FILE ) ) {
-            $wp_filesystem->put_contents( BIHRWI_LOG_FILE, '' );
+    public function clear_logs(): void {
+        if ( file_exists( $this->log_file ) ) {
+            file_put_contents( $this->log_file, '' );
         }
     }
 }

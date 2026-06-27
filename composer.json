@@ -10,9 +10,15 @@
         }
     ],
     "autoload": {
+        "psr-4": {
+            "Bihr\\Synch\\": "src/"
+        },
         "classmap": [
             "includes/",
             "admin/"
+        ],
+        "files": [
+            "src/class-alias-loader.php"
         ]
     },
     "require": {
@@ -31,7 +37,7 @@
         }
     },
     "scripts": {
-        "lint": "phpcs --standard=WordPress --extensions=php includes/ admin/",
-        "lint-fix": "phpcbf --standard=WordPress --extensions=php includes/ admin/"
+        "lint": "phpcs --standard=WordPress --extensions=php src/ includes/ admin/",
+        "lint-fix": "phpcbf --standard=WordPress --extensions=php src/ includes/ admin/"
     }
 }

@@ -1,6 +1,9 @@
 vendor/
+node_modules/
 composer.lock
 .DS_Store
 *.log
+config.php
+/build/
 /.opencode/
 /.claude/

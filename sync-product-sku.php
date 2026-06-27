@@ -1,41 +1,18 @@
 <?php
 /**
  * Script de synchronisation des SKU - Version 2.0
- * 
+ * @deprecated Utilisez l'outil dans l'admin: BiHR Synch > Sync SKU produit
+ *
  * Lie les produits BIHR aux produits WooCommerce et synchronise les SKU
- * 
- * Étapes:
- * 1. Trouve les produits WooCommerce par nom
- * 2. Met à jour product_id dans wp_bihr_products
- * 3. Ajoute/met à jour le SKU (new_part_number) dans wp_postmeta
  */
 
-// Charger WordPress si nécessaire
 if ( ! defined( 'ABSPATH' ) ) {
-    $wp_load_path = dirname( __FILE__, 4 ) . '/wp-load.php';
-
-    if ( file_exists( $wp_load_path ) ) {
-        require_once $wp_load_path;
-    } else {
-        exit( '❌ Impossible de charger WordPress' );
-    }
+    exit;
 }
 
-// Vérifier les permissions
-if ( ! current_user_can( 'manage_options' ) ) {
-    wp_die( esc_html__( 'Accès refusé. Vous devez être administrateur.', 'bihr-synch' ) );
-}
-
-$action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
-$offset      = isset( $_GET['offset'] ) ? max( 0, intval( wp_unslash( $_GET['offset'] ) ) ) : 0;
-$nonce_action = 'bihr_sync_product_sku';
-
-if ( 'sync' === $action ) {
-    check_admin_referer( $nonce_action );
-}
-
-global $wpdb;
-set_time_limit(0);
+// Rediriger vers l'outil admin
+wp_safe_redirect( admin_url( 'admin.php?page=bihr-sync-sku' ) );
+exit;
 
 ?>
 <!DOCTYPE html>

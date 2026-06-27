@@ -1,0 +1,183 @@
+# Copyright (C) 2024 BIHR
+# This file is distributed under the same license as the BIHR WooCommerce Importer plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: BIHR WooCommerce Importer 2.0.0\n"
+"Report-Msgid-Bugs-To: https://bihr.fr\n"
+"Last-Translator: BIHR <support@bihr.fr>\n"
+"Language-Team: French\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2024-01-01T00:00:00+00:00\n"
+"PO-Revision-Date: 2024-01-01T00:00:00+00:00\n"
+"X-Generator: bihr-synch\n"
+"X-Domain: bihr-synch\n"
+
+#. Plugin name.
+msgid "BIHR WooCommerce Importer"
+msgstr ""
+
+#. Plugin description.
+msgid "Importez et synchronisez vos produits BIHR avec WooCommerce"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "BIHR WooCommerce"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "BIHR"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Dashboard BIHR"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "🏠 Accueil"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Authentification Bihr"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "🔐 Authentification"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Logs Bihr"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "📊 Logs"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Catégories traduites"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "🏷️ Catégories FR"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Produits Bihr"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "📦 Produits BIHR"
+msgstr ""
+
+#: admin/class-bihr-admin.php admin/class-bihr-admin.php
+msgid "Paramètres Commandes"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "🛒 Commandes"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Gestion des marges"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "💰 Marges"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Produits Importés"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "✅ Produits Importés"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Compatibilité Véhicules"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "🚗 Compatibilité"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Synchronisation SKU (Compatibilité)"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "🔄 Synchro SKU"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Aide & Tutoriels"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "📚 Aide"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "Diagnostic WP‑Cron"
+msgstr ""
+
+#: admin/class-bihr-admin.php
+msgid "⚙️ WP‑Cron"
+msgstr ""
+
+#: admin/class-bihr-tools.php
+msgid "Sync SKU depuis produit"
+msgstr ""
+
+#: admin/class-bihr-tools.php
+msgid "Sync SKU produit"
+msgstr ""
+
+#: admin/class-bihr-tools.php
+msgid "Sync SKU depuis compatibilité"
+msgstr ""
+
+#: admin/class-bihr-tools.php
+msgid "Sync SKU compat"
+msgstr ""
+
+#: admin/class-bihr-tools.php
+msgid "Debug filtre véhicule"
+msgstr ""
+
+#: admin/class-bihr-tools.php
+msgid "Debug véhicule"
+msgstr ""
+
+#: admin/class-bihr-tools.php
+msgid "Accès refusé."
+msgstr ""
+
+#: includes/class-bihr-rest-controller.php
+msgid "Produit non trouvé."
+msgstr ""
+
+#: includes/class-bihr-rest-controller.php
+msgid "Impossible de récupérer le stock."
+msgstr ""
+
+#: includes/class-bihr-rest-controller.php
+msgid "Commande introuvable."
+msgstr ""
+
+#: includes/class-bihr-rest-controller.php
+msgid "Échec de la synchronisation."
+msgstr ""
+
+#: includes/class-bihr-rest-controller.php
+msgid "Traduction des catégories terminée."
+msgstr ""
+
+#: includes/class-bihr-rest-controller.php
+msgid "Génération du catalog démarrée (ticket #)."
+msgstr ""
+
+#: includes/class-bihr-rest-controller.php
+msgid "produits consolidés."
+msgstr ""

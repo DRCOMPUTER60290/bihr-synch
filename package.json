@@ -1,0 +1,17 @@
+{
+    "name": "bihr-synch",
+    "version": "2.0.0",
+    "description": "BIHR WooCommerce Importer - Gutenberg blocks and admin scripts",
+    "private": true,
+    "scripts": {
+        "build": "wp-scripts build",
+        "start": "wp-scripts start",
+        "lint:js": "wp-scripts lint-js",
+        "lint:css": "wp-scripts lint-style",
+        "format": "wp-scripts format",
+        "packages-update": "wp-scripts packages-update"
+    },
+    "devDependencies": {
+        "@wordpress/scripts": "^30.0.0"
+    }
+}
