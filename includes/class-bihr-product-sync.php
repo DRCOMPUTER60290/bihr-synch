@@ -7,6 +7,7 @@ class BihrWI_Product_Sync {
 
     protected $logger;
     protected $table_name;
+    protected $product_lookup_cache = array();
 
     public function __construct( BihrWI_Logger $logger ) {
         global $wpdb;
@@ -31,13 +32,100 @@ class BihrWI_Product_Sync {
     }
 
     /**
+     * Précharge un cache de lookup WooCommerce pour un lot d'IDs BIHR.
+     * Élimine le problème N+1 (jusqu'à 20 000 requêtes pour 10 000 produits).
+     *
+     * @param int[] $bihr_product_ids IDs dans wp_bihr_products.
+     */
+    public function preload_product_lookup( array $bihr_product_ids ): void {
+        global $wpdb;
+
+        if ( empty( $bihr_product_ids ) ) {
+            return;
+        }
+
+        $bihr_product_ids = array_map( 'intval', $bihr_product_ids );
+        $table_name       = esc_sql( $this->table_name );
+        $placeholders     = implode( ',', array_fill( 0, count( $bihr_product_ids ), '%d' ) );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT product_code, new_part_number FROM `{$table_name}` WHERE id IN ({$placeholders})",
+                ...$bihr_product_ids
+            ),
+            ARRAY_A
+        );
+
+        if ( empty( $rows ) ) {
+            return;
+        }
+
+        $all_identifiers = array();
+        foreach ( $rows as $row ) {
+            $sku = ! empty( $row['new_part_number'] ) ? trim( $row['new_part_number'] ) : trim( $row['product_code'] );
+            if ( $sku ) {
+                $all_identifiers[] = $sku;
+            }
+            if ( ! empty( $row['product_code'] ) ) {
+                $all_identifiers[] = trim( $row['product_code'] );
+            }
+        }
+        $all_identifiers = array_unique( array_filter( $all_identifiers ) );
+
+        if ( empty( $all_identifiers ) ) {
+            return;
+        }
+
+        $ph = implode( ',', array_fill( 0, count( $all_identifiers ), '%s' ) );
+
+        $sku_results = $wpdb->get_results(
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->prepare(
+                "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value IN ({$ph})",
+                ...$all_identifiers
+            ),
+            ARRAY_A
+        );
+        foreach ( $sku_results as $row ) {
+            $this->product_lookup_cache[ $row['meta_value'] ] = (int) $row['post_id'];
+        }
+
+        $code_results = $wpdb->get_results(
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->prepare(
+                "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_product_code' AND meta_value IN ({$ph})",
+                ...$all_identifiers
+            ),
+            ARRAY_A
+        );
+        foreach ( $code_results as $row ) {
+            if ( ! isset( $this->product_lookup_cache[ $row['meta_value'] ] ) ) {
+                $this->product_lookup_cache[ $row['meta_value'] ] = (int) $row['post_id'];
+            }
+        }
+
+        $this->logger->log( '[Preload] Cache lookup préchargé: ' . count( $this->product_lookup_cache ) . ' produit(s).' );
+    }
+
+    /**
      * Retrouve un produit WooCommerce existant via le SKU ou le code BIHR (meta).
+     * Consulte le cache préchargé par preload_product_lookup() avant toute requête DB.
      */
     protected function find_existing_product( $sku, $product_code ) {
+        // Consultation du cache préchargé
+        if ( ! empty( $sku ) && isset( $this->product_lookup_cache[ trim( $sku ) ] ) ) {
+            return $this->product_lookup_cache[ trim( $sku ) ];
+        }
+        if ( ! empty( $product_code ) && isset( $this->product_lookup_cache[ trim( $product_code ) ] ) ) {
+            return $this->product_lookup_cache[ trim( $product_code ) ];
+        }
+
         // 1) Recherche par SKU (rapide)
         if ( ! empty( $sku ) ) {
             $product_id = wc_get_product_id_by_sku( $sku );
             if ( $product_id ) {
+                $this->product_lookup_cache[ trim( $sku ) ] = (int) $product_id;
                 return (int) $product_id;
             }
         }
@@ -58,6 +146,7 @@ class BihrWI_Product_Sync {
             ) );
 
             if ( ! empty( $query->posts ) ) {
+                $this->product_lookup_cache[ trim( $product_code ) ] = (int) $query->posts[0];
                 return (int) $query->posts[0];
             }
         }
@@ -502,11 +591,14 @@ class BihrWI_Product_Sync {
             throw new Exception( 'Produit introuvable dans wp_bihr_products.' );
         }
 
-        if ( ! class_exists( 'WC_Product_Simple' ) ) {
-            throw new Exception( 'WooCommerce n’est pas chargé.' );
+        if ( ! class_exists( ‘WC_Product_Simple’ ) ) {
+            throw new Exception( ‘WooCommerce n’est pas chargé.’ );
         }
 
-        $this->logger->log( 'Import WooCommerce: préparation produit ' . $row->product_code );
+        $wpdb->query( ‘START TRANSACTION’ );
+        try {
+
+        $this->logger->log( ‘Import WooCommerce: préparation produit ‘ . $row->product_code );
 
         // Déterminer le SKU cible (priorité NewPartNumber)
         $sku = ! empty( $row->new_part_number ) ? $row->new_part_number : $row->product_code;
@@ -679,7 +771,14 @@ class BihrWI_Product_Sync {
             'Import WooCommerce: produit ' . $row->product_code . ' importé avec succès (post_id=' . $product_id_wc . ')'
         );
 
+        $wpdb->query( 'COMMIT' );
         return $product_id_wc;
+
+        } catch ( Exception $e ) {
+            $wpdb->query( 'ROLLBACK' );
+            $this->logger->log( '[ERROR] Import WooCommerce: rollback — ' . $e->getMessage() );
+            throw $e;
+        }
     }
 
     /**

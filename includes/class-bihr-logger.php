@@ -5,6 +5,45 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class BihrWI_Logger {
 
+    const LEVEL_DEBUG = 0;
+    const LEVEL_INFO  = 1;
+    const LEVEL_WARN  = 2;
+    const LEVEL_ERROR = 3;
+
+    private $min_level = self::LEVEL_DEBUG;
+    private $silent    = false;
+
+    public function set_silent( bool $silent ): void {
+        $this->silent = $silent;
+    }
+
+    public function set_min_level( int $level ): void {
+        $this->min_level = $level;
+    }
+
+    public function error( string $message ): void {
+        $this->write( self::LEVEL_ERROR, '[ERROR] ' . $message );
+    }
+
+    public function warning( string $message ): void {
+        $this->write( self::LEVEL_WARN, '[WARN] ' . $message );
+    }
+
+    public function info( string $message ): void {
+        $this->write( self::LEVEL_INFO, $message );
+    }
+
+    public function debug( string $message ): void {
+        $this->write( self::LEVEL_DEBUG, '[DEBUG] ' . $message );
+    }
+
+    private function write( int $level, string $message ): void {
+        if ( $this->silent || $level < $this->min_level ) {
+            return;
+        }
+        $this->log( $message );
+    }
+
     private function get_wp_filesystem() {
         require_once ABSPATH . 'wp-admin/includes/file.php';
         WP_Filesystem();

@@ -73,6 +73,11 @@ define( 'BIHRWI_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BIHRWI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BIHRWI_LOG_FILE', WP_CONTENT_DIR . '/uploads/bihr-import/bihr-import.log' );
 define( 'BIHRWI_IMAGE_BASE_URL', 'https://api.mybihr.com' );
+define( 'BIHRWI_BATCH_SIZE', 50 );
+define( 'BIHRWI_MAX_BATCH_SIZE', 100 );
+define( 'BIHRWI_API_POLL_INTERVAL_SECONDS', 5 );
+define( 'BIHRWI_MAX_CATALOG_ATTEMPTS', 120 );
+define( 'BIHRWI_TOKEN_CACHE_MINUTES', 25 );
 
 // Autochargement simple de nos classes
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-logger.php';
@@ -86,6 +91,8 @@ require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-filter.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-path.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-filters.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-translator.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-validator.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-rate-limiter.php';
 require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
 
 // Enregistrement des commandes WP-CLI (import massif en ligne de commande)

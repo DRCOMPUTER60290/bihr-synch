@@ -42,6 +42,8 @@ class BihrWI_Admin {
 
         // Handlers AJAX
         add_action( 'wp_ajax_bihrwi_download_all_catalogs_ajax', array( $this, 'ajax_download_all_catalogs' ) );
+        add_action( 'wp_ajax_bihrwi_start_catalog_download', array( $this, 'ajax_start_catalog_download' ) );
+        add_action( 'wp_ajax_bihrwi_check_catalog_download_status', array( $this, 'ajax_check_catalog_download_status' ) );
         add_action( 'wp_ajax_bihrwi_merge_catalogs_ajax', array( $this, 'ajax_merge_catalogs' ) );
         add_action( 'wp_ajax_bihrwi_import_single_product', array( $this, 'ajax_import_single_product' ) );
         add_action( 'wp_ajax_bihrwi_import_products_batch', array( $this, 'ajax_import_products_batch' ) );
@@ -1497,6 +1499,152 @@ class BihrWI_Admin {
 		}
 	}
 
+    /**
+     * AJAX: Lance la génération des catalogues et retourne un session_id immédiatement.
+     * Remplace l'attente serveur par un polling côté client (bihrwi_check_catalog_download_status).
+     */
+    public function ajax_start_catalog_download() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Permission refusée.', 'bihr-synch' ) ) );
+        }
+
+        $catalogs = array(
+            'References'   => 'References',
+            'ExtendedFull' => 'Extended',
+            'Attributes'   => 'Attributes',
+            'Images'       => 'Images',
+            'Stocks'       => 'Stocks',
+        );
+
+        try {
+            $session_id  = substr( md5( uniqid( '', true ) ), 0, 16 );
+            $ticket_data = array();
+
+            foreach ( $catalogs as $name => $path ) {
+                $ticket_id               = $this->api_client->start_catalog_generation( $path );
+                $ticket_data[ $name ] = array(
+                    'path'      => $path,
+                    'ticket_id' => $ticket_id,
+                    'status'    => 'PROCESSING',
+                );
+                $this->logger->log( "Catalog download lancé: {$name} → ticket {$ticket_id}" );
+            }
+
+            set_transient( 'bihrwi_catalog_dl_' . $session_id, $ticket_data, 30 * MINUTE_IN_SECONDS );
+
+            wp_send_json_success( array(
+                'session_id' => $session_id,
+                'total'      => count( $ticket_data ),
+            ) );
+
+        } catch ( Exception $e ) {
+            $this->logger->log( 'Catalog start error: ' . $e->getMessage() );
+            wp_send_json_error( array( 'message' => $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * AJAX: Vérifie l'état de génération et télécharge/extrait quand tous sont prêts.
+     */
+    public function ajax_check_catalog_download_status() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Permission refusée.', 'bihr-synch' ) ) );
+        }
+
+        $session_id = sanitize_text_field( isset( $_POST['session_id'] ) ? $_POST['session_id'] : '' );
+        if ( empty( $session_id ) ) {
+            wp_send_json_error( array( 'message' => __( 'Session invalide.', 'bihr-synch' ) ) );
+            return;
+        }
+
+        $ticket_data = get_transient( 'bihrwi_catalog_dl_' . $session_id );
+        if ( false === $ticket_data ) {
+            wp_send_json_error( array( 'message' => __( 'Session expirée. Veuillez recommencer.', 'bihr-synch' ) ) );
+            return;
+        }
+
+        try {
+            $done_count = 0;
+            $all_done   = true;
+
+            foreach ( $ticket_data as $name => &$info ) {
+                if ( in_array( $info['status'], array( 'DONE', 'ERROR' ), true ) ) {
+                    if ( 'DONE' === $info['status'] ) {
+                        $done_count++;
+                    }
+                    continue;
+                }
+
+                $status_response = $this->api_client->get_catalog_status( $info['ticket_id'] );
+                $status          = strtoupper( $status_response['status'] ?? '' );
+                $info['status']  = $status;
+
+                if ( 'DONE' === $status ) {
+                    $info['download_id'] = $status_response['downloadId'] ?? '';
+                    $done_count++;
+                } elseif ( 'ERROR' === $status ) {
+                    $info['error'] = $status_response['error'] ?? 'Erreur inconnue';
+                } else {
+                    $all_done = false;
+                }
+            }
+            unset( $info );
+
+            set_transient( 'bihrwi_catalog_dl_' . $session_id, $ticket_data, 30 * MINUTE_IN_SECONDS );
+
+            if ( ! $all_done ) {
+                wp_send_json_success( array(
+                    'status'     => 'processing',
+                    'done_count' => $done_count,
+                    'total'      => count( $ticket_data ),
+                ) );
+                return;
+            }
+
+            // Tous prêts → télécharger et extraire
+            $import_dir = WP_CONTENT_DIR . '/uploads/bihr-import/';
+            if ( ! is_dir( $import_dir ) ) {
+                wp_mkdir_p( $import_dir );
+            }
+
+            $downloaded_files = array();
+            foreach ( $ticket_data as $name => $info ) {
+                if ( 'DONE' !== $info['status'] ) {
+                    continue;
+                }
+                $download_id = $info['download_id'] ?? '';
+                if ( empty( $download_id ) || '00000000000000000000000000000000' === $download_id ) {
+                    continue;
+                }
+                $zip_file = $this->api_client->download_catalog_file( $download_id, strtolower( $name ) );
+                if ( $zip_file ) {
+                    $downloaded_files[ $name ] = $zip_file;
+                    $this->logger->log( "Catalog {$name} téléchargé: {$zip_file}" );
+                }
+            }
+
+            $total_extracted = 0;
+            foreach ( $downloaded_files as $zip_file ) {
+                $total_extracted += $this->product_sync->extract_zip_to_import_dir( $zip_file );
+            }
+
+            delete_transient( 'bihrwi_catalog_dl_' . $session_id );
+            $this->logger->log( 'Catalog download terminé: ' . count( $downloaded_files ) . " catalogues, {$total_extracted} fichiers" );
+
+            wp_send_json_success( array(
+                'status'         => 'complete',
+                'catalogs_count' => count( $downloaded_files ),
+                'files_count'    => $total_extracted,
+            ) );
+
+        } catch ( Exception $e ) {
+            $this->logger->log( 'Catalog status error: ' . $e->getMessage() );
+            wp_send_json_error( array( 'message' => $e->getMessage() ) );
+        }
+    }
+
 	/**
 	 * Handler AJAX pour la fusion des catalogues
 	 */
@@ -1635,6 +1783,9 @@ class BihrWI_Admin {
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( true );
         }
+
+        // Préchargement du cache WooCommerce pour éviter N+1 requêtes DB
+        $this->product_sync->preload_product_lookup( $product_ids );
 
         $results = array();
 
