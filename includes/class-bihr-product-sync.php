@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -173,48 +173,48 @@ class BihrWI_Product_Sync {
         global $wpdb;
 
         $args      = array();
-        $where_sql = ‘1=1’;
+        $where_sql = '1=1';
 
-        if ( ‘’ !== $search ) {
-            $search_like = ‘%’ . $wpdb->esc_like( $search ) . ‘%’;
-            $where_sql  .= ‘ AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)’;
+        if ( '' !== $search ) {
+            $search_like = '%' . $wpdb->esc_like( $search ) . '%';
+            $where_sql  .= ' AND (product_code LIKE %s OR new_part_number LIKE %s OR name LIKE %s OR description LIKE %s)';
             $args[]      = $search_like;
             $args[]      = $search_like;
             $args[]      = $search_like;
             $args[]      = $search_like;
         }
 
-        if ( ‘in_stock’ === $stock_filter ) {
-            $where_sql .= ‘ AND stock_level > 0’;
-        } elseif ( ‘out_of_stock’ === $stock_filter ) {
-            $where_sql .= ‘ AND (stock_level = 0 OR stock_level IS NULL)’;
+        if ( 'in_stock' === $stock_filter ) {
+            $where_sql .= ' AND stock_level > 0';
+        } elseif ( 'out_of_stock' === $stock_filter ) {
+            $where_sql .= ' AND (stock_level = 0 OR stock_level IS NULL)';
         }
 
-        if ( ‘’ !== $price_min && is_numeric( $price_min ) ) {
-            $where_sql .= ‘ AND dealer_price_ht >= %f’;
+        if ( '' !== $price_min && is_numeric( $price_min ) ) {
+            $where_sql .= ' AND dealer_price_ht >= %f';
             $args[]     = (float) $price_min;
         }
 
-        if ( ‘’ !== $price_max && is_numeric( $price_max ) ) {
-            $where_sql .= ‘ AND dealer_price_ht <= %f’;
+        if ( '' !== $price_max && is_numeric( $price_max ) ) {
+            $where_sql .= ' AND dealer_price_ht <= %f';
             $args[]     = (float) $price_max;
         }
 
-        if ( ‘’ !== $category_filter ) {
-            $normalized_category = str_replace( "\xc2\xa0", ‘ ‘, $category_filter );
-            $normalized_category = preg_replace( ‘/\s+/u’, ‘ ‘, trim( $normalized_category ) );
-            $category_column     = esc_sql( ‘category’ );
-            $where_sql          .= " AND REPLACE(TRIM(`{$category_column}`), CHAR(160), ‘ ‘) = %s";
+        if ( '' !== $category_filter ) {
+            $normalized_category = str_replace( "\xc2\xa0", ' ', $category_filter );
+            $normalized_category = preg_replace( '/\s+/u', ' ', trim( $normalized_category ) );
+            $category_column     = esc_sql( 'category' );
+            $where_sql          .= " AND REPLACE(TRIM(`{$category_column}`), CHAR(160), ' ') = %s";
             $args[]              = $normalized_category;
         }
 
-        foreach ( array( ‘cat_l1’ => $cat_l1_filter, ‘cat_l2’ => $cat_l2_filter, ‘cat_l3’ => $cat_l3_filter ) as $col => $val ) {
-            if ( ‘’ === $val ) {
+        foreach ( array( 'cat_l1' => $cat_l1_filter, 'cat_l2' => $cat_l2_filter, 'cat_l3' => $cat_l3_filter ) as $col => $val ) {
+            if ( '' === $val ) {
                 continue;
             }
-            $values = array_filter( array_map( ‘trim’, explode( ‘||’, $val ) ) );
+            $values = array_filter( array_map( 'trim', explode( '||', $val ) ) );
             if ( count( $values ) > 1 ) {
-                $placeholders = implode( ‘,’, array_fill( 0, count( $values ), ‘%s’ ) );
+                $placeholders = implode( ',', array_fill( 0, count( $values ), '%s' ) );
                 $where_sql   .= " AND TRIM({$col}) IN ({$placeholders})";
                 $args         = array_merge( $args, $values );
             } else {
@@ -223,20 +223,20 @@ class BihrWI_Product_Sync {
             }
         }
 
-        if ( ‘’ !== $cat_l2_not ) {
-            $values_not = array_filter( array_map( ‘trim’, explode( ‘||’, $cat_l2_not ) ) );
+        if ( '' !== $cat_l2_not ) {
+            $values_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
             if ( ! empty( $values_not ) ) {
-                $placeholders = implode( ‘,’, array_fill( 0, count( $values_not ), ‘%s’ ) );
+                $placeholders = implode( ',', array_fill( 0, count( $values_not ), '%s' ) );
                 $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
                 $args         = array_merge( $args, $values_not );
             }
         }
 
-        return array( ‘where’ => $where_sql, ‘args’ => $args );
+        return array( 'where' => $where_sql, 'args' => $args );
     }
 
     /* =========================================================
-     *   LECTURE / LISTE DES PRODUITS (pour la page d’admin)
+     *   LECTURE / LISTE DES PRODUITS (pour la page d'admin)
      * ======================================================= */
 
 
@@ -569,7 +569,7 @@ class BihrWI_Product_Sync {
     }
 
     /* =========================================================
-     *          IMPORT D’UN PRODUIT DANS WOOCOMMERCE
+     *          IMPORT D'UN PRODUIT DANS WOOCOMMERCE
      * ======================================================= */
 
     /**
@@ -591,14 +591,14 @@ class BihrWI_Product_Sync {
             throw new Exception( 'Produit introuvable dans wp_bihr_products.' );
         }
 
-        if ( ! class_exists( ‘WC_Product_Simple’ ) ) {
-            throw new Exception( ‘WooCommerce n’est pas chargé.’ );
+        if ( ! class_exists( 'WC_Product_Simple' ) ) {
+            throw new Exception( 'WooCommerce n'est pas chargé.' );
         }
 
-        $wpdb->query( ‘START TRANSACTION’ );
+        $wpdb->query( 'START TRANSACTION' );
         try {
 
-        $this->logger->log( ‘Import WooCommerce: préparation produit ‘ . $row->product_code );
+        $this->logger->log( 'Import WooCommerce: préparation produit ' . $row->product_code );
 
         // Déterminer le SKU cible (priorité NewPartNumber)
         $sku = ! empty( $row->new_part_number ) ? $row->new_part_number : $row->product_code;
@@ -616,7 +616,7 @@ class BihrWI_Product_Sync {
 
             $this->logger->log( 'Import WooCommerce: mise à jour du produit existant ID ' . $existing_product_id );
         } else {
-            // Création d’un produit simple
+            // Création d'un produit simple
             $product = new WC_Product_Simple();
         }
 
@@ -1128,7 +1128,7 @@ class BihrWI_Product_Sync {
             }
         }
 
-        // On ajoute ce qui n’est pas encore présent
+        // On ajoute ce qui n'est pas encore présent
         foreach ( $prices_data as $code => $row ) {
             if ( ! isset( $merged[ $code ] ) ) {
                 $merged[ $code ] = array( 'product_code' => $code );
@@ -1809,7 +1809,7 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Essaie de récupérer le code produit à partir d’une ligne CSV
+     * Essaie de récupérer le code produit à partir d'une ligne CSV
      * (ProductCode, ProductId, etc.)
      */
     protected function get_product_code_from_row( $row ) {
