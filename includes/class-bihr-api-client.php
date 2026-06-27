@@ -172,8 +172,46 @@ class BihrWI_API_Client {
 
         $this->logger->log( 'Catalog start: code ' . $code . ' – réponse : ' . $body );
 
+        // Rate limit (429) ou erreur serveur (5xx) : attendre et réessayer
+        $attempt = 0;
+        while ( in_array( $code, array( 429, 500, 502, 503, 504 ), true ) && $attempt < $max_retries ) {
+            $attempt++;
+            $wait = $attempt * 2;
+            $reason = ( $code === 429 ) ? 'rate limit' : 'erreur serveur';
+            $this->logger->log( "Catalog start: {$reason} ({$code}), pause {$wait}s (tentative {$attempt}/{$max_retries})" );
+            sleep( $wait );
+            $response = $this->post_with_retry(
+                $url,
+                array(
+                    'timeout' => 30,
+                    'headers' => array(
+                        'Accept'        => 'application/json',
+                        'Authorization' => 'Bearer ' . $token,
+                        'Content-Type'  => 'text/json',
+                    ),
+                    'body'    => null,
+                )
+            );
+            if ( is_wp_error( $response ) ) {
+                $this->logger->log( 'Catalog start: erreur HTTP après retry : ' . $response->get_error_message() );
+                throw new Exception( 'Erreur HTTP lors du démarrage du catalog.' );
+            }
+            $code = wp_remote_retrieve_response_code( $response );
+            $body = wp_remote_retrieve_body( $response );
+            $this->logger->log( 'Catalog start: code ' . $code . ' (après retry) – réponse : ' . $body );
+        }
+
         if ( $code < 200 || $code >= 300 ) {
-            throw new Exception( 'Erreur API Bihr lors du démarrage du catalog : ' . esc_html( $body ) );
+            $error_message = 'Erreur API Bihr';
+            if ( $code === 429 ) {
+                $error_message .= ' : quota dépassé, réessayez plus tard.';
+            } elseif ( $code >= 500 ) {
+                $error_message .= ' : le serveur Bihr est temporairement indisponible (erreur ' . $code . '). Réessayez dans quelques minutes.';
+            } else {
+                $error_message .= ' lors du démarrage du catalog (code ' . $code . ').';
+            }
+            $this->logger->log( $error_message . ' Détail: ' . esc_html( $body ) );
+            throw new Exception( $error_message );
         }
 
         $data = json_decode( $body, true );
@@ -215,12 +253,13 @@ class BihrWI_API_Client {
 
         $this->logger->log( 'Catalog status: code ' . $code . ' – réponse : ' . $body );
 
-        // Rate limit (429) : attendre et réessayer avec backoff exponentiel
+        // Rate limit (429) ou erreur serveur (5xx) : attendre et réessayer avec backoff
         $attempt = 0;
-        while ( $code === 429 && $attempt < $max_retries ) {
+        while ( in_array( $code, array( 429, 500, 502, 503, 504 ), true ) && $attempt < $max_retries ) {
             $attempt++;
-            $wait = $attempt; // 1s, 2s, 3s
-            $this->logger->log( "Catalog status: rate limit atteint, pause {$wait}s (tentative {$attempt}/{$max_retries})" );
+            $wait = $attempt * 2; // 2s, 4s, 6s
+            $reason = ( $code === 429 ) ? 'rate limit' : 'erreur serveur';
+            $this->logger->log( "Catalog status: {$reason} ({$code}), pause {$wait}s (tentative {$attempt}/{$max_retries})" );
             sleep( $wait );
             $response = wp_remote_get(
                 $url,
@@ -233,16 +272,25 @@ class BihrWI_API_Client {
                 )
             );
             if ( is_wp_error( $response ) ) {
-                $this->logger->log( 'Catalog status: erreur HTTP après rate-limit : ' . $response->get_error_message() );
+                $this->logger->log( 'Catalog status: erreur HTTP après retry : ' . $response->get_error_message() );
                 throw new Exception( 'Erreur HTTP lors de la récupération du status.' );
             }
             $code = wp_remote_retrieve_response_code( $response );
             $body = wp_remote_retrieve_body( $response );
-            $this->logger->log( 'Catalog status: code ' . $code . ' (après rate-limit) – réponse : ' . $body );
+            $this->logger->log( 'Catalog status: code ' . $code . ' (après retry) – réponse : ' . $body );
         }
 
         if ( $code < 200 || $code >= 300 ) {
-            throw new Exception( 'Erreur API Bihr lors de la récupération du status : ' . esc_html( $body ) );
+            $error_message = 'Erreur API Bihr';
+            if ( $code === 429 ) {
+                $error_message .= ' : quota dépassé, réessayez plus tard.';
+            } elseif ( $code >= 500 ) {
+                $error_message .= ' : le serveur Bihr est temporairement indisponible (erreur ' . $code . '). Réessayez dans quelques minutes.';
+            } else {
+                $error_message .= ' lors de la récupération du status (code ' . $code . ').';
+            }
+            $this->logger->log( $error_message . ' Détail: ' . esc_html( $body ) );
+            throw new Exception( $error_message );
         }
 
         $data = json_decode( $body, true );
