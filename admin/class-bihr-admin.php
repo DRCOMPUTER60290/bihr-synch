@@ -1577,6 +1577,7 @@ class BihrWI_Admin {
             $done_count = 0;
             $all_done   = true;
 
+            $delay_between_checks = 1.1; // 1.1s entre chaque vérification (rate limit: 1/sec)
             foreach ( $ticket_data as $name => &$info ) {
                 if ( in_array( $info['status'], array( 'DONE', 'ERROR' ), true ) ) {
                     if ( 'DONE' === $info['status'] ) {
@@ -1597,6 +1598,9 @@ class BihrWI_Admin {
                 } else {
                     $all_done = false;
                 }
+
+                // Pause entre chaque appel API pour respecter le rate limit (1/sec)
+                usleep( (int) ( $delay_between_checks * 1000000 ) );
             }
             unset( $info );
 

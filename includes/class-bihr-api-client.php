@@ -188,7 +188,7 @@ class BihrWI_API_Client {
      * Vérifie le status de génération d’un catalog
      * Appelle GET /Catalog/GenerationStatus?ticketId=...
      */
-    public function get_catalog_status( $ticket_id ) {
+    public function get_catalog_status( $ticket_id, int $max_retries = 3 ) {
         $token = $this->get_token();
 
         $url = $this->base_url . '/Catalog/GenerationStatus?ticketId=' . urlencode( $ticket_id );
@@ -214,6 +214,32 @@ class BihrWI_API_Client {
         $body = wp_remote_retrieve_body( $response );
 
         $this->logger->log( 'Catalog status: code ' . $code . ' – réponse : ' . $body );
+
+        // Rate limit (429) : attendre et réessayer avec backoff exponentiel
+        $attempt = 0;
+        while ( $code === 429 && $attempt < $max_retries ) {
+            $attempt++;
+            $wait = $attempt; // 1s, 2s, 3s
+            $this->logger->log( "Catalog status: rate limit atteint, pause {$wait}s (tentative {$attempt}/{$max_retries})" );
+            sleep( $wait );
+            $response = wp_remote_get(
+                $url,
+                array(
+                    'timeout' => 30,
+                    'headers' => array(
+                        'Accept'        => 'application/json',
+                        'Authorization' => 'Bearer ' . $token,
+                    ),
+                )
+            );
+            if ( is_wp_error( $response ) ) {
+                $this->logger->log( 'Catalog status: erreur HTTP après rate-limit : ' . $response->get_error_message() );
+                throw new Exception( 'Erreur HTTP lors de la récupération du status.' );
+            }
+            $code = wp_remote_retrieve_response_code( $response );
+            $body = wp_remote_retrieve_body( $response );
+            $this->logger->log( 'Catalog status: code ' . $code . ' (après rate-limit) – réponse : ' . $body );
+        }
 
         if ( $code < 200 || $code >= 300 ) {
             throw new Exception( 'Erreur API Bihr lors de la récupération du status : ' . esc_html( $body ) );
