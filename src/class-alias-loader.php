@@ -16,35 +16,8 @@ function bihrwi_alias( string $old_name, string $new_name ): void {
     }
 }
 
-// Charger les nouvelles classes namespacées
-$src_dir = __DIR__;
-
-// Files are loaded in dependency order
-$src_files = array(
-    'Logger.php',
-    'Api/Client.php',
-    'Rate/Limiter.php',
-    'Product/Validator.php',
-    'Category/Path.php',
-    'AI/Enrichment.php',
-    'Category/Translator.php',
-    'Product/Sync.php',
-    'Vehicle/Compatibility.php',
-    'Order/Sync.php',
-    'Vehicle/Filter.php',
-    'Product/Filter.php',
-    'Category/Filters.php',
-    'CLI/Commands.php',
-    'Admin/Admin.php',
-    'Admin/Tools.php',
-);
-
-foreach ( $src_files as $file ) {
-    $path = $src_dir . '/' . $file;
-    if ( file_exists( $path ) ) {
-        require_once $path;
-    }
-}
+// Les classes src/ sont chargées par le PSR-4 (Composer) à la demande.
+// On ne fait ici que créer les alias pour la rétrocompatibilité.
 
 // Créer les alias pour la rétrocompatibilité
 bihrwi_alias( 'BihrWI_Logger', 'Bihr\\Synch\\Logger' );
