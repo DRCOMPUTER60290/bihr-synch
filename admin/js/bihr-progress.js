@@ -8,6 +8,7 @@ jQuery(document).ready(function($) {
     // ============================================
     
     var selectedProducts = [];
+    var stopImport = false;
     
     // Fonction pour mettre à jour le compteur
     function updateSelectedCount() {
@@ -89,8 +90,29 @@ jQuery(document).ready(function($) {
     
     // Initialiser le compteur au chargement de la page
     updateSelectedCount();
-    
-    // Import des produits sélectionnés
+
+    // ============================================
+    // BOUTONS D'ARRÊT
+    // ============================================
+
+    $('#bihr-stop-import, #bihr-stop-images').on('click', function(e) {
+        e.preventDefault();
+        stopImport = true;
+
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('⏳ Arrêt en cours...');
+
+        // Nettoyer la queue WP-Cron au cas où
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'bihrwi_stop_mass_import', nonce: bihrProgressData.nonce }
+        });
+    });
+
+    // ============================================
+    // IMPORT DES PRODUITS SÉLECTIONNÉS
+    // ============================================
     $('#bihr-import-selected').on('click', function(e) {
         e.preventDefault();
         
@@ -109,11 +131,13 @@ jQuery(document).ready(function($) {
         var $progressText = $('#bihr-progress-text');
         var $progressDetails = $('#bihr-progress-details');
         
+        stopImport = false;
         $progressContainer.show();
+        $('#bihr-stop-import').show();
         $progressBar.css('width', '0%').text('0%');
         $progressText.text('0 / ' + selectedProducts.length + ' produits importés');
         $progressDetails.html('');
-        
+
         // Désactiver les boutons
         $('#bihr-import-selected, #bihr-select-all, #bihr-deselect-all').prop('disabled', true);
         $('.bihr-product-checkbox').prop('disabled', true);
@@ -133,6 +157,7 @@ jQuery(document).ready(function($) {
                     finalMsg += ', ' + errorCount + ' erreur(s)';
                 }
                 $progressText.html('<strong style="color: green;">' + finalMsg + '</strong>');
+                $('#bihr-stop-import').hide();
 
                 function reenableButtons() {
                     $('#bihr-import-selected, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
@@ -160,6 +185,17 @@ jQuery(document).ready(function($) {
                     setTimeout(reenableButtons, 2000);
                 }
 
+                return;
+            }
+
+            if (stopImport) {
+                $progressBar.css('width', '0%').text('0%');
+                $progressText.html('<strong style="color: #d63638;">⏹ Import arrêté par l\'utilisateur</strong>');
+                $progressDetails.append('<div style="color:#d63638; font-weight:bold;">Import arrêté après ' + currentIndex + ' / ' + selectedProducts.length + ' produits.</div>');
+                $('#bihr-stop-import, #bihr-stop-images').hide();
+                $('#bihr-import-selected, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
+                $('.bihr-product-checkbox').prop('disabled', false);
+                updateSelectedCount();
                 return;
             }
 
@@ -311,11 +347,13 @@ jQuery(document).ready(function($) {
                     var $progressText = $('#bihr-progress-text');
                     var $progressDetails = $('#bihr-progress-details');
                     
+                    stopImport = false;
                     $progressContainer.show();
+                    $('#bihr-stop-import').show();
                     $progressBar.css('width', '0%').text('0%');
                     $progressText.text('0 / ' + count + ' produits importés');
                     $progressDetails.html('');
-                    
+
                     // Désactiver les boutons
                     $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', true);
                     $('.bihr-product-checkbox').prop('disabled', true);
@@ -335,6 +373,7 @@ jQuery(document).ready(function($) {
                                 finalMsg += ', ' + errorCount + ' erreur(s)';
                             }
                             $progressText.html('<strong style="color: green;">' + finalMsg + '</strong>');
+                            $('#bihr-stop-import').hide();
 
                             // Lancer le téléchargement des images si nécessaire
                             if (!$('#bihr-skip-images').is(':checked')) {
@@ -358,6 +397,17 @@ jQuery(document).ready(function($) {
                                 }, 2000);
                             }
 
+                            return;
+                        }
+
+                        if (stopImport) {
+                            $progressBar.css('width', '0%').text('0%');
+                            $progressText.html('<strong style="color: #d63638;">⏹ Import arrêté par l\'utilisateur</strong>');
+                            $progressDetails.append('<div style="color:#d63638; font-weight:bold;">Import arrêté après ' + currentIndex + ' / ' + allProducts.length + ' produits.</div>');
+                            $('#bihr-stop-import, #bihr-stop-images').hide();
+                            $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
+                            $('.bihr-product-checkbox').prop('disabled', false);
+                            $btn.html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
                             return;
                         }
 
@@ -499,7 +549,9 @@ jQuery(document).ready(function($) {
     // ============================================
 
     function chainImageDownloadAfterImport($imageContainer, $imageBar, $imageText, $imageDetails, afterComplete) {
+        stopImport = false;
         $imageContainer.show();
+        $('#bihr-stop-images').show();
         $imageBar.css('width', '0%').text('0%');
         $imageText.text('Préparation du téléchargement des images...');
         $imageDetails.html('');
@@ -515,11 +567,21 @@ jQuery(document).ready(function($) {
                     $imageText.text('0 / ' + initialCount + ' images téléchargées');
 
                     function imageDownloadLoop() {
+                        if (stopImport) {
+                            $imageBar.css('width', '0%').text('0%');
+                            $imageText.html('<strong style="color: #d63638;">⏹ Téléchargement arrêté par l\'utilisateur</strong>');
+                            $imageDetails.append('<div style="color:#d63638; font-weight:bold;">Arrêté après ' + downloaded + ' / ' + initialCount + ' images.</div>');
+                            $('#bihr-stop-images').hide();
+                            if (afterComplete) afterComplete();
+                            return;
+                        }
+
                         $.ajax({
                             url: ajaxurl,
                             type: 'POST',
                             data: { action: 'bihrwi_download_pending_images', nonce: bihrProgressData.nonce },
                             success: function(resp) {
+                                if (stopImport) return;
                                 if (resp.success) {
                                     var remaining = resp.data.remaining;
                                     downloaded = initialCount - remaining;
@@ -532,6 +594,7 @@ jQuery(document).ready(function($) {
                                     } else {
                                         $imageBar.css('width', '100%').text('100%');
                                         $imageText.html('<strong style="color: green;">✓ Toutes les images ont été téléchargées</strong>');
+                                        $('#bihr-stop-images').hide();
                                         if (afterComplete) afterComplete();
                                     }
                                 } else {
@@ -550,6 +613,7 @@ jQuery(document).ready(function($) {
                 } else {
                     if (response.success && response.data.count === 0) {
                         $imageText.html('<strong>Aucune image en attente</strong>');
+                        $('#bihr-stop-images').hide();
                     } else {
                         $imageText.html('<span style="color:red;">Erreur lors du comptage des images</span>');
                     }

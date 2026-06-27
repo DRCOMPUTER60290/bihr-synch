@@ -49,6 +49,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_import_products_batch', array( $this, 'ajax_import_products_batch' ) );
         add_action( 'wp_ajax_bihrwi_download_pending_images', array( $this, 'ajax_download_pending_images' ) );
         add_action( 'wp_ajax_bihrwi_count_pending_images', array( $this, 'ajax_count_pending_images' ) );
+        add_action( 'wp_ajax_bihrwi_stop_mass_import', array( $this, 'ajax_stop_mass_import' ) );
         add_action( 'wp_ajax_bihr_refresh_stock', array( $this, 'ajax_refresh_stock' ) );
         add_action( 'wp_ajax_bihrwi_import_vehicles', array( $this, 'ajax_import_vehicles' ) );
         if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
@@ -1863,6 +1864,33 @@ class BihrWI_Admin {
         );
 
         wp_send_json_success( array( 'count' => $count ) );
+    }
+
+    public function ajax_stop_mass_import() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        global $wpdb;
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$queue_table}'" ) === $queue_table ) {
+            $wpdb->query( "TRUNCATE TABLE `{$queue_table}`" );
+        }
+
+        $crons = array( 'bihrwi_mass_import_event', 'bihrwi_mass_image_event' );
+        foreach ( $crons as $hook ) {
+            $timestamp = wp_next_scheduled( $hook );
+            if ( $timestamp ) {
+                wp_unschedule_event( $timestamp, $hook );
+            }
+        }
+
+        delete_option( 'bihrwi_mass_import_stats' );
+
+        wp_send_json_success( array( 'message' => 'Import arrêté.' ) );
     }
 
     /**

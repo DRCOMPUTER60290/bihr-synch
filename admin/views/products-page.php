@@ -1383,7 +1383,12 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
     <!-- Barre de progression et import multiple -->
     <div id="bihr-import-progress" style="display:none; margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ccd0d4; border-radius: 4px;">
-        <h3 style="margin-top: 0;">Import en cours...</h3>
+        <h3 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+            <span>Import en cours...</span>
+            <button id="bihr-stop-import" class="button" style="border-color: #d63638; color: #d63638; display: none;">
+                <span class="dashicons dashicons-dismiss" style="vertical-align: middle;"></span> Arrêter
+            </button>
+        </h3>
         <div style="background: #f0f0f1; height: 30px; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
             <div id="bihr-progress-bar" style="background: #2271b1; height: 100%; width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;"></div>
         </div>
@@ -1393,7 +1398,12 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
     <!-- Barre de progression pour le téléchargement des images -->
     <div id="bihr-image-progress" style="display:none; margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ccd0d4; border-radius: 4px;">
-        <h3 style="margin-top: 0;">Téléchargement des images...</h3>
+        <h3 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+            <span>Téléchargement des images...</span>
+            <button id="bihr-stop-images" class="button" style="border-color: #d63638; color: #d63638; display: none;">
+                <span class="dashicons dashicons-dismiss" style="vertical-align: middle;"></span> Arrêter
+            </button>
+        </h3>
         <div style="background: #f0f0f1; height: 30px; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
             <div id="bihr-image-progress-bar" style="background: #b32d2e; height: 100%; width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;"></div>
         </div>
