@@ -168,6 +168,11 @@ function bihrwi_activate_plugin() {
     $vc->create_tables();
 }
 
+// Charge les traductions du domaine bihr-synch
+add_action( 'plugins_loaded', function() {
+    load_plugin_textdomain( 'bihr-synch', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+}, 0 );
+
 // Ajoute un intervalle "tous les 5 minutes" pour WP-Cron
 add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['five_minutes'] ) ) {
