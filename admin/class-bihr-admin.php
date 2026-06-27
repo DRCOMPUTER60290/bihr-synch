@@ -94,7 +94,7 @@ class BihrWI_Admin {
         // Log pour confirmer que les hooks sont attachés
         add_action( 'init', function() {
             if ( has_action( 'bihrwi_auto_prices_generation' ) ) {
-                error_log( '[BIHR] Hook bihrwi_auto_prices_generation attaché avec succès' );
+                // Debug left-over — supprimé en production
             }
         }, 999 );
 
@@ -146,7 +146,7 @@ class BihrWI_Admin {
 		// Charger le JS des filtres dépendants uniquement sur la page bihr-products
 		$current_screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 		$is_products_page = ( $current_screen && 'bihr-products' === $current_screen->id ) || 
-		                    ( isset( $_GET['page'] ) && 'bihr-products' === $_GET['page'] );
+		                    ( isset( $_GET['page'] ) && 'bihr-products' === wp_unslash( $_GET['page'] ) );
 		
 		if ( $is_products_page ) {
 			wp_enqueue_script(
@@ -180,7 +180,7 @@ class BihrWI_Admin {
         }
 
         $order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
-        $force    = ! empty( $_POST['force'] );
+        $force    = ! empty( sanitize_text_field( wp_unslash( $_POST['force'] ?? '' ) ) );
 
         if ( ! $order_id ) {
             wp_send_json_error( array( 'message' => __( 'Paramètre order_id manquant.', 'bihr-synch' ) ) );
@@ -751,8 +751,12 @@ class BihrWI_Admin {
         $openai_key = isset( $_POST['bihrwi_openai_key'] ) ? sanitize_text_field( wp_unslash( $_POST['bihrwi_openai_key'] ) ) : '';
 
         update_option( 'bihrwi_username', $username );
-        update_option( 'bihrwi_password', bihrwi_encrypt_credential( $password ) );
-        update_option( 'bihrwi_openai_key', bihrwi_encrypt_credential( $openai_key ) );
+        if ( ! empty( $password ) ) {
+            update_option( 'bihrwi_password', bihrwi_encrypt_credential( $password ) );
+        }
+        if ( ! empty( $openai_key ) ) {
+            update_option( 'bihrwi_openai_key', bihrwi_encrypt_credential( $openai_key ) );
+        }
 
         $redirect_dashboard = add_query_arg( array( 'page' => 'bihr-dashboard' ), admin_url( 'admin.php' ) );
         $redirect_auth      = add_query_arg( array( 'page' => 'bihr-auth' ), admin_url( 'admin.php' ) );
@@ -1903,9 +1907,17 @@ class BihrWI_Admin {
 
         // Insérer les IDs en bulk par lots de 500 pour ne pas dépasser les limites SQL
         foreach ( array_chunk( array_map( 'intval', $ids ), 500 ) as $chunk ) {
-            $values = implode( ',', array_map( function ( $id ) { return "(${id},'pending')"; }, $chunk ) );
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-            $wpdb->query( "INSERT INTO `{$queue_table}` (bihr_id, status) VALUES {$values}" );
+            $placeholders = implode( ',', array_fill( 0, count( $chunk ), '(%d, %s)' ) );
+            $flat_values  = array();
+            foreach ( $chunk as $id ) {
+                $flat_values[] = $id;
+                $flat_values[] = 'pending';
+            }
+            $sql = $wpdb->prepare(
+                "INSERT INTO `{$queue_table}` (bihr_id, status) VALUES {$placeholders}",
+                $flat_values
+            );
+            $wpdb->query( $sql );
         }
 
         // Stats légères (pas les 83 000 IDs) dans wp_options
@@ -1951,7 +1963,10 @@ class BihrWI_Admin {
         $batch_size  = 30;
 
         // Nombre de produits restants (requête légère)
-        $pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
+        $pending = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = %s",
+            'pending'
+        ) );
 
         if ( 0 === $pending ) {
             $stats = get_option( 'bihrwi_mass_import_stats', array() );
@@ -2046,10 +2061,11 @@ class BihrWI_Admin {
         $limit = 8;
 
         // COUNT direct : pas de get_posts() qui chargerait tous les IDs
-        $pending = (int) $wpdb->get_var(
+        $pending = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
-             WHERE meta_key = '_bihr_pending_image_url'"
-        );
+             WHERE meta_key = %s",
+            '_bihr_pending_image_url'
+        ) );
 
         if ( 0 === $pending ) {
             $this->logger->log( '[Mass Image] Toutes les images ont été téléchargées.' );

@@ -48,12 +48,12 @@ if ( ! defined( 'ABSPATH' ) ) {
             </tr>
             <tr>
                 <th scope="row"><label for="bihrwi_password">Password Bihr</label></th>
-                <td><input name="bihrwi_password" id="bihrwi_password" type="password" class="regular-text" value="<?php echo esc_attr( $password ); ?>"></td>
+                <td><input name="bihrwi_password" id="bihrwi_password" type="password" class="regular-text" placeholder="<?php echo $password ? '•••••••• (laisser vide pour conserver)' : ''; ?>" value=""></td>
             </tr>
             <tr>
                 <th scope="row"><label for="bihrwi_openai_key">Clé API OpenAI (optionnel)</label></th>
                 <td>
-                    <input name="bihrwi_openai_key" id="bihrwi_openai_key" type="password" class="regular-text" value="<?php echo esc_attr( $openai_key ); ?>">
+                    <input name="bihrwi_openai_key" id="bihrwi_openai_key" type="password" class="regular-text" placeholder="<?php echo $openai_key ? '•••••••• (laisser vide pour conserver)' : ''; ?>" value="">
                     <button type="button" id="bihr-test-openai-key" class="button" style="margin-left: 10px;">
                         🧪 Tester la clé
                     </button>

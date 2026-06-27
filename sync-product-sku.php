@@ -237,20 +237,30 @@ set_time_limit(0);
         } else {
             // PAGE D'ACCUEIL
             $wc_with_bihr = $wpdb->get_var(
-                "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} 
-                WHERE meta_key = '_bihr_product_code' 
-                AND meta_value IS NOT NULL 
-                AND meta_value != ''"
+                $wpdb->prepare(
+                    "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} 
+                    WHERE meta_key = %s 
+                    AND meta_value IS NOT NULL 
+                    AND meta_value != ''",
+                    '_bihr_product_code'
+                )
             );
             $wc_products = $wpdb->get_var(
-                "SELECT COUNT(*) FROM {$wpdb->posts} 
-                WHERE post_type = 'product' 
-                AND post_status = 'publish'"
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->posts} 
+                    WHERE post_type = %s 
+                    AND post_status = %s",
+                    'product',
+                    'publish'
+                )
             );
             $wc_sku_count = $wpdb->get_var(
-                "SELECT COUNT(*) FROM {$wpdb->postmeta} 
-                WHERE meta_key = '_sku' 
-                AND meta_value != ''"
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->postmeta} 
+                    WHERE meta_key = %s 
+                    AND meta_value != ''",
+                    '_sku'
+                )
             );
             $missing = $wc_with_bihr - $wc_sku_count;
             
@@ -277,23 +287,29 @@ set_time_limit(0);
             
             // Exemples
             echo '<h3>📊 Aperçu (10 premiers produits)</h3>';
-            $samples = $wpdb->get_results("
-                SELECT 
-                    pm_code.post_id as wc_id,
-                    p.post_title as name,
-                    pm_code.meta_value as product_code,
-                    pm_sku.meta_value as current_sku,
-                    bp.id as bihr_id
-                FROM {$wpdb->postmeta} pm_code
-                INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
-                LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = '_sku'
-                LEFT JOIN {$wpdb->prefix}bihr_products bp ON bp.product_code = pm_code.meta_value
-                WHERE pm_code.meta_key = '_bihr_product_code'
-                AND pm_code.meta_value IS NOT NULL
-                AND pm_code.meta_value != ''
-                AND p.post_type = 'product'
-                LIMIT 10
-            ", ARRAY_A);
+            $samples = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT 
+                        pm_code.post_id as wc_id,
+                        p.post_title as name,
+                        pm_code.meta_value as product_code,
+                        pm_sku.meta_value as current_sku,
+                        bp.id as bihr_id
+                    FROM {$wpdb->postmeta} pm_code
+                    INNER JOIN {$wpdb->posts} p ON p.ID = pm_code.post_id
+                    LEFT JOIN {$wpdb->postmeta} pm_sku ON pm_sku.post_id = pm_code.post_id AND pm_sku.meta_key = %s
+                    LEFT JOIN {$wpdb->prefix}bihr_products bp ON bp.product_code = pm_code.meta_value
+                    WHERE pm_code.meta_key = %s
+                    AND pm_code.meta_value IS NOT NULL
+                    AND pm_code.meta_value != ''
+                    AND p.post_type = %s
+                    LIMIT 10",
+                    '_sku',
+                    '_bihr_product_code',
+                    'product'
+                ),
+                ARRAY_A
+            );
             
             echo '<table>';
             echo '<tr><th>WC ID</th><th>Nom Produit</th><th>Code BIHR</th><th>SKU Actuel</th><th>BIHR ID</th><th>Statut</th></tr>';

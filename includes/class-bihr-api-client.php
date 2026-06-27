@@ -24,7 +24,11 @@ if ( ! function_exists( 'bihrwi_decrypt_credential' ) ) {
             return '';
         }
         if ( 0 !== strpos( $value, 'enc:' ) ) {
-            return $value; // Valeur en clair (avant migration) : retourner tel quel
+            // Valeur en clair (avant migration) : logger et retourner tel quel
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                error_log( '[BIHR] Credential non chiffré détecté — ré-enregistrez vos identifiants Bihr pour activer le chiffrement AES-256.' );
+            }
+            return $value;
         }
         $decoded = base64_decode( substr( $value, 4 ), true );
         if ( false === $decoded || strlen( $decoded ) < 17 ) {

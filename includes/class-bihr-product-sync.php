@@ -2308,7 +2308,7 @@ class BihrWI_Product_Sync {
 
         $col_list = '`' . implode( '`, `', $columns ) . '`';
         $sql = "INSERT INTO `{$this->table_name}` ({$col_list}) VALUES " . implode( ', ', $value_strings );
-        $wpdb->query( $sql );
+        $wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared — esc_sql/intval/floatval utilisés ligne par ligne, table_name = $wpdb->prefix + constante
     }
 
     /**
