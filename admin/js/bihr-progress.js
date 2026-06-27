@@ -133,12 +133,10 @@ jQuery(document).ready(function($) {
                     finalMsg += ', ' + errorCount + ' erreur(s)';
                 }
                 $progressText.html('<strong style="color: green;">' + finalMsg + '</strong>');
-                
-                // Réactiver les boutons après 2 secondes
-                setTimeout(function() {
+
+                function reenableButtons() {
                     $('#bihr-import-selected, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
                     $('.bihr-product-checkbox').prop('disabled', false);
-                    // Décocher tous les produits importés avec succès
                     $('.bihr-product-checkbox:checked').each(function() {
                         var productId = $(this).val();
                         var wasSuccess = $('#bihr-success-' + productId).length > 0;
@@ -147,8 +145,21 @@ jQuery(document).ready(function($) {
                         }
                     });
                     updateSelectedCount();
-                }, 2000);
-                
+                }
+
+                if (!$('#bihr-skip-images').is(':checked')) {
+                    var $imageContainer = $('#bihr-image-progress');
+                    var $imageBar = $('#bihr-image-progress-bar');
+                    var $imageText = $('#bihr-image-progress-text');
+                    var $imageDetails = $('#bihr-image-progress-details');
+
+                    chainImageDownloadAfterImport($imageContainer, $imageBar, $imageText, $imageDetails, function() {
+                        setTimeout(reenableButtons, 2000);
+                    });
+                } else {
+                    setTimeout(reenableButtons, 2000);
+                }
+
                 return;
             }
 
@@ -324,14 +335,29 @@ jQuery(document).ready(function($) {
                                 finalMsg += ', ' + errorCount + ' erreur(s)';
                             }
                             $progressText.html('<strong style="color: green;">' + finalMsg + '</strong>');
-                            
-                            // Réactiver les boutons après 2 secondes
-                            setTimeout(function() {
-                                $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
-                                $('.bihr-product-checkbox').prop('disabled', false);
-                                $btn.html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
-                            }, 2000);
-                            
+
+                            // Lancer le téléchargement des images si nécessaire
+                            if (!$('#bihr-skip-images').is(':checked')) {
+                                var $imageContainer = $('#bihr-image-progress');
+                                var $imageBar = $('#bihr-image-progress-bar');
+                                var $imageText = $('#bihr-image-progress-text');
+                                var $imageDetails = $('#bihr-image-progress-details');
+
+                                chainImageDownloadAfterImport($imageContainer, $imageBar, $imageText, $imageDetails, function() {
+                                    setTimeout(function() {
+                                        $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
+                                        $('.bihr-product-checkbox').prop('disabled', false);
+                                        $btn.html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
+                                    }, 2000);
+                                });
+                            } else {
+                                setTimeout(function() {
+                                    $('#bihr-import-selected, #bihr-import-all-filtered, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
+                                    $('.bihr-product-checkbox').prop('disabled', false);
+                                    $btn.html('<span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span> Importer tous les produits filtrés');
+                                }, 2000);
+                            }
+
                             return;
                         }
 
@@ -467,6 +493,75 @@ jQuery(document).ready(function($) {
         $btn.after($status);
         downloadPendingImagesLoop($btn, $status);
     });
+
+    // ============================================
+    // TÉLÉCHARGEMENT DES IMAGES AVEC BARRE DE PROGRESSION (auto après import)
+    // ============================================
+
+    function chainImageDownloadAfterImport($imageContainer, $imageBar, $imageText, $imageDetails, afterComplete) {
+        $imageContainer.show();
+        $imageBar.css('width', '0%').text('0%');
+        $imageText.text('Préparation du téléchargement des images...');
+        $imageDetails.html('');
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'bihrwi_count_pending_images', nonce: bihrProgressData.nonce },
+            success: function(response) {
+                if (response.success && response.data.count > 0) {
+                    var initialCount = response.data.count;
+                    var downloaded = 0;
+                    $imageText.text('0 / ' + initialCount + ' images téléchargées');
+
+                    function imageDownloadLoop() {
+                        $.ajax({
+                            url: ajaxurl,
+                            type: 'POST',
+                            data: { action: 'bihrwi_download_pending_images', nonce: bihrProgressData.nonce },
+                            success: function(resp) {
+                                if (resp.success) {
+                                    var remaining = resp.data.remaining;
+                                    downloaded = initialCount - remaining;
+                                    var pct = Math.round((downloaded / initialCount) * 100);
+                                    $imageBar.css('width', pct + '%').text(pct + '%');
+                                    $imageText.text(downloaded + ' / ' + initialCount + ' images téléchargées');
+
+                                    if (remaining > 0) {
+                                        setTimeout(imageDownloadLoop, 1000);
+                                    } else {
+                                        $imageBar.css('width', '100%').text('100%');
+                                        $imageText.html('<strong style="color: green;">✓ Toutes les images ont été téléchargées</strong>');
+                                        if (afterComplete) afterComplete();
+                                    }
+                                } else {
+                                    $imageDetails.append('<div style="color:red;">Erreur lors du téléchargement.</div>');
+                                    if (afterComplete) afterComplete();
+                                }
+                            },
+                            error: function() {
+                                $imageDetails.append('<div style="color:red;">Erreur de connexion, nouvelle tentative...</div>');
+                                setTimeout(imageDownloadLoop, 2000);
+                            }
+                        });
+                    }
+
+                    imageDownloadLoop();
+                } else {
+                    if (response.success && response.data.count === 0) {
+                        $imageText.html('<strong>Aucune image en attente</strong>');
+                    } else {
+                        $imageText.html('<span style="color:red;">Erreur lors du comptage des images</span>');
+                    }
+                    if (afterComplete) afterComplete();
+                }
+            },
+            error: function() {
+                $imageText.html('<span style="color:red;">Erreur lors du comptage des images</span>');
+                if (afterComplete) afterComplete();
+            }
+        });
+    }
 
     // ============================================
     // TEST DE LA CLÉ OPENAI

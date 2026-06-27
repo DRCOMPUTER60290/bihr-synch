@@ -1391,6 +1391,16 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         <div id="bihr-progress-details" style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-size: 12px;"></div>
     </div>
 
+    <!-- Barre de progression pour le téléchargement des images -->
+    <div id="bihr-image-progress" style="display:none; margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ccd0d4; border-radius: 4px;">
+        <h3 style="margin-top: 0;">Téléchargement des images...</h3>
+        <div style="background: #f0f0f1; height: 30px; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
+            <div id="bihr-image-progress-bar" style="background: #b32d2e; height: 100%; width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;"></div>
+        </div>
+        <p id="bihr-image-progress-text">0 images téléchargées</p>
+        <div id="bihr-image-progress-details" style="max-height: 120px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-size: 12px;"></div>
+    </div>
+
     <div style="margin-bottom: 15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
         <div>
             <button id="bihr-select-all" class="button" style="margin-right: 5px;">Sélectionner tout (page)</button>

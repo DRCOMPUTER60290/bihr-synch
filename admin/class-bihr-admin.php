@@ -48,6 +48,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_import_single_product', array( $this, 'ajax_import_single_product' ) );
         add_action( 'wp_ajax_bihrwi_import_products_batch', array( $this, 'ajax_import_products_batch' ) );
         add_action( 'wp_ajax_bihrwi_download_pending_images', array( $this, 'ajax_download_pending_images' ) );
+        add_action( 'wp_ajax_bihrwi_count_pending_images', array( $this, 'ajax_count_pending_images' ) );
         add_action( 'wp_ajax_bihr_refresh_stock', array( $this, 'ajax_refresh_stock' ) );
         add_action( 'wp_ajax_bihrwi_import_vehicles', array( $this, 'ajax_import_vehicles' ) );
         if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
@@ -1846,6 +1847,22 @@ class BihrWI_Admin {
         $remaining = $this->product_sync->download_pending_images_batch( 20 );
 
         wp_send_json_success( array( 'remaining' => $remaining ) );
+    }
+
+    public function ajax_count_pending_images() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        global $wpdb;
+        $count = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_pending_image_url'"
+        );
+
+        wp_send_json_success( array( 'count' => $count ) );
     }
 
     /**
