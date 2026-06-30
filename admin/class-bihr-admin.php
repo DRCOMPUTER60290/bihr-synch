@@ -122,7 +122,7 @@ class BihrWI_Admin {
 			'bihr-progress-js',
 			BIHRWI_PLUGIN_URL . 'admin/js/bihr-progress.js',
 			array( 'jquery' ),
-			BIHRWI_VERSION,
+			filemtime( BIHRWI_PLUGIN_DIR . 'admin/js/bihr-progress.js' ),
 			true
 		);
 
