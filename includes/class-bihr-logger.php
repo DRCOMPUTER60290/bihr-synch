@@ -15,6 +15,8 @@ class BihrWI_Logger {
     private $min_level = self::LEVEL_DEBUG;
     private $silent    = false;
     private $log_file;
+    private $buffer = array();
+    private $buffering = false;
 
     public function __construct( ?string $log_file = null ) {
         $this->log_file = $log_file ?? BIHRWI_LOG_FILE;
@@ -26,6 +28,29 @@ class BihrWI_Logger {
 
     public function set_min_level( int $level ): void {
         $this->min_level = $level;
+    }
+
+    public function enable_buffer(): void {
+        $this->buffer    = array();
+        $this->buffering = true;
+    }
+
+    public function disable_buffer(): void {
+        $this->buffering = false;
+    }
+
+    public function flush_buffer(): void {
+        if ( empty( $this->buffer ) ) {
+            return;
+        }
+        $lines = implode( '', $this->buffer );
+        $this->buffer = array();
+
+        if ( ! $this->ensure_log_dir() ) {
+            return;
+        }
+        $this->rotate_if_needed();
+        file_put_contents( $this->log_file, $lines, FILE_APPEND | LOCK_EX );
     }
 
     public function error( string $message ): void {
@@ -62,6 +87,14 @@ class BihrWI_Logger {
     public function log( $message ): void {
         $date = function_exists( 'wp_date' ) ? wp_date( 'Y-m-d H:i:s' ) : current_time( 'mysql' );
         $line = "[$date] $message" . PHP_EOL;
+
+        if ( $this->buffering ) {
+            $this->buffer[] = $line;
+            if ( count( $this->buffer ) >= 200 ) {
+                $this->flush_buffer();
+            }
+            return;
+        }
 
         if ( ! $this->ensure_log_dir() ) {
             return;

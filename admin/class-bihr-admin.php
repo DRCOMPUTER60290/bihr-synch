@@ -1791,6 +1791,12 @@ class BihrWI_Admin {
 
         $skip_images = ! empty( $_POST['skip_images'] ) && '1' === $_POST['skip_images'];
 
+        // Bufferiser les logs en mémoire pour ce batch
+        $this->logger->enable_buffer();
+
+        // Recharger les marges (cache static vidé = nouvelle lecture option)
+        $this->product_sync->reset_margin_cache();
+
         // Désactiver le recomptage WooCommerce pendant le batch (gain ~30%)
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( true );
@@ -1834,6 +1840,8 @@ class BihrWI_Admin {
         }
 
         $this->logger->log( sprintf( 'Batch terminé : %d produits traités.', count( $results ) ) );
+        $this->logger->flush_buffer();
+        $this->logger->disable_buffer();
 
         wp_send_json_success( array( 'results' => $results ) );
     }
@@ -2068,6 +2076,11 @@ class BihrWI_Admin {
         // Supprimer les logs debug/info pendant le batch (réduit ~1200 syscalls/150 produits).
         // Les logs d'erreur (LEVEL_ERROR) et les appels directs à log() passent toujours.
         $this->logger->set_min_level( BihrWI_Logger::LEVEL_WARN );
+        // Bufferiser les logs en mémoire : un seul write disque par batch au lieu d'un par produit.
+        $this->logger->enable_buffer();
+
+        // Forcer le rechargement des marges (cache static) en début de batch.
+        $this->product_sync->reset_margin_cache();
 
         $i = 0;
         foreach ( $rows as $row ) {
@@ -2080,8 +2093,6 @@ class BihrWI_Admin {
                 if ( $wc_id ) {
                     $success++;
                     $wpdb->update( $queue_table, array( 'status' => 'done' ), array( 'id' => $queue_id ) );
-                    // Libérer le cache de ce produit : post, meta, termes ne servent plus.
-                    clean_post_cache( $wc_id );
                 } else {
                     $errors++;
                     $wpdb->update( $queue_table, array( 'status' => 'error' ), array( 'id' => $queue_id ) );
@@ -2093,11 +2104,11 @@ class BihrWI_Admin {
                 $this->logger->log( "[Mass Import] Erreur bihr_id={$product_id} : " . $e->getMessage() );
             }
 
-            // Vider le cache objet WordPress toutes les 25 itérations.
+            // Vider le cache objet WordPress toutes les 50 itérations.
             // Chaque save() accumule posts/metas/termes en mémoire ; sans vidage,
             // la mémoire croît linéairement avec le batch et ralentit les lookups.
             $i++;
-            if ( 0 === $i % 25 ) {
+            if ( 0 === $i % 50 ) {
                 wp_cache_flush();
                 // Vider aussi le log de requêtes wpdb si SAVEQUERIES est activé.
                 if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
@@ -2115,6 +2126,8 @@ class BihrWI_Admin {
         wp_defer_term_counting( false );
 
         // Restaurer le niveau de log normal après le batch
+        $this->logger->flush_buffer();
+        $this->logger->disable_buffer();
         $this->logger->set_min_level( BihrWI_Logger::LEVEL_DEBUG );
 
         // Sauvegarder les stats (petit tableau, pas de sérialisation de 83 000 IDs)

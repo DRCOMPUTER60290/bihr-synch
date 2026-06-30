@@ -9,6 +9,7 @@ class BihrWI_Product_Sync {
     protected $table_name;
     protected $product_lookup_cache = array();
     protected $ai_enrichment        = null;
+    protected static $margin_settings_cache = null;
 
     public function __construct( BihrWI_Logger $logger ) {
         global $wpdb;
@@ -591,9 +592,6 @@ class BihrWI_Product_Sync {
             throw new Exception( "WooCommerce n'est pas chargé." );
         }
 
-        $wpdb->query( 'START TRANSACTION' );
-        try {
-
         $this->logger->debug( 'Import WooCommerce: préparation produit ' . $row->product_code );
 
         // Déterminer le SKU cible (priorité NewPartNumber)
@@ -702,44 +700,62 @@ class BihrWI_Product_Sync {
         // Sauvegarde du produit
         $product_id_wc = $product->save();
 
-        // Stocker le prix fournisseur dans les métadonnées
-        if ( $row->dealer_price_ht !== null ) {
-            update_post_meta( $product_id_wc, '_bihr_supplier_price', $row->dealer_price_ht );
-        }
-
-        // Meta Bihr
-        update_post_meta( $product_id_wc, '_bihr_product_code', $row->product_code );
-        if ( ! empty( $row->new_part_number ) ) {
-            update_post_meta( $product_id_wc, '_bihr_new_part_number', $row->new_part_number );
-        }
-
         // Gestion des catégories WooCommerce à partir des niveaux CategoryPath Bihr (cat_l1/2/3).
+        $levels = array(
+            'l1' => ! empty( $row->cat_l1 ) ? (string) $row->cat_l1 : '',
+            'l2' => ! empty( $row->cat_l2 ) ? (string) $row->cat_l2 : '',
+            'l3' => ! empty( $row->cat_l3 ) ? (string) $row->cat_l3 : '',
+        );
         if ( class_exists( 'BihrWI_Category_Path' ) && taxonomy_exists( 'product_cat' ) ) {
-            $levels = array(
-                'l1' => ! empty( $row->cat_l1 ) ? (string) $row->cat_l1 : '',
-                'l2' => ! empty( $row->cat_l2 ) ? (string) $row->cat_l2 : '',
-                'l3' => ! empty( $row->cat_l3 ) ? (string) $row->cat_l3 : '',
-            );
-
             $term_id = BihrWI_Category_Path::ensure_product_categories( $levels['l1'], $levels['l2'], $levels['l3'] );
-
             if ( $term_id ) {
-                // Assigner uniquement la catégorie la plus précise (les parents sont gérés par product_cat).
                 wp_set_object_terms( $product_id_wc, array( $term_id ), 'product_cat' );
                 $this->logger->debug( 'Catégorie product_cat assignée (term_id=' . $term_id . ') pour ' . $row->product_code );
             }
-
-            // Stocker les niveaux Bihr en métadonnées (facultatif mais utile).
-            if ( ! empty( $levels['l1'] ) ) {
-                update_post_meta( $product_id_wc, '_bihr_cat_l1', $levels['l1'] );
-            }
-            if ( ! empty( $levels['l2'] ) ) {
-                update_post_meta( $product_id_wc, '_bihr_cat_l2', $levels['l2'] );
-            }
-            if ( ! empty( $levels['l3'] ) ) {
-                update_post_meta( $product_id_wc, '_bihr_cat_l3', $levels['l3'] );
-            }
         }
+
+        // Meta en bulk : une seule requête DELETE + une seule requête INSERT
+        $meta_rows = array(
+            array( 'key' => '_bihr_product_code', 'value' => $row->product_code ),
+        );
+        if ( $row->dealer_price_ht !== null ) {
+            $meta_rows[] = array( 'key' => '_bihr_supplier_price', 'value' => $row->dealer_price_ht );
+        }
+        if ( ! empty( $row->new_part_number ) ) {
+            $meta_rows[] = array( 'key' => '_bihr_new_part_number', 'value' => $row->new_part_number );
+        }
+        if ( ! empty( $levels['l1'] ) ) {
+            $meta_rows[] = array( 'key' => '_bihr_cat_l1', 'value' => $levels['l1'] );
+        }
+        if ( ! empty( $levels['l2'] ) ) {
+            $meta_rows[] = array( 'key' => '_bihr_cat_l2', 'value' => $levels['l2'] );
+        }
+        if ( ! empty( $levels['l3'] ) ) {
+            $meta_rows[] = array( 'key' => '_bihr_cat_l3', 'value' => $levels['l3'] );
+        }
+
+        $meta_keys = array();
+        foreach ( $meta_rows as $m ) {
+            $meta_keys[] = $m['key'];
+        }
+        // Effacer les metas existantes pour ce post en une requête
+        $placeholders = implode( ',', array_fill( 0, count( $meta_keys ), '%s' ) );
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key IN ({$placeholders})",
+            array_merge( array( $product_id_wc ), $meta_keys )
+        ) );
+        // Insérer toutes les metas en une seule requête
+        $values_ph = implode( ',', array_fill( 0, count( $meta_rows ), '(%d, %s, %s)' ) );
+        $flat = array();
+        foreach ( $meta_rows as $m ) {
+            $flat[] = $product_id_wc;
+            $flat[] = $m['key'];
+            $flat[] = $m['value'];
+        }
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value) VALUES {$values_ph}",
+            $flat
+        ) );
 
         // Image principale
         if ( ! empty( $row->image_url ) ) {
@@ -759,14 +775,7 @@ class BihrWI_Product_Sync {
             'Import WooCommerce: produit ' . $row->product_code . ' importé avec succès (post_id=' . $product_id_wc . ')'
         );
 
-        $wpdb->query( 'COMMIT' );
         return $product_id_wc;
-
-        } catch ( Exception $e ) {
-            $wpdb->query( 'ROLLBACK' );
-            $this->logger->error( 'Import WooCommerce: rollback — ' . $e->getMessage() );
-            throw $e;
-        }
     }
 
     /**
@@ -2578,6 +2587,13 @@ class BihrWI_Product_Sync {
     }
 
     /**
+     * Vide le cache static des marges (appelé en début de batch).
+     */
+    public function reset_margin_cache(): void {
+        self::$margin_settings_cache = null;
+    }
+
+    /**
      * Calcule le prix de vente avec application de la marge configurée
      *
      * @param float $supplier_price Prix fournisseur HT
@@ -2585,29 +2601,30 @@ class BihrWI_Product_Sync {
      * @return float Prix de vente HT avec marge appliquée
      */
     protected function calculate_price_with_margin( $supplier_price, $category = '' ) {
-        // Récupérer la configuration des marges
-        $margin_settings = get_option( 'bihrwi_margin_settings', array(
-            'default_margin_type' => 'percentage',
-            'default_margin_value' => 0,
-            'category_margins' => array(),
-            'price_range_margins' => array(),
-            'priority' => 'specific'
-        ) );
+        if ( null === self::$margin_settings_cache ) {
+            self::$margin_settings_cache = get_option( 'bihrwi_margin_settings', array(
+                'default_margin_type' => 'percentage',
+                'default_margin_value' => 0,
+                'category_margins' => array(),
+                'price_range_margins' => array(),
+                'priority' => 'specific'
+            ) );
+        }
 
         // Si priorité globale uniquement, appliquer la marge par défaut
-        if ( $margin_settings['priority'] === 'global' ) {
+        if ( self::$margin_settings_cache['priority'] === 'global' ) {
             return $this->apply_margin( 
                 $supplier_price, 
-                $margin_settings['default_margin_type'], 
-                $margin_settings['default_margin_value'] 
+                self::$margin_settings_cache['default_margin_type'], 
+                self::$margin_settings_cache['default_margin_value'] 
             );
         }
 
         // Priorité spécifique : chercher dans l'ordre Tranche de prix → Catégorie → Défaut
 
         // 1. Vérifier les tranches de prix
-        if ( ! empty( $margin_settings['price_range_margins'] ) ) {
-            foreach ( $margin_settings['price_range_margins'] as $range ) {
+        if ( ! empty( self::$margin_settings_cache['price_range_margins'] ) ) {
+            foreach ( self::$margin_settings_cache['price_range_margins'] as $range ) {
                 if ( ! $range['enabled'] ) {
                     continue;
                 }
@@ -2627,11 +2644,11 @@ class BihrWI_Product_Sync {
         }
 
         // 2. Vérifier la marge par catégorie
-        if ( ! empty( $category ) && ! empty( $margin_settings['category_margins'] ) ) {
+        if ( ! empty( $category ) && ! empty( self::$margin_settings_cache['category_margins'] ) ) {
             $cat_key = sanitize_key( $category );
             
-            if ( isset( $margin_settings['category_margins'][ $cat_key ] ) ) {
-                $cat_margin = $margin_settings['category_margins'][ $cat_key ];
+            if ( isset( self::$margin_settings_cache['category_margins'][ $cat_key ] ) ) {
+                $cat_margin = self::$margin_settings_cache['category_margins'][ $cat_key ];
                 
                 if ( $cat_margin['enabled'] ) {
                     $this->logger->log( sprintf(
@@ -2645,18 +2662,18 @@ class BihrWI_Product_Sync {
         }
 
         // 3. Appliquer la marge par défaut
-        if ( $margin_settings['default_margin_value'] > 0 ) {
+        if ( self::$margin_settings_cache['default_margin_value'] > 0 ) {
             $this->logger->log( sprintf(
                 'Marge appliquée (par défaut): %s %s',
-                $margin_settings['default_margin_value'], 
-                $margin_settings['default_margin_type'] === 'percentage' ? '%' : '€'
+                self::$margin_settings_cache['default_margin_value'], 
+                self::$margin_settings_cache['default_margin_type'] === 'percentage' ? '%' : '€'
             ) );
         }
 
         return $this->apply_margin( 
             $supplier_price, 
-            $margin_settings['default_margin_type'], 
-            $margin_settings['default_margin_value'] 
+            self::$margin_settings_cache['default_margin_type'], 
+            self::$margin_settings_cache['default_margin_value'] 
         );
     }
 
