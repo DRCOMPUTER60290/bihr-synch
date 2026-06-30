@@ -2009,7 +2009,7 @@ class BihrWI_Admin {
         @set_time_limit( 270 );
 
         $queue_table = $wpdb->prefix . 'bihr_import_queue';
-        $batch_size  = 30;
+        $batch_size  = 80; // ~20s/batch mesuré à 0,25s/produit sur o2switch mutualisé
 
         // Nombre de produits restants (requête légère)
         $pending = (int) $wpdb->get_var( $wpdb->prepare(
