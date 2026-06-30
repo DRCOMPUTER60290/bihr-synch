@@ -642,8 +642,15 @@ class BihrWI_Product_Sync {
         if ( $existing_product_id ) {
             $product = wc_get_product( $existing_product_id );
 
-            // Si le type n'est pas simple, rebasculer sur un produit simple pour aligner avec la logique d'import
-            if ( ! $product instanceof WC_Product_Simple ) {
+            if ( ! $product instanceof WC_Product ) {
+                // Lookup table orpheline (produit WooCommerce supprimé)
+                // Nettoyer l'entrée orpheline et créer un nouveau produit
+                $wpdb->delete( $wpdb->prefix . 'wc_product_meta_lookup', array( 'product_id' => $existing_product_id ) );
+                $wpdb->delete( $wpdb->postmeta, array( 'post_id' => $existing_product_id ) );
+                $product = new WC_Product_Simple();
+                $this->logger->log( "Lookup orpheline nettoyée pour SKU {$sku} (ID {$existing_product_id}), création nouveau produit" );
+            } elseif ( ! $product instanceof WC_Product_Simple ) {
+                // Le type n'est pas simple → forcer un produit simple
                 $product = new WC_Product_Simple( $existing_product_id );
             }
 
