@@ -1140,28 +1140,19 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Retrouve un attachment existant par son meta _bihr_image_source
+     * Retrouve un attachment existant par son meta _bihr_image_source (SQL direct, sans WP_Query).
      */
     protected function find_existing_attachment_by_url( $image_url ) {
-        $args = array(
-            'post_type'      => 'attachment',
-            'post_status'    => 'inherit',
-            'posts_per_page' => 1,
-            'meta_query'     => array(
-                array(
-                    'key'   => '_bihr_image_source',
-                    'value' => esc_url_raw( $image_url ),
-                ),
-            ),
-            'fields'         => 'ids',
-        );
+        global $wpdb;
 
-        $ids = get_posts( $args );
-        if ( ! empty( $ids ) ) {
-            return (int) $ids[0];
-        }
+        $post_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT post_id FROM {$wpdb->postmeta}
+             WHERE meta_key = '_bihr_image_source' AND meta_value = %s
+             LIMIT 1",
+            esc_url_raw( $image_url )
+        ) );
 
-        return 0;
+        return $post_id ? (int) $post_id : 0;
     }
 
     /* =========================================================

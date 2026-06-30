@@ -2107,10 +2107,13 @@ class BihrWI_Admin {
                 $rows_to_skip[] = $r;
             }
         }
-        // Marquer les ignorés comme 'done' dans la queue
-        foreach ( $rows_to_skip as $sr ) {
-            $wpdb->update( $queue_table, array( 'status' => 'done' ), array( 'id' => (int) $sr->id ) );
-            $success++;
+        // Bulk UPDATE des ignorés (déjà importés) — 1 requête au lieu de N
+        if ( ! empty( $rows_to_skip ) ) {
+            $skip_ids = array_map( function( $r ) { return (int) $r->id; }, $rows_to_skip );
+            $ph       = implode( ',', array_fill( 0, count( $skip_ids ), '%d' ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='done' WHERE id IN ({$ph})", $skip_ids ) );
+            $success += count( $skip_ids );
         }
         $rows = $rows_to_process;
 
@@ -2150,39 +2153,48 @@ class BihrWI_Admin {
 
         $batch_start = microtime( true );
         $batch_count = count( $rows );
+        $done_ids    = array();
+        $error_ids   = array();
         $i = 0;
         foreach ( $rows as $row ) {
             $queue_id   = (int) $row->id;
             $product_id = (int) $row->bihr_id;
 
             try {
-                // true = skip_images : les images sont téléchargées par le cron dédié
                 $wc_id = $this->product_sync->import_to_woocommerce( $product_id, true );
                 if ( $wc_id ) {
                     $success++;
-                    $wpdb->update( $queue_table, array( 'status' => 'done' ), array( 'id' => $queue_id ) );
+                    $done_ids[] = $queue_id;
                 } else {
                     $errors++;
-                    $wpdb->update( $queue_table, array( 'status' => 'error' ), array( 'id' => $queue_id ) );
+                    $error_ids[] = $queue_id;
                     $this->logger->log( "[Mass Import] Échec bihr_id={$product_id}" );
                 }
-            } catch ( Exception $e ) {
+            } catch ( Throwable $e ) {
                 $errors++;
-                $wpdb->update( $queue_table, array( 'status' => 'error' ), array( 'id' => $queue_id ) );
+                $error_ids[] = $queue_id;
                 $this->logger->log( "[Mass Import] Erreur bihr_id={$product_id} : " . $e->getMessage() );
             }
 
-            // Vider le cache objet WordPress toutes les 50 itérations.
-            // Chaque save() accumule posts/metas/termes en mémoire ; sans vidage,
-            // la mémoire croît linéairement avec le batch et ralentit les lookups.
             $i++;
             if ( 0 === $i % 50 ) {
                 wp_cache_flush();
-                // Vider aussi le log de requêtes wpdb si SAVEQUERIES est activé.
                 if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
                     $wpdb->queries = array();
                 }
             }
+        }
+
+        // Bulk UPDATE : 2 requêtes au lieu de 500 (une par produit)
+        if ( ! empty( $done_ids ) ) {
+            $ph = implode( ',', array_fill( 0, count( $done_ids ), '%d' ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='done' WHERE id IN ({$ph})", $done_ids ) );
+        }
+        if ( ! empty( $error_ids ) ) {
+            $ph = implode( ',', array_fill( 0, count( $error_ids ), '%d' ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='error' WHERE id IN ({$ph})", $error_ids ) );
         }
 
         // Vider les résultats wpdb accumulés pendant le batch
@@ -2222,19 +2234,23 @@ class BihrWI_Admin {
 
     /**
      * Tâche WP‑Cron : télécharge un lot d'images en attente (_bihr_pending_image_url).
-     * Séparé du cron produits pour ne pas saturer les I/O o2switch mutualisé.
-     * 8 images par minute max, avec 300ms de pause entre chaque téléchargement.
+     *
+     * Contexte web (WP-Cron) : WP_MEMORY_LIMIT = 40MB seulement.
+     * media_handle_sideload() génère des thumbnails en mémoire → 1 image ≈ 4–8MB.
+     * On reste donc à 3 concurrent max pour ne pas dépasser 40MB.
+     * Pour aller vite, utiliser la commande WP-CLI (512MB, sans limite de temps) :
+     *   wp bihr download-images --batch=500 --concurrent=15 --all
      */
     public function run_mass_image_batch() {
         global $wpdb;
         @set_time_limit( 270 );
 
-        $limit = 8;
+        // 3 concurrent max (contrainte mémoire web 40MB), 20 images par run
+        $batch      = 20;
+        $concurrent = 3;
 
-        // COUNT direct : pas de get_posts() qui chargerait tous les IDs
         $pending = (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
-             WHERE meta_key = %s",
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = %s",
             '_bihr_pending_image_url'
         ) );
 
@@ -2243,31 +2259,12 @@ class BihrWI_Admin {
             return;
         }
 
-        $rows = $wpdb->get_results( $wpdb->prepare(
-            "SELECT DISTINCT post_id FROM {$wpdb->postmeta}
-             WHERE meta_key = '_bihr_pending_image_url'
-             LIMIT %d",
-            $limit
-        ) );
+        $this->logger->log( sprintf( '[Mass Image] %d en attente — traitement de %d (concurrent=%d, mémoire web 40MB)', $pending, min( $batch, $pending ), $concurrent ) );
 
-        $this->logger->log( sprintf(
-            '[Mass Image] Téléchargement de %d images (%d restantes)',
-            count( $rows ),
-            $pending
-        ) );
-
-        foreach ( $rows as $row ) {
-            $this->product_sync->process_pending_image( (int) $row->post_id );
-            usleep( 300000 ); // 300ms entre chaque image pour ménager les I/O o2switch
-        }
-
-        // Replanifier si des images restent
-        $remaining = (int) $wpdb->get_var(
-            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta}
-             WHERE meta_key = '_bihr_pending_image_url'"
-        );
+        $remaining = $this->product_sync->download_pending_images_parallel( $batch, $concurrent );
 
         if ( $remaining > 0 ) {
+            $this->logger->log( sprintf( '[Mass Image] %d restantes — prochain run dans 60s', $remaining ) );
             wp_schedule_single_event( time() + 60, 'bihrwi_mass_image_event' );
         } else {
             $this->logger->log( '[Mass Image] Toutes les images téléchargées.' );
