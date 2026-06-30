@@ -2053,10 +2053,17 @@ class BihrWI_Admin {
             $errors
         ) );
 
-        // Désactiver le recomptage WooCommerce pendant le batch
+        // Précharger le cache SKU/code pour ce batch — élimine 2 requêtes wp_postmeta
+        // par produit (wc_get_product_id_by_sku + WP_Query _bihr_product_code).
+        // Sans ça, wp_postmeta est scanné à chaque produit et ralentit en O(n).
+        $batch_bihr_ids = array_map( function ( $r ) { return (int) $r->bihr_id; }, $rows );
+        $this->product_sync->preload_product_lookup( $batch_bihr_ids );
+
+        // Désactiver les recomptages WooCommerce et WordPress pendant le batch
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( true );
         }
+        wp_defer_term_counting( true );
 
         foreach ( $rows as $row ) {
             $queue_id   = (int) $row->id;
@@ -2083,6 +2090,7 @@ class BihrWI_Admin {
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( false );
         }
+        wp_defer_term_counting( false );
 
         // Sauvegarder les stats (petit tableau, pas de sérialisation de 83 000 IDs)
         $stats['success'] = $success;
