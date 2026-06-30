@@ -459,6 +459,8 @@ class BihrWI_Category_Translator {
      * @param callable|null $callback fn($type, $message, $current, $total, $extra=[])
      */
     public function apply_to_products( $callback = null ) {
+        global $wpdb;
+
         if ( ! taxonomy_exists( 'product_cat' ) ) {
             return array( 'error' => 'WooCommerce non disponible' );
         }
@@ -466,6 +468,7 @@ class BihrWI_Category_Translator {
         $mapping = $this->get_mapping();
         $start   = microtime( true );
 
+        // fields='ids' : ne charge que les IDs en mémoire (~660 KB pour 83 000 produits).
         $product_ids = get_posts( array(
             'post_type'      => 'product',
             'post_status'    => 'any',
@@ -486,25 +489,85 @@ class BihrWI_Category_Translator {
             call_user_func( $callback, 'status', "$total produits WooCommerce à traiter...", 0, $total );
         }
 
+        // Charger les 3 meta sources en une seule requête SQL au lieu de 3×N get_post_meta().
+        // Sur 83 000 produits : 249 000 requêtes → 1 requête.
+        $meta_by_post = array();
+        $chunks       = array_chunk( $product_ids, 1000 );
+        foreach ( $chunks as $chunk ) {
+            $id_list = implode( ',', array_map( 'intval', $chunk ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $rows = $wpdb->get_results(
+                "SELECT post_id, meta_key, meta_value FROM {$wpdb->postmeta}
+                 WHERE post_id IN ({$id_list})
+                   AND meta_key IN ('_bihr_cat_l1','_bihr_cat_l2','_bihr_cat_l3')",
+                ARRAY_A
+            );
+            foreach ( $rows as $row ) {
+                $meta_by_post[ (int) $row['post_id'] ][ $row['meta_key'] ] = $row['meta_value'];
+            }
+        }
+
+        // Différer le recomptage des termes : une seule passe à la fin au lieu de N passes.
+        wp_defer_term_counting( true );
+
+        // Accumuler les mises à jour FR pour un INSERT groupé (1 DELETE + 1 INSERT par tranche).
+        $pending_fr    = array(); // post_id => [fr1, fr2, fr3]
+        $write_chunk   = 500;
+
+        $flush_pending_fr = function() use ( &$pending_fr, $wpdb ) {
+            if ( empty( $pending_fr ) ) {
+                return;
+            }
+            $id_list = implode( ',', array_map( 'intval', array_keys( $pending_fr ) ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query(
+                "DELETE FROM {$wpdb->postmeta}
+                 WHERE post_id IN ({$id_list})
+                   AND meta_key IN ('_bihr_category1_fr','_bihr_category2_fr','_bihr_category3_fr')"
+            );
+            // 3 lignes par produit : (post_id, meta_key, meta_value) × 3 meta keys.
+            $placeholders = array();
+            $params       = array();
+            foreach ( $pending_fr as $pid => $fr ) {
+                $placeholders[] = '(%d,%s,%s)';
+                $placeholders[] = '(%d,%s,%s)';
+                $placeholders[] = '(%d,%s,%s)';
+                array_push( $params, $pid, '_bihr_category1_fr', $fr[0] );
+                array_push( $params, $pid, '_bihr_category2_fr', $fr[1] );
+                array_push( $params, $pid, '_bihr_category3_fr', $fr[2] );
+            }
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query(
+                $wpdb->prepare(
+                    'INSERT INTO ' . $wpdb->postmeta . ' (post_id,meta_key,meta_value) VALUES ' . implode( ',', $placeholders ),
+                    ...$params
+                )
+            );
+            $pending_fr = array();
+        };
+
         foreach ( $product_ids as $product_id ) {
-            $cat_l1 = (string) get_post_meta( $product_id, '_bihr_cat_l1', true );
-            $cat_l2 = (string) get_post_meta( $product_id, '_bihr_cat_l2', true );
-            $cat_l3 = (string) get_post_meta( $product_id, '_bihr_cat_l3', true );
+            $pid    = (int) $product_id;
+            $cat_l1 = (string) ( $meta_by_post[ $pid ]['_bihr_cat_l1'] ?? '' );
+            $cat_l2 = (string) ( $meta_by_post[ $pid ]['_bihr_cat_l2'] ?? '' );
+            $cat_l3 = (string) ( $meta_by_post[ $pid ]['_bihr_cat_l3'] ?? '' );
 
             $fr1 = ( '' !== $cat_l1 && isset( $mapping[ $cat_l1 ] ) && '' !== $mapping[ $cat_l1 ] ) ? $mapping[ $cat_l1 ] : $cat_l1;
             $fr2 = ( '' !== $cat_l2 && isset( $mapping[ $cat_l2 ] ) && '' !== $mapping[ $cat_l2 ] ) ? $mapping[ $cat_l2 ] : $cat_l2;
             $fr3 = ( '' !== $cat_l3 && isset( $mapping[ $cat_l3 ] ) && '' !== $mapping[ $cat_l3 ] ) ? $mapping[ $cat_l3 ] : $cat_l3;
 
-            update_post_meta( $product_id, '_bihr_category1_fr', $fr1 );
-            update_post_meta( $product_id, '_bihr_category2_fr', $fr2 );
-            update_post_meta( $product_id, '_bihr_category3_fr', $fr3 );
+            $pending_fr[ $pid ] = array( $fr1, $fr2, $fr3 );
 
             $term_id = BihrWI_Category_Path::ensure_product_categories( $fr1, $fr2, $fr3 );
             if ( $term_id ) {
-                wp_set_object_terms( $product_id, array( $term_id ), 'product_cat' );
+                wp_set_object_terms( $pid, array( $term_id ), 'product_cat' );
             }
 
             $updated++;
+
+            if ( 0 === $updated % $write_chunk ) {
+                $flush_pending_fr();
+            }
 
             if ( $callback && 0 === $updated % 100 ) {
                 call_user_func( $callback, 'progress',
@@ -513,6 +576,10 @@ class BihrWI_Category_Translator {
                 );
             }
         }
+
+        // Écrire le dernier lot et déclencher le recomptage des termes.
+        $flush_pending_fr();
+        wp_defer_term_counting( false );
 
         $elapsed = round( microtime( true ) - $start, 1 );
         $stats   = array(
