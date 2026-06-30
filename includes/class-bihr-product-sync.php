@@ -97,19 +97,9 @@ class BihrWI_Product_Sync {
             $this->product_lookup_cache[ $row['meta_value'] ] = (int) $row['post_id'];
         }
 
-        $code_results = $wpdb->get_results(
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-            $wpdb->prepare(
-                "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_product_code' AND meta_value IN ({$ph})",
-                ...$all_identifiers
-            ),
-            ARRAY_A
-        );
-        foreach ( $code_results as $row ) {
-            if ( ! isset( $this->product_lookup_cache[ $row['meta_value'] ] ) ) {
-                $this->product_lookup_cache[ $row['meta_value'] ] = (int) $row['post_id'];
-            }
-        }
+        // La requête _bihr_product_code sur wp_postmeta a été supprimée : sans index sur
+        // meta_value, elle scanne toutes les lignes existantes (O(n produits importés)).
+        // Le preload SKU via wc_product_meta_lookup (indexé) couvre tous les cas normaux.
 
         $this->logger->log( '[Preload] Cache lookup préchargé: ' . count( $this->product_lookup_cache ) . ' produit(s).' );
     }
@@ -604,7 +594,7 @@ class BihrWI_Product_Sync {
         $wpdb->query( 'START TRANSACTION' );
         try {
 
-        $this->logger->log( 'Import WooCommerce: préparation produit ' . $row->product_code );
+        $this->logger->debug( 'Import WooCommerce: préparation produit ' . $row->product_code );
 
         // Déterminer le SKU cible (priorité NewPartNumber)
         $sku = ! empty( $row->new_part_number ) ? $row->new_part_number : $row->product_code;
@@ -620,7 +610,7 @@ class BihrWI_Product_Sync {
                 $product = new WC_Product_Simple( $existing_product_id );
             }
 
-            $this->logger->log( 'Import WooCommerce: mise à jour du produit existant ID ' . $existing_product_id );
+            $this->logger->debug( 'Import WooCommerce: mise à jour du produit existant ID ' . $existing_product_id );
         } else {
             // Création d'un produit simple
             $product = new WC_Product_Simple();
@@ -643,7 +633,7 @@ class BihrWI_Product_Sync {
         // Enrichissement IA si disponible (instance partagée, pas de get_option() par produit)
         $ai_enrichment = $this->ai_enrichment;
         if ( $ai_enrichment->is_enabled() ) {
-            $this->logger->log( 'Import WooCommerce: enrichissement IA activé pour ' . $row->product_code );
+            $this->logger->debug( 'Import WooCommerce: enrichissement IA activé pour ' . $row->product_code );
             
             // Construire l'URL complète de l'image si disponible
             $full_image_url = '';
@@ -655,43 +645,35 @@ class BihrWI_Product_Sync {
                 }
             }
             
-            $this->logger->log( 'IA - Appel generate_descriptions pour: ' . $name . ' | Image URL: ' . $full_image_url . ' | Code: ' . $row->product_code );
-            
+            $this->logger->debug( 'IA - Appel generate_descriptions pour: ' . $name . ' | Code: ' . $row->product_code );
+
             // Génération du nom amélioré et des descriptions enrichies
             $ai_descriptions = $ai_enrichment->generate_descriptions( $name, $full_image_url, $row->product_code );
-            
-            $this->logger->log( 'IA - Résultat generate_descriptions: ' . wp_json_encode( $ai_descriptions ) );
-            
+
             if ( $ai_descriptions && is_array( $ai_descriptions ) ) {
                 // Nom amélioré par l'IA (si disponible)
                 if ( ! empty( $ai_descriptions['product_name'] ) ) {
                     $name = $ai_descriptions['product_name'];
-                    $this->logger->log( 'Import WooCommerce: nom amélioré par IA - ' . $name );
                 }
-                
+
                 // Description courte (excerpt WooCommerce)
                 if ( ! empty( $ai_descriptions['short_description'] ) ) {
                     $product->set_short_description( $ai_descriptions['short_description'] );
-                    $this->logger->log( 'Import WooCommerce: description courte IA ajoutée - ' . $ai_descriptions['short_description'] );
-
                 }
-                
+
                 // Description longue
                 if ( ! empty( $ai_descriptions['long_description'] ) ) {
-                    // On peut ajouter la description de base en complément si elle existe
                     $long_desc = $ai_descriptions['long_description'];
                     if ( ! empty( $base_description ) ) {
                         $long_desc .= "\n\n<h3>Informations techniques</h3>\n" . $base_description;
                     }
                     $product->set_description( $long_desc );
-                    $this->logger->log( 'Import WooCommerce: description longue IA ajoutée' );
                 } else {
                     $product->set_description( $base_description );
                 }
             } else {
                 // Fallback sur description de base si l'IA échoue
                 $product->set_description( $base_description );
-                $this->logger->log( 'Import WooCommerce: utilisation description de base (IA échouée)' );
             }
         } else {
             // Pas d'enrichissement IA
@@ -744,7 +726,7 @@ class BihrWI_Product_Sync {
             if ( $term_id ) {
                 // Assigner uniquement la catégorie la plus précise (les parents sont gérés par product_cat).
                 wp_set_object_terms( $product_id_wc, array( $term_id ), 'product_cat' );
-                $this->logger->log( 'Catégorie product_cat assignée (term_id=' . $term_id . ') pour ' . $row->product_code );
+                $this->logger->debug( 'Catégorie product_cat assignée (term_id=' . $term_id . ') pour ' . $row->product_code );
             }
 
             // Stocker les niveaux Bihr en métadonnées (facultatif mais utile).
@@ -773,7 +755,7 @@ class BihrWI_Product_Sync {
             }
         }
 
-        $this->logger->log(
+        $this->logger->debug(
             'Import WooCommerce: produit ' . $row->product_code . ' importé avec succès (post_id=' . $product_id_wc . ')'
         );
 
@@ -782,7 +764,7 @@ class BihrWI_Product_Sync {
 
         } catch ( Exception $e ) {
             $wpdb->query( 'ROLLBACK' );
-            $this->logger->log( '[ERROR] Import WooCommerce: rollback — ' . $e->getMessage() );
+            $this->logger->error( 'Import WooCommerce: rollback — ' . $e->getMessage() );
             throw $e;
         }
     }

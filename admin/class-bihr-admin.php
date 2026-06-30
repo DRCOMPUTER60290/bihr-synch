@@ -2065,6 +2065,10 @@ class BihrWI_Admin {
         }
         wp_defer_term_counting( true );
 
+        // Supprimer les logs debug/info pendant le batch (réduit ~1200 syscalls/150 produits).
+        // Les logs d'erreur (LEVEL_ERROR) et les appels directs à log() passent toujours.
+        $this->logger->set_min_level( BihrWI_Logger::LEVEL_WARN );
+
         foreach ( $rows as $row ) {
             $queue_id   = (int) $row->id;
             $product_id = (int) $row->bihr_id;
@@ -2091,6 +2095,9 @@ class BihrWI_Admin {
             wc_defer_product_counting( false );
         }
         wp_defer_term_counting( false );
+
+        // Restaurer le niveau de log normal après le batch
+        $this->logger->set_min_level( BihrWI_Logger::LEVEL_DEBUG );
 
         // Sauvegarder les stats (petit tableau, pas de sérialisation de 83 000 IDs)
         $stats['success'] = $success;
