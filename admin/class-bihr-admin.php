@@ -2069,6 +2069,7 @@ class BihrWI_Admin {
         // Les logs d'erreur (LEVEL_ERROR) et les appels directs à log() passent toujours.
         $this->logger->set_min_level( BihrWI_Logger::LEVEL_WARN );
 
+        $i = 0;
         foreach ( $rows as $row ) {
             $queue_id   = (int) $row->id;
             $product_id = (int) $row->bihr_id;
@@ -2079,6 +2080,8 @@ class BihrWI_Admin {
                 if ( $wc_id ) {
                     $success++;
                     $wpdb->update( $queue_table, array( 'status' => 'done' ), array( 'id' => $queue_id ) );
+                    // Libérer le cache de ce produit : post, meta, termes ne servent plus.
+                    clean_post_cache( $wc_id );
                 } else {
                     $errors++;
                     $wpdb->update( $queue_table, array( 'status' => 'error' ), array( 'id' => $queue_id ) );
@@ -2089,7 +2092,22 @@ class BihrWI_Admin {
                 $wpdb->update( $queue_table, array( 'status' => 'error' ), array( 'id' => $queue_id ) );
                 $this->logger->log( "[Mass Import] Erreur bihr_id={$product_id} : " . $e->getMessage() );
             }
+
+            // Vider le cache objet WordPress toutes les 25 itérations.
+            // Chaque save() accumule posts/metas/termes en mémoire ; sans vidage,
+            // la mémoire croît linéairement avec le batch et ralentit les lookups.
+            $i++;
+            if ( 0 === $i % 25 ) {
+                wp_cache_flush();
+                // Vider aussi le log de requêtes wpdb si SAVEQUERIES est activé.
+                if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
+                    $wpdb->queries = array();
+                }
+            }
         }
+
+        // Vider les résultats wpdb accumulés pendant le batch
+        $wpdb->flush();
 
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( false );
