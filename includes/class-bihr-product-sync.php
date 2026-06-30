@@ -872,7 +872,9 @@ class BihrWI_Product_Sync {
 
     public function download_pending_images_parallel( $limit = 50, $concurrent = 5 ) {
         global $wpdb;
-        @set_time_limit( 300 );
+        // 300s couvrait un lot de 50 ; avec des lots plus larges (jusqu'à 200+),
+        // on garde de la marge même si plusieurs chunks atteignent le timeout curl de 30s.
+        @set_time_limit( 600 );
 
         require_once ABSPATH . 'wp-admin/includes/image.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';

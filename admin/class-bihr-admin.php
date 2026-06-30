@@ -1890,7 +1890,11 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Permission denied.' ) );
         }
 
-        $remaining = $this->product_sync->download_pending_images_parallel( 50, 5 );
+        // Contexte admin-ajax.php : wp-admin/includes/admin.php a déjà appelé
+        // wp_raise_memory_limit('admin') (WP_MAX_MEMORY_LIMIT), contrairement au
+        // contexte WP-Cron (wp-cron.php) qui reste bloqué à WP_MEMORY_LIMIT (40M).
+        // On dispose donc de bien plus de marge ici : lot plus large.
+        $remaining = $this->product_sync->download_pending_images_parallel( 200, 10 );
 
         wp_send_json_success( array( 'remaining' => $remaining ) );
     }
