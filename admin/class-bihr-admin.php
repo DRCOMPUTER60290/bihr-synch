@@ -1843,12 +1843,19 @@ class BihrWI_Admin {
                         'message'    => 'Échec de l\'import du produit.',
                     );
                 }
-            } catch ( Exception $e ) {
+            } catch ( Throwable $e ) {
                 $results[] = array(
                     'product_id' => $product_id,
                     'success'    => false,
                     'message'    => $e->getMessage(),
+                    'error_code' => method_exists( $e, 'getCode' ) ? $e->getCode() : 0,
                 );
+                $this->logger->log( sprintf(
+                    '[AJAX] Erreur produit #%d : %s [code=%s]',
+                    $product_id,
+                    $e->getMessage(),
+                    method_exists( $e, 'getCode' ) ? $e->getCode() : 0
+                ) );
             }
         }
 
