@@ -146,7 +146,7 @@ jQuery(document).ready(function($) {
         var currentIndex = 0;
         var successCount = 0;
         var errorCount = 0;
-        var batchSize = 300; // Taille de batch cible
+        var batchSize = 500; // Taille de batch cible
 
         function importNextProductBatch() {
             if (currentIndex >= selectedProducts.length) {
@@ -274,7 +274,7 @@ jQuery(document).ready(function($) {
                     var percent = Math.round((currentIndex / selectedProducts.length) * 100);
                     $progressBar.css('width', percent + '%').text(percent + '%');
                     $progressText.text(currentIndex + ' / ' + selectedProducts.length + ' produits importés');
-                    setTimeout(importNextProductBatch, 300);
+                    importNextProductBatch();
                 }
             });
         }
@@ -362,7 +362,7 @@ jQuery(document).ready(function($) {
                     var currentIndex = 0;
                     var successCount = 0;
                     var errorCount = 0;
-                    var batchSize = 300; // Taille de batch cible
+                    var batchSize = 500; // Taille de batch cible
 
                     function importNextFilteredProductBatch() {
                         if (currentIndex >= allProducts.length) {
@@ -486,7 +486,7 @@ jQuery(document).ready(function($) {
                                 var percent = Math.round((currentIndex / allProducts.length) * 100);
                                 $progressBar.css('width', percent + '%').text(percent + '%');
                                 $progressText.text(currentIndex + ' / ' + allProducts.length + ' produits importés');
-                                setTimeout(importNextFilteredProductBatch, 300);
+                                importNextFilteredProductBatch();
                             }
                         });
                     }

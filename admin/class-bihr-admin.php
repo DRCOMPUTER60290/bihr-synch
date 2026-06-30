@@ -1774,8 +1774,8 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Permission denied.' ) );
         }
 
-        // Éviter le timeout PHP sur les gros batches
-        @set_time_limit( 300 );
+        // Éviter le timeout PHP sur les gros batches (max_input_time=360s, wait_timeout=260s)
+        @set_time_limit( 360 );
 
         $product_ids = isset( $_POST['product_ids'] ) ? (array) $_POST['product_ids'] : array();
         $product_ids = array_map( 'intval', $product_ids );
@@ -1785,8 +1785,8 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Aucun ID de produit valide fourni.' ) );
         }
 
-        if ( count( $product_ids ) > 300 ) {
-            $product_ids = array_slice( $product_ids, 0, 300 );
+        if ( count( $product_ids ) > 500 ) {
+            $product_ids = array_slice( $product_ids, 0, 500 );
         }
 
         $skip_images = ! empty( $_POST['skip_images'] ) && '1' === $_POST['skip_images'];
@@ -2047,10 +2047,10 @@ class BihrWI_Admin {
      */
     public function run_mass_import_batch() {
         global $wpdb;
-        @set_time_limit( 270 );
+        @set_time_limit( 360 );
 
         $queue_table = $wpdb->prefix . 'bihr_import_queue';
-        $batch_size  = 200; // ~50s/batch mesuré à 0,25s/produit sur o2switch mutualisé
+        $batch_size  = 500; // ~125s/batch mesuré à 0,25s/produit -- wait_timeout MySQL 260s
 
         // Nombre de produits restants (requête légère)
         $pending = (int) $wpdb->get_var( $wpdb->prepare(
