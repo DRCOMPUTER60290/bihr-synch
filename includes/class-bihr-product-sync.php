@@ -1008,7 +1008,9 @@ class BihrWI_Product_Sync {
                     'type'     => $file_type['type'],
                 );
 
+                add_filter( 'intermediate_image_sizes_advanced', '__return_empty_array' );
                 $attachment_id = media_handle_sideload( $file_array, $item['post_id'] );
+                remove_filter( 'intermediate_image_sizes_advanced', '__return_empty_array' );
                 if ( is_wp_error( $attachment_id ) ) {
                     $this->logger->log( 'Erreur media_handle_sideload parallèle : ' . $attachment_id->get_error_message() );
                     if ( file_exists( $tmp ) ) {
@@ -1123,7 +1125,9 @@ class BihrWI_Product_Sync {
             'type'     => $file_type['type'],
         );
 
+        add_filter( 'intermediate_image_sizes_advanced', '__return_empty_array' );
         $attachment_id = media_handle_sideload( $file_array, $post_id );
+        remove_filter( 'intermediate_image_sizes_advanced', '__return_empty_array' );
 
         if ( is_wp_error( $attachment_id ) ) {
             $this->logger->log( 'Erreur media_handle_sideload : ' . $attachment_id->get_error_message() );
