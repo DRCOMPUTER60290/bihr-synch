@@ -171,11 +171,21 @@ class BihrWI_Category_Path {
      * @return int term_id ou 0.
      */
     protected static function ensure_term( $name, $parent_id = 0 ) {
+        // Cache statique : évite les requêtes DB répétées pour les mêmes termes.
+        // Sans ce cache, chaque produit déclenche jusqu'à 3 get_terms() identiques
+        // (l1, l2, l3), soit 450 requêtes pour 150 produits.
+        static $cache = array();
+
         $name      = trim( wp_strip_all_tags( (string) $name ) );
         $parent_id = absint( $parent_id );
 
         if ( '' === $name ) {
             return 0;
+        }
+
+        $cache_key = $parent_id . '|' . $name;
+        if ( isset( $cache[ $cache_key ] ) ) {
+            return $cache[ $cache_key ];
         }
 
         // Chercher un term avec ce nom et parent donné.
@@ -191,7 +201,8 @@ class BihrWI_Category_Path {
         );
 
         if ( ! is_wp_error( $existing ) && ! empty( $existing ) ) {
-            return (int) $existing[0];
+            $cache[ $cache_key ] = (int) $existing[0];
+            return $cache[ $cache_key ];
         }
 
         $args = array();
@@ -203,13 +214,15 @@ class BihrWI_Category_Path {
 
         if ( is_wp_error( $term ) ) {
             if ( isset( $term->error_data['term_exists'] ) ) {
-                return (int) $term->error_data['term_exists'];
+                $cache[ $cache_key ] = (int) $term->error_data['term_exists'];
+                return $cache[ $cache_key ];
             }
 
             return 0;
         }
 
-        return (int) $term['term_id'];
+        $cache[ $cache_key ] = (int) $term['term_id'];
+        return $cache[ $cache_key ];
     }
 
     /**
@@ -218,24 +231,32 @@ class BihrWI_Category_Path {
      * @return int term_id
      */
     protected static function ensure_uncategorized_term() {
-        $label = __( 'Non classé', 'bihr-synch' );
+        static $cached_id = null;
 
+        if ( null !== $cached_id ) {
+            return $cached_id;
+        }
+
+        $label    = __( 'Non classé', 'bihr-synch' );
         $existing = get_term_by( 'name', $label, 'product_cat' );
         if ( $existing && ! is_wp_error( $existing ) ) {
-            return (int) $existing->term_id;
+            $cached_id = (int) $existing->term_id;
+            return $cached_id;
         }
 
         $term = wp_insert_term( $label, 'product_cat' );
 
         if ( is_wp_error( $term ) ) {
             if ( isset( $term->error_data['term_exists'] ) ) {
-                return (int) $term->error_data['term_exists'];
+                $cached_id = (int) $term->error_data['term_exists'];
+                return $cached_id;
             }
 
             return 0;
         }
 
-        return (int) $term['term_id'];
+        $cached_id = (int) $term['term_id'];
+        return $cached_id;
     }
 }
 

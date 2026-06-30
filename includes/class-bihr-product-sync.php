@@ -8,11 +8,14 @@ class BihrWI_Product_Sync {
     protected $logger;
     protected $table_name;
     protected $product_lookup_cache = array();
+    protected $ai_enrichment        = null;
 
     public function __construct( BihrWI_Logger $logger ) {
         global $wpdb;
-        $this->logger     = $logger;
-        $this->table_name = $wpdb->prefix . 'bihr_products';
+        $this->logger        = $logger;
+        $this->table_name    = $wpdb->prefix . 'bihr_products';
+        // Instancié une seule fois pour éviter un get_option() par produit importé.
+        $this->ai_enrichment = new BihrWI_AI_Enrichment( $logger );
     }
 
     /**
@@ -79,10 +82,13 @@ class BihrWI_Product_Sync {
 
         $ph = implode( ',', array_fill( 0, count( $all_identifiers ), '%s' ) );
 
-        $sku_results = $wpdb->get_results(
+        // Utilise wp_wc_product_meta_lookup (indexé sur sku) au lieu de wp_postmeta
+        // (non indexé sur meta_value) — évite un full-scan sur 400 000+ lignes.
+        $lookup_table = $wpdb->prefix . 'wc_product_meta_lookup';
+        $sku_results  = $wpdb->get_results(
             // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
             $wpdb->prepare(
-                "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value IN ({$ph})",
+                "SELECT product_id AS post_id, sku AS meta_value FROM `{$lookup_table}` WHERE sku IN ({$ph}) AND sku != ''",
                 ...$all_identifiers
             ),
             ARRAY_A
@@ -634,8 +640,8 @@ class BihrWI_Product_Sync {
             $base_description = $row->description;
         }
 
-        // Enrichissement IA si disponible
-        $ai_enrichment = new BihrWI_AI_Enrichment( $this->logger );
+        // Enrichissement IA si disponible (instance partagée, pas de get_option() par produit)
+        $ai_enrichment = $this->ai_enrichment;
         if ( $ai_enrichment->is_enabled() ) {
             $this->logger->log( 'Import WooCommerce: enrichissement IA activé pour ' . $row->product_code );
             
