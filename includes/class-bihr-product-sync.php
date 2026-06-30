@@ -810,6 +810,13 @@ class BihrWI_Product_Sync {
             }
         }
 
+        // Sauvegarder le lien Bihr-ID → WC-ID pour le filtrage futur
+        $wpdb->query( $wpdb->prepare(
+            "UPDATE `{$table_name}` SET product_id = %d WHERE id = %d",
+            $product_id_wc,
+            (int) $product_id
+        ) );
+
         $this->logger->debug(
             'Import WooCommerce: produit ' . $row->product_code . ' importé avec succès (post_id=' . $product_id_wc . ')'
         );

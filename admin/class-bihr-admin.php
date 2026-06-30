@@ -1785,8 +1785,8 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Aucun ID de produit valide fourni.' ) );
         }
 
-        if ( count( $product_ids ) > 150 ) {
-            $product_ids = array_slice( $product_ids, 0, 150 );
+        if ( count( $product_ids ) > 300 ) {
+            $product_ids = array_slice( $product_ids, 0, 300 );
         }
 
         $skip_images = ! empty( $_POST['skip_images'] ) && '1' === $_POST['skip_images'];
@@ -1809,15 +1809,21 @@ class BihrWI_Admin {
             wp_send_json_success( array( 'results' => array(), 'skipped' => $skipped ) );
         }
 
-        // Désactiver le recomptage WooCommerce pendant le batch (gain ~30%)
+        // Désactiver les recomptages et notifications pendant le batch
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( true );
         }
+        if ( function_exists( 'wc_defer_transaction_requests' ) ) {
+            wc_defer_transaction_requests( true );
+        }
+        wp_defer_term_counting( true );
 
         // Préchargement du cache WooCommerce pour éviter N+1 requêtes DB
         $this->product_sync->preload_product_lookup( $product_ids );
 
         $results = array();
+        $batch_start = microtime( true );
+        $total_bihr = count( $product_ids );
 
         foreach ( $product_ids as $product_id ) {
             try {
@@ -1846,12 +1852,20 @@ class BihrWI_Admin {
             }
         }
 
-        // Réactiver le recomptage et déclencher une mise à jour finale
+        $elapsed = microtime( true ) - $batch_start;
+
+        // Réactiver les recomptages et déclencher les mises à jour finales
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( false );
         }
+        wp_defer_term_counting( false );
 
-        $this->logger->log( sprintf( 'Batch terminé : %d produits traités.', count( $results ) ) );
+        $this->logger->log( sprintf(
+            'Batch AJAX : %d produits en %.1fs (%.2fs/produit)',
+            $total_bihr,
+            $elapsed,
+            $elapsed / max( $total_bihr, 1 )
+        ) );
         $this->logger->flush_buffer();
         $this->logger->disable_buffer();
 
@@ -2029,7 +2043,7 @@ class BihrWI_Admin {
         @set_time_limit( 270 );
 
         $queue_table = $wpdb->prefix . 'bihr_import_queue';
-        $batch_size  = 80; // ~20s/batch mesuré à 0,25s/produit sur o2switch mutualisé
+        $batch_size  = 200; // ~50s/batch mesuré à 0,25s/produit sur o2switch mutualisé
 
         // Nombre de produits restants (requête légère)
         $pending = (int) $wpdb->get_var( $wpdb->prepare(
@@ -2113,6 +2127,9 @@ class BihrWI_Admin {
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( true );
         }
+        if ( function_exists( 'wc_defer_transaction_requests' ) ) {
+            wc_defer_transaction_requests( true );
+        }
         wp_defer_term_counting( true );
 
         // Supprimer les logs debug/info pendant le batch (réduit ~1200 syscalls/150 produits).
@@ -2124,6 +2141,8 @@ class BihrWI_Admin {
         // Forcer le rechargement des marges (cache static) en début de batch.
         $this->product_sync->reset_margin_cache();
 
+        $batch_start = microtime( true );
+        $batch_count = count( $rows );
         $i = 0;
         foreach ( $rows as $row ) {
             $queue_id   = (int) $row->id;
@@ -2167,7 +2186,15 @@ class BihrWI_Admin {
         }
         wp_defer_term_counting( false );
 
+        $elapsed = microtime( true ) - $batch_start;
+
         // Restaurer le niveau de log normal après le batch
+        $this->logger->log( sprintf(
+            '[Mass Import] Batch %d produits en %.1fs (%.2fs/produit)',
+            $batch_count,
+            $elapsed,
+            $elapsed / max( $batch_count, 1 )
+        ) );
         $this->logger->flush_buffer();
         $this->logger->disable_buffer();
         $this->logger->set_min_level( BihrWI_Logger::LEVEL_DEBUG );
