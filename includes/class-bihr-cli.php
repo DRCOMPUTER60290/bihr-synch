@@ -122,6 +122,7 @@ class BihrWI_CLI_Commands {
             }
 
             $i = 0;
+            $wpdb->query( 'START TRANSACTION' );
             foreach ( $chunk_ids as $product_id ) {
                 $i++;
                 try {
@@ -146,6 +147,7 @@ class BihrWI_CLI_Commands {
                     }
                 }
             }
+            $wpdb->query( 'COMMIT' );
 
             // Réactiver les recomptages et vider wpdb après chaque chunk
             wp_defer_term_counting( false );

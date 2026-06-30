@@ -889,7 +889,8 @@ class BihrWI_Product_Sync {
             return 0;
         }
 
-        $items = array();
+        // Charger toutes les URLs en attente en une seule requête postmeta
+        $pending_map = array(); // post_id => image_url
         foreach ( $post_ids as $post_id ) {
             $post_id   = (int) $post_id;
             $image_url = get_post_meta( $post_id, '_bihr_pending_image_url', true );
@@ -897,14 +898,35 @@ class BihrWI_Product_Sync {
                 delete_post_meta( $post_id, '_bihr_pending_image_url' );
                 continue;
             }
-
             if ( ! preg_match( '#^https?://#i', $image_url ) ) {
                 $image_url = rtrim( BIHRWI_IMAGE_BASE_URL, '/' ) . '/' . ltrim( $image_url, '/' );
             }
+            $pending_map[ $post_id ] = $image_url;
+        }
 
-            $existing_id = $this->find_existing_attachment_by_url( $image_url );
-            if ( $existing_id ) {
-                set_post_thumbnail( $post_id, $existing_id );
+        // Batch pre-check : une seule requête pour toutes les URLs déjà téléchargées
+        $existing_map = array(); // image_url => attachment_id
+        if ( ! empty( $pending_map ) ) {
+            $all_urls = array_unique( array_values( $pending_map ) );
+            $ph       = implode( ',', array_fill( 0, count( $all_urls ), '%s' ) );
+            $rows     = $wpdb->get_results(
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->prepare(
+                    "SELECT post_id, meta_value FROM {$wpdb->postmeta}
+                     WHERE meta_key = '_bihr_image_source' AND meta_value IN ({$ph})",
+                    ...$all_urls
+                ),
+                ARRAY_A
+            );
+            foreach ( $rows as $row ) {
+                $existing_map[ $row['meta_value'] ] = (int) $row['post_id'];
+            }
+        }
+
+        $items = array();
+        foreach ( $pending_map as $post_id => $image_url ) {
+            if ( isset( $existing_map[ $image_url ] ) ) {
+                set_post_thumbnail( $post_id, $existing_map[ $image_url ] );
                 delete_post_meta( $post_id, '_bihr_pending_image_url' );
                 continue;
             }
@@ -2681,7 +2703,7 @@ class BihrWI_Product_Sync {
                 $max = floatval( $range['max'] );
 
                 if ( $supplier_price >= $min && $supplier_price <= $max ) {
-                    $this->logger->log( sprintf(
+                    $this->logger->debug( sprintf(
                         'Marge appliquée (tranche %.2f-%.2f€): %s %s',
                         $min, $max, $range['value'], $range['type'] === 'percentage' ? '%' : '€'
                     ) );
@@ -2699,7 +2721,7 @@ class BihrWI_Product_Sync {
                 $cat_margin = self::$margin_settings_cache['category_margins'][ $cat_key ];
                 
                 if ( $cat_margin['enabled'] ) {
-                    $this->logger->log( sprintf(
+                    $this->logger->debug( sprintf(
                         'Marge appliquée (catégorie %s): %s %s',
                         $category, $cat_margin['value'], $cat_margin['type'] === 'percentage' ? '%' : '€'
                     ) );
@@ -2711,9 +2733,9 @@ class BihrWI_Product_Sync {
 
         // 3. Appliquer la marge par défaut
         if ( self::$margin_settings_cache['default_margin_value'] > 0 ) {
-            $this->logger->log( sprintf(
+            $this->logger->debug( sprintf(
                 'Marge appliquée (par défaut): %s %s',
-                self::$margin_settings_cache['default_margin_value'], 
+                self::$margin_settings_cache['default_margin_value'],
                 self::$margin_settings_cache['default_margin_type'] === 'percentage' ? '%' : '€'
             ) );
         }
