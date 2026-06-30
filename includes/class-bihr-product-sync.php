@@ -106,6 +106,45 @@ class BihrWI_Product_Sync {
     }
 
     /**
+     * Filtre les IDs de produits BIHR : ne garde que ceux pas encore importés
+     * (product_id IS NULL dans wp_bihr_products).
+     *
+     * @param int[] $ids IDs dans wp_bihr_products.
+     * @return int[] IDs non encore importés.
+     */
+    public function filter_unimported_products( array $ids ): array {
+        global $wpdb;
+
+        if ( empty( $ids ) ) {
+            return array();
+        }
+
+        $ids         = array_map( 'intval', $ids );
+        $table_name  = esc_sql( $this->table_name );
+        $ph          = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+        $imported    = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT id FROM `{$table_name}` WHERE id IN ({$ph}) AND product_id IS NOT NULL",
+                ...$ids
+            )
+        );
+
+        if ( empty( $imported ) ) {
+            return $ids;
+        }
+
+        $imported_set = array_flip( array_map( 'intval', $imported ) );
+        $unimported   = array();
+        foreach ( $ids as $id ) {
+            if ( ! isset( $imported_set[ $id ] ) ) {
+                $unimported[] = $id;
+            }
+        }
+
+        return $unimported;
+    }
+
+    /**
      * Retrouve un produit WooCommerce existant via le SKU ou le code BIHR (meta).
      * Consulte le cache préchargé par preload_product_lookup() avant toute requête DB.
      */

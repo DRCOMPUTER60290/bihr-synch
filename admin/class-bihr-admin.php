@@ -1797,6 +1797,18 @@ class BihrWI_Admin {
         // Recharger les marges (cache static vidé = nouvelle lecture option)
         $this->product_sync->reset_margin_cache();
 
+        // Exclure les produits déjà importés (product_id IS NOT NULL)
+        $total_ids  = count( $product_ids );
+        $product_ids = $this->product_sync->filter_unimported_products( $product_ids );
+        $skipped     = $total_ids - count( $product_ids );
+
+        if ( empty( $product_ids ) ) {
+            $this->logger->log( 'Batch AJAX: tous les produits sont déjà importés (' . $skipped . ' ignorés).' );
+            $this->logger->flush_buffer();
+            $this->logger->disable_buffer();
+            wp_send_json_success( array( 'results' => array(), 'skipped' => $skipped ) );
+        }
+
         // Désactiver le recomptage WooCommerce pendant le batch (gain ~30%)
         if ( function_exists( 'wc_defer_product_counting' ) ) {
             wc_defer_product_counting( true );
@@ -2061,10 +2073,40 @@ class BihrWI_Admin {
             $errors
         ) );
 
-        // Précharger le cache SKU/code pour ce batch — élimine 2 requêtes wp_postmeta
-        // par produit (wc_get_product_id_by_sku + WP_Query _bihr_product_code).
-        // Sans ça, wp_postmeta est scanné à chaque produit et ralentit en O(n).
+        // Exclure les produits déjà importés (product_id IS NOT NULL dans wp_bihr_products)
         $batch_bihr_ids = array_map( function ( $r ) { return (int) $r->bihr_id; }, $rows );
+        $unimported_ids = $this->product_sync->filter_unimported_products( $batch_bihr_ids );
+        $unimported_set = array_flip( $unimported_ids );
+        $rows_to_skip   = array();
+        $rows_to_process = array();
+        foreach ( $rows as $r ) {
+            if ( isset( $unimported_set[ (int) $r->bihr_id ] ) ) {
+                $rows_to_process[] = $r;
+            } else {
+                $rows_to_skip[] = $r;
+            }
+        }
+        // Marquer les ignorés comme 'done' dans la queue
+        foreach ( $rows_to_skip as $sr ) {
+            $wpdb->update( $queue_table, array( 'status' => 'done' ), array( 'id' => (int) $sr->id ) );
+            $success++;
+        }
+        $rows = $rows_to_process;
+
+        if ( empty( $rows ) ) {
+            $this->logger->log( '[Mass Import] Batch ignoré : tous les produits sont déjà importés.' );
+            $stats['success'] = $success;
+            $stats['errors']  = $errors;
+            update_option( 'bihrwi_mass_import_stats', $stats );
+            // Replanifier
+            $remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
+            if ( $remaining > 0 ) {
+                wp_schedule_single_event( time() + 60, 'bihrwi_mass_import_event' );
+            }
+            return;
+        }
+
+        $batch_bihr_ids = $unimported_ids;
         $this->product_sync->preload_product_lookup( $batch_bihr_ids );
 
         // Désactiver les recomptages WooCommerce et WordPress pendant le batch
