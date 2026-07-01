@@ -1890,7 +1890,7 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Permission denied.' ) );
         }
 
-        $remaining = $this->product_sync->download_pending_images_parallel( 50, 5 );
+        $remaining = $this->product_sync->download_pending_images_parallel( 50, 8 );
 
         wp_send_json_success( array( 'remaining' => $remaining ) );
     }

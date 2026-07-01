@@ -217,7 +217,7 @@ jQuery(document).ready(function($) {
             // Scroll vers le bas
             $progressDetails.scrollTop($progressDetails[0].scrollHeight);
 
-            var skipImages = $('#bihr-skip-images').is(':checked') ? '1' : '0';
+            var skipImages = '1'; // toujours différer les images — phase dédiée après l'import
 
             // Appel AJAX pour importer le batch de produits
             $.ajax({
@@ -429,7 +429,7 @@ jQuery(document).ready(function($) {
                         // Scroll vers le bas
                         $progressDetails.scrollTop($progressDetails[0].scrollHeight);
 
-                        var skipImagesFiltered = $('#bihr-skip-images').is(':checked') ? '1' : '0';
+                        var skipImagesFiltered = '1'; // toujours différer les images — phase dédiée après l'import
 
                         // Appel AJAX pour importer le batch de produits
                         $.ajax({
@@ -590,7 +590,7 @@ jQuery(document).ready(function($) {
                                     $imageText.text(downloaded + ' / ' + initialCount + ' images téléchargées');
 
                                     if (remaining > 0) {
-                                        setTimeout(imageDownloadLoop, 500);
+                                        setTimeout(imageDownloadLoop, 0);
                                     } else {
                                         $imageBar.css('width', '100%').text('100%');
                                         $imageText.html('<strong style="color: green;">✓ Toutes les images ont été téléchargées</strong>');
