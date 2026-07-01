@@ -648,6 +648,7 @@ class BihrWI_Product_Sync {
                 $wpdb->delete( $wpdb->prefix . 'wc_product_meta_lookup', array( 'product_id' => $existing_product_id ) );
                 $wpdb->delete( $wpdb->postmeta, array( 'post_id' => $existing_product_id ) );
                 $product = new WC_Product_Simple();
+                $product->set_status( 'publish' );
                 $this->logger->log( "Lookup orpheline nettoyée pour SKU {$sku} (ID {$existing_product_id}), création nouveau produit" );
             } elseif ( ! $product instanceof WC_Product_Simple ) {
                 // Le type n'est pas simple → forcer un produit simple
@@ -657,7 +658,9 @@ class BihrWI_Product_Sync {
             $this->logger->debug( 'Import WooCommerce: mise à jour du produit existant ID ' . $existing_product_id );
         } else {
             // Création d'un produit simple
+            // WooCommerce 10.x ne met plus 'publish' par défaut — doit être explicite.
             $product = new WC_Product_Simple();
+            $product->set_status( 'publish' );
         }
 
         // Nom du produit (sera peut-être amélioré par l'IA)
@@ -745,6 +748,10 @@ class BihrWI_Product_Sync {
 
         // Sauvegarde du produit
         $product_id_wc = $product->save();
+
+        if ( ! $product_id_wc ) {
+            throw new Exception( "Échec save() WooCommerce pour SKU {$sku} (code {$row->product_code}) — produit non créé." );
+        }
 
         // Gestion des catégories WooCommerce à partir des niveaux CategoryPath Bihr (cat_l1/2/3).
         $levels = array(
