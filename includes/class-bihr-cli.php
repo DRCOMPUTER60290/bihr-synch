@@ -14,16 +14,19 @@ class BihrWI_CLI_Commands {
     /**
      * Importe les produits depuis wp_bihr_products vers WooCommerce.
      *
-     * Optimisé pour WP-CLI (512MB, pas de timeout PHP) :
-     *   - preload du cache SKU par chunk (élimine N+1 sur wc_product_meta_lookup)
-     *   - defer term counting et product counting pendant chaque chunk
-     *   - wp_cache_flush() toutes les 50 itérations (évite la croissance mémoire)
-     *   - chunk de 500 : ~125s/chunk mesuré < wait_timeout MySQL 260s
+     * Optimisé pour WP-CLI (512MB, pas de timeout PHP, o2switch 64 cores) :
+     *   - preload_product_rows() : 1 SELECT/chunk au lieu de N (élimine N+1 sur wp_bihr_products)
+     *   - preload_product_lookup() : 1 SELECT/chunk sur wc_product_meta_lookup (élimine N+1 SKU)
+     *   - batch_update_product_links() : 1 INSERT…ON DUPLICATE KEY UPDATE/chunk au lieu de N UPDATE
+     *   - log bufferisé par chunk : 1 fwrite groupé au lieu de N syscalls
+     *   - defer term/product counting pendant chaque chunk
+     *   - wp_cache_flush() toutes les 200 itérations
+     *   - chunk de 1000 : ~60s/chunk estimé < wait_timeout MySQL 260s
      *
      * Modes images :
      *   (défaut)       : images différées → lancer ensuite "wp bihr download-images --all"
      *   --with-images  : après chaque chunk produits, télécharge leurs images en parallèle
-     *                    (curl_multi, 15 concurrent) — tout en un, sans étape séparée
+     *                    (curl_multi, 40 concurrent) — tout en un, sans étape séparée
      *
      * ## OPTIONS
      *
@@ -34,17 +37,17 @@ class BihrWI_CLI_Commands {
      * : Nombre max de produits à traiter au total (défaut: 0 = tous les non importés).
      *
      * [--chunk=<n>]
-     * : Taille d'un chunk de traitement (défaut: 500 — calibré < 260s MySQL).
+     * : Taille d'un chunk de traitement (défaut: 1000 — calibré < 260s MySQL o2switch).
      *
      * [--ids=<ids>]
      * : Liste d'IDs wp_bihr_products séparés par virgule (prioritaire sur offset/limit).
      *
      * [--with-images]
-     * : Télécharge les images après chaque chunk via curl_multi (15 concurrent, 512MB).
+     * : Télécharge les images après chaque chunk via curl_multi (40 concurrent).
      *   Plus lent qu'un import seul mais tout se fait en une commande.
      *
      * [--img-concurrent=<n>]
-     * : Connexions cURL simultanées pour les images (défaut: 15, avec --with-images).
+     * : Connexions cURL simultanées pour les images (défaut: 40, avec --with-images).
      *
      * ## EXAMPLES
      *
@@ -55,17 +58,17 @@ class BihrWI_CLI_Commands {
      *   # Tout en un : produits + images dans la même commande
      *   wp bihr import-products --with-images
      *
-     *   # Import 5000 produits par tranches de 500
-     *   wp bihr import-products --limit=5000 --chunk=500
+     *   # Import limité pour test
+     *   wp bihr import-products --limit=100 --chunk=100
      */
     public function import_products( $args, $assoc_args ) {
         global $wpdb;
 
-        $chunk_size     = isset( $assoc_args['chunk'] )          ? max( 1, (int) $assoc_args['chunk'] )          : 500;
+        $chunk_size     = isset( $assoc_args['chunk'] )          ? max( 1, (int) $assoc_args['chunk'] )          : 1000;
         $limit_total    = isset( $assoc_args['limit'] )          ? max( 0, (int) $assoc_args['limit'] )          : 0;
         $offset         = isset( $assoc_args['offset'] )         ? max( 0, (int) $assoc_args['offset'] )         : 0;
         $with_images    = isset( $assoc_args['with-images'] );
-        $img_concurrent = isset( $assoc_args['img-concurrent'] ) ? max( 1, (int) $assoc_args['img-concurrent'] ) : 15;
+        $img_concurrent = isset( $assoc_args['img-concurrent'] ) ? max( 1, (int) $assoc_args['img-concurrent'] ) : 40;
         $skip_images    = true; // toujours différer en import, on télécharge après si --with-images
 
         $logger = new BihrWI_Logger();
@@ -112,8 +115,14 @@ class BihrWI_CLI_Commands {
 
             WP_CLI::log( sprintf( '--- Chunk %d/%d (%d produits) ---', $chunk_num, count( $chunks ), count( $chunk_ids ) ) );
 
+            // Précharger toutes les lignes wp_bihr_products du chunk en 1 seul SELECT
+            $sync->preload_product_rows( $chunk_ids );
+
             // Précharger le cache SKU pour ce chunk (élimine N+1 sur wc_product_meta_lookup)
             $sync->preload_product_lookup( $chunk_ids );
+
+            // Buffériser les logs : 1 fwrite groupé par chunk au lieu de N syscalls fichier
+            $logger->enable_buffer();
 
             // Différer les recomptages coûteux pendant le chunk
             wp_defer_term_counting( true );
@@ -121,13 +130,16 @@ class BihrWI_CLI_Commands {
                 wc_defer_product_counting( true );
             }
 
-            $i = 0;
-            $wpdb->query( 'START TRANSACTION' );
+            $i           = 0;
+            $link_pairs  = array(); // bihr_id => wc_id, pour batch_update_product_links()
+
             foreach ( $chunk_ids as $product_id ) {
                 $i++;
                 try {
-                    $wc_id = $sync->import_to_woocommerce( $product_id, $skip_images );
+                    // skip_link_update=true : on regroupe les UPDATE en fin de chunk
+                    $wc_id = $sync->import_to_woocommerce( $product_id, $skip_images, true );
                     if ( $wc_id ) {
+                        $link_pairs[ $product_id ] = $wc_id;
                         $success++;
                     } else {
                         $errors++;
@@ -138,16 +150,22 @@ class BihrWI_CLI_Commands {
                     WP_CLI::warning( "Erreur bihr_id={$product_id} : " . $e->getMessage() );
                 }
 
-                // Vider le cache objet toutes les 50 itérations
-                // (WooCommerce accumule posts/metas/termes en mémoire)
-                if ( 0 === $i % 50 ) {
+                // Vider le cache objet toutes les 200 itérations
+                // (24 GB buffer pool InnoDB : cache WP beaucoup moins critique qu'en mutu classique)
+                if ( 0 === $i % 200 ) {
                     wp_cache_flush();
                     if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
                         $wpdb->queries = array();
                     }
                 }
             }
-            $wpdb->query( 'COMMIT' );
+
+            // 1 seul INSERT…ON DUPLICATE KEY UPDATE pour tout le chunk (au lieu de N UPDATE individuels)
+            $sync->batch_update_product_links( $link_pairs );
+
+            // Écrire tous les logs accumulés pendant le chunk en 1 seule opération disque
+            $logger->flush_buffer();
+            $logger->disable_buffer();
 
             // Réactiver les recomptages et vider wpdb après chaque chunk
             wp_defer_term_counting( false );
@@ -197,28 +215,29 @@ class BihrWI_CLI_Commands {
      * Télécharge les images en attente (_bihr_pending_image_url) via curl_multi.
      *
      * En WP-CLI : WP_MAX_MEMORY_LIMIT=512MB, pas de timeout PHP.
-     * Calibrage recommandé o2switch : --batch=500 --concurrent=15
+     * Calibrage o2switch (64 cores, 115 GB disque) : --batch=2000 --concurrent=40
      *
      * ## OPTIONS
      *
      * [--batch=<n>]
-     * : Images par run (défaut: 500 — calibré pour 512MB WP-CLI).
+     * : Images par run (défaut: 2000 — calibré pour 512MB WP-CLI o2switch).
      *
      * [--concurrent=<n>]
-     * : cURL simultanés par chunk (défaut: 15 — o2switch 64 cores).
+     * : cURL simultanés par chunk (défaut: 40 — o2switch 64 cores).
      *
      * [--all]
      * : Boucle jusqu'à épuisement de la file d'images.
      *
      * ## EXAMPLES
      *
-     *   wp bihr download-images --batch=500 --concurrent=15 --all
+     *   wp bihr download-images --all
+     *   wp bihr download-images --batch=2000 --concurrent=40 --all
      */
     public function download_images( $args, $assoc_args ) {
         global $wpdb;
 
-        $batch      = isset( $assoc_args['batch'] )      ? max( 1, (int) $assoc_args['batch'] )      : 500;
-        $concurrent = isset( $assoc_args['concurrent'] ) ? max( 1, (int) $assoc_args['concurrent'] ) : 15;
+        $batch      = isset( $assoc_args['batch'] )      ? max( 1, (int) $assoc_args['batch'] )      : 2000;
+        $concurrent = isset( $assoc_args['concurrent'] ) ? max( 1, (int) $assoc_args['concurrent'] ) : 40;
         $loop_all   = isset( $assoc_args['all'] );
 
         $logger = new BihrWI_Logger();

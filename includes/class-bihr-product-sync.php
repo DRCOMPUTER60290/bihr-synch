@@ -8,6 +8,7 @@ class BihrWI_Product_Sync {
     protected $logger;
     protected $table_name;
     protected $product_lookup_cache = array();
+    protected $product_rows_cache   = array(); // bihr_id => row object, chargé par preload_product_rows()
     protected $ai_enrichment        = null;
     protected static $margin_settings_cache = null;
 
@@ -41,6 +42,72 @@ class BihrWI_Product_Sync {
      *
      * @param int[] $bihr_product_ids IDs dans wp_bihr_products.
      */
+    /**
+     * Précharge les lignes wp_bihr_products pour un chunk entier en 1 seule requête.
+     * Élimine le SELECT individuel dans import_to_woocommerce() (N → 1 requête/chunk).
+     *
+     * @param int[] $bihr_product_ids IDs dans wp_bihr_products.
+     */
+    public function preload_product_rows( array $bihr_product_ids ): void {
+        global $wpdb;
+
+        if ( empty( $bihr_product_ids ) ) {
+            return;
+        }
+
+        $ids          = array_map( 'intval', $bihr_product_ids );
+        $table_name   = esc_sql( $this->table_name );
+        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM `{$table_name}` WHERE id IN ({$placeholders})",
+                ...$ids
+            )
+        );
+
+        foreach ( $rows as $row ) {
+            $this->product_rows_cache[ (int) $row->id ] = $row;
+        }
+    }
+
+    /**
+     * Met à jour en batch le champ product_id dans wp_bihr_products pour un chunk entier.
+     * Remplace les N UPDATE individuels dans import_to_woocommerce() par 1 seule requête.
+     *
+     * @param array<int,int> $pairs Tableau [ bihr_id => wc_product_id ].
+     */
+    public function batch_update_product_links( array $pairs ): void {
+        global $wpdb;
+
+        if ( empty( $pairs ) ) {
+            return;
+        }
+
+        $table_name   = esc_sql( $this->table_name );
+        $placeholders = array();
+        $values       = array();
+
+        foreach ( $pairs as $bihr_id => $wc_id ) {
+            $placeholders[] = '(%d, %d)';
+            $values[]       = (int) $bihr_id;
+            $values[]       = (int) $wc_id;
+        }
+
+        $values_sql = implode( ',', $placeholders );
+
+        // INSERT ON DUPLICATE KEY UPDATE : utilise la PK (id) pour faire un UPDATE en masse.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+        $wpdb->query(
+            $wpdb->prepare(
+                "INSERT INTO `{$table_name}` (id, product_id) VALUES {$values_sql}
+                 ON DUPLICATE KEY UPDATE product_id = VALUES(product_id)",
+                ...$values
+            )
+        );
+    }
+
     public function preload_product_lookup( array $bihr_product_ids ): void {
         global $wpdb;
 
@@ -611,17 +678,25 @@ class BihrWI_Product_Sync {
     /**
      * Importe un produit Bihr (ligne de wp_bihr_products) vers WooCommerce
      */
-    public function import_to_woocommerce( $product_id, $skip_images = false ) {
+    /**
+     * @param bool $skip_link_update Si true, ne fait pas l'UPDATE product_id dans wp_bihr_products.
+     *                               Utiliser avec batch_update_product_links() pour regrouper en 1 requête/chunk.
+     */
+    public function import_to_woocommerce( $product_id, $skip_images = false, $skip_link_update = false ) {
         global $wpdb;
 
-        // Échapper le nom de table pour la sécurité (les noms de table ne peuvent pas utiliser de placeholders)
-        $table_name = esc_sql( $this->table_name );
-        $row = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT * FROM `{$table_name}` WHERE id = %d",
-                (int) $product_id
-            )
-        );
+        // Utiliser le cache préchargé par preload_product_rows() si disponible (évite 1 SELECT/produit).
+        $row = $this->product_rows_cache[ (int) $product_id ] ?? null;
+
+        if ( ! $row ) {
+            $table_name = esc_sql( $this->table_name );
+            $row        = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM `{$table_name}` WHERE id = %d",
+                    (int) $product_id
+                )
+            );
+        }
 
         if ( ! $row ) {
             throw new Exception( 'Produit introuvable dans wp_bihr_products.' );
@@ -824,12 +899,15 @@ class BihrWI_Product_Sync {
             }
         }
 
-        // Sauvegarder le lien Bihr-ID → WC-ID pour le filtrage futur
-        $wpdb->query( $wpdb->prepare(
-            "UPDATE `{$table_name}` SET product_id = %d WHERE id = %d",
-            $product_id_wc,
-            (int) $product_id
-        ) );
+        // Sauvegarder le lien Bihr-ID → WC-ID (sauf si batch_update_product_links() est utilisé)
+        if ( ! $skip_link_update ) {
+            $table_name = esc_sql( $this->table_name );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE `{$table_name}` SET product_id = %d WHERE id = %d",
+                $product_id_wc,
+                (int) $product_id
+            ) );
+        }
 
         $this->logger->debug(
             'Import WooCommerce: produit ' . $row->product_code . ' importé avec succès (post_id=' . $product_id_wc . ')'
