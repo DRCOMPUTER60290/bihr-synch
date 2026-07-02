@@ -50,6 +50,9 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_download_pending_images', array( $this, 'ajax_download_pending_images' ) );
         add_action( 'wp_ajax_bihrwi_count_pending_images', array( $this, 'ajax_count_pending_images' ) );
         add_action( 'wp_ajax_bihrwi_stop_mass_import', array( $this, 'ajax_stop_mass_import' ) );
+        add_action( 'wp_ajax_bihrwi_start_image_download_bg', array( $this, 'ajax_start_image_download_bg' ) );
+        add_action( 'wp_ajax_bihrwi_stop_image_download_bg',  array( $this, 'ajax_stop_image_download_bg' ) );
+        add_action( 'wp_ajax_bihrwi_image_download_status',   array( $this, 'ajax_image_download_status' ) );
         add_action( 'wp_ajax_bihr_refresh_stock', array( $this, 'ajax_refresh_stock' ) );
         add_action( 'wp_ajax_bihrwi_import_vehicles', array( $this, 'ajax_import_vehicles' ) );
         if ( function_exists('bwi_fs') && bwi_fs()->is__premium_only() ) {
@@ -1911,6 +1914,93 @@ class BihrWI_Admin {
         wp_send_json_success( array( 'count' => $count ) );
     }
 
+    /**
+     * Démarre le téléchargement des images en arrière-plan (WP-Cron).
+     * Stocke le total initial pour le calcul de la progression.
+     */
+    public function ajax_start_image_download_bg() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        global $wpdb;
+        $remaining = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_pending_image_url'"
+        );
+
+        if ( 0 === $remaining ) {
+            delete_option( 'bihrwi_image_dl_total' );
+            delete_option( 'bihrwi_image_dl_stopped' );
+            wp_send_json_success( array( 'remaining' => 0, 'total' => 0 ) );
+            return;
+        }
+
+        // Enregistre le total initial (ne pas écraser si déjà en cours)
+        if ( ! get_option( 'bihrwi_image_dl_total' ) ) {
+            update_option( 'bihrwi_image_dl_total', $remaining, false );
+        }
+        delete_option( 'bihrwi_image_dl_stopped' );
+
+        // Lance le cron de secours (tourne même si la page est fermée)
+        if ( ! wp_next_scheduled( 'bihrwi_mass_image_event' ) ) {
+            wp_schedule_single_event( time() + 5, 'bihrwi_mass_image_event' );
+        }
+
+        wp_send_json_success( array(
+            'remaining' => $remaining,
+            'total'     => (int) get_option( 'bihrwi_image_dl_total', $remaining ),
+        ) );
+    }
+
+    /**
+     * Arrête le téléchargement en arrière-plan (cron + flag stop pour l'AJAX loop).
+     */
+    public function ajax_stop_image_download_bg() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        update_option( 'bihrwi_image_dl_stopped', 1, false );
+
+        $timestamp = wp_next_scheduled( 'bihrwi_mass_image_event' );
+        if ( $timestamp ) {
+            wp_unschedule_event( $timestamp, 'bihrwi_mass_image_event' );
+        }
+
+        wp_send_json_success();
+    }
+
+    /**
+     * Retourne l'état du téléchargement d'images en arrière-plan.
+     */
+    public function ajax_image_download_status() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+        }
+
+        global $wpdb;
+        $remaining = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_pending_image_url'"
+        );
+        $total   = (int) get_option( 'bihrwi_image_dl_total', $remaining );
+        $stopped = (bool) get_option( 'bihrwi_image_dl_stopped', false );
+
+        if ( 0 === $remaining ) {
+            delete_option( 'bihrwi_image_dl_total' );
+            delete_option( 'bihrwi_image_dl_stopped' );
+        }
+
+        wp_send_json_success( array(
+            'remaining' => $remaining,
+            'total'     => $total ?: $remaining,
+            'stopped'   => $stopped,
+            'started'   => (bool) get_option( 'bihrwi_image_dl_total' ),
+        ) );
+    }
+
     public function ajax_stop_mass_import() {
         check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
 
@@ -2245,6 +2335,12 @@ class BihrWI_Admin {
         global $wpdb;
         @set_time_limit( 270 );
 
+        // Arrêt demandé par l'utilisateur
+        if ( get_option( 'bihrwi_image_dl_stopped' ) ) {
+            $this->logger->log( '[Mass Image] Arrêté par l\'utilisateur.' );
+            return;
+        }
+
         // 3 concurrent max (contrainte mémoire web 40MB), 20 images par run
         $batch      = 20;
         $concurrent = 3;
@@ -2256,6 +2352,8 @@ class BihrWI_Admin {
 
         if ( 0 === $pending ) {
             $this->logger->log( '[Mass Image] Toutes les images ont été téléchargées.' );
+            delete_option( 'bihrwi_image_dl_total' );
+            delete_option( 'bihrwi_image_dl_stopped' );
             return;
         }
 
@@ -2264,10 +2362,12 @@ class BihrWI_Admin {
         $remaining = $this->product_sync->download_pending_images_parallel( $batch, $concurrent );
 
         if ( $remaining > 0 ) {
-            $this->logger->log( sprintf( '[Mass Image] %d restantes — prochain run dans 60s', $remaining ) );
-            wp_schedule_single_event( time() + 60, 'bihrwi_mass_image_event' );
+            $this->logger->log( sprintf( '[Mass Image] %d restantes — prochain run dans 30s', $remaining ) );
+            wp_schedule_single_event( time() + 30, 'bihrwi_mass_image_event' );
         } else {
             $this->logger->log( '[Mass Image] Toutes les images téléchargées.' );
+            delete_option( 'bihrwi_image_dl_total' );
+            delete_option( 'bihrwi_image_dl_stopped' );
         }
     }
 

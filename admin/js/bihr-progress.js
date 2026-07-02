@@ -507,42 +507,141 @@ jQuery(document).ready(function($) {
     });
     
     // ============================================
-    // TÉLÉCHARGEMENT DES IMAGES EN ATTENTE
+    // TÉLÉCHARGEMENT DES IMAGES EN ATTENTE (background + progress bar)
     // ============================================
 
-    function downloadPendingImagesLoop($btn, $status) {
+    var imgDlRunning  = false;
+    var imgDlStopping = false;
+
+    function imgDlShowProgress() {
+        $('#bihr-img-dl-idle').hide();
+        $('#bihr-img-dl-progress').show();
+    }
+
+    function imgDlShowIdle(remaining) {
+        $('#bihr-img-dl-progress').hide();
+        $('#bihr-img-dl-idle').show();
+        if (remaining !== undefined) {
+            $('#bihr-img-dl-count').html('<strong>' + remaining + '</strong> produit(s) sans image en attente de téléchargement.');
+        }
+    }
+
+    function imgDlUpdateBar(remaining, total) {
+        if (!total || total <= 0) return;
+        var done = total - remaining;
+        var pct  = Math.min(100, Math.round((done / total) * 100));
+        $('#bihr-img-dl-bar').css('width', pct + '%');
+        $('#bihr-img-dl-pct').text(pct + '%');
+        $('#bihr-img-dl-label').text(done.toLocaleString('fr-FR') + ' / ' + total.toLocaleString('fr-FR') + ' images téléchargées');
+    }
+
+    function imgDlFinished() {
+        imgDlRunning = false;
+        $('#bihr-img-dl-bar').css('width', '100%');
+        $('#bihr-img-dl-pct').text('100%');
+        $('#bihr-img-dl-label').html('<strong style="color:#2e7d32;">✓ Toutes les images ont été téléchargées !</strong>');
+        $('#bihr-stop-image-download').hide();
+        $('#bihr-img-dl-note').hide();
+        setTimeout(function() { $('#bihr-pending-images-banner').slideUp(); }, 3000);
+    }
+
+    function imgDlLoop(total) {
+        if (imgDlStopping || !imgDlRunning) return;
+
         $.ajax({
             url: ajaxurl,
             type: 'POST',
             data: { action: 'bihrwi_download_pending_images', nonce: bihrProgressData.nonce },
-            success: function(response) {
-                if (response.success) {
-                    var remaining = response.data.remaining;
-                    $status.text('Images restantes : ' + remaining);
+            timeout: 120000,
+            success: function(resp) {
+                if (imgDlStopping || !imgDlRunning) return;
+                if (resp.success) {
+                    var remaining = resp.data.remaining;
+                    imgDlUpdateBar(remaining, total);
                     if (remaining > 0) {
-                        setTimeout(function() { downloadPendingImagesLoop($btn, $status); }, 1000);
+                        setTimeout(function() { imgDlLoop(total); }, 500);
                     } else {
-                        $status.html('<strong style="color:green;">✓ Toutes les images ont été téléchargées !</strong>');
-                        $btn.prop('disabled', false).text('Télécharger les images manquantes');
-                        $('#bihr-pending-images-banner').slideUp();
+                        imgDlFinished();
                     }
                 }
             },
             error: function() {
-                $status.html('<span style="color:red;">Erreur de connexion. Réessayez.</span>');
-                $btn.prop('disabled', false).text('Télécharger les images manquantes');
+                if (imgDlStopping || !imgDlRunning) return;
+                // Pause 5s puis relance (erreur réseau temporaire)
+                setTimeout(function() { imgDlLoop(total); }, 5000);
             }
         });
     }
 
+    // Démarrer le téléchargement (bouton)
     $(document).on('click', '#bihr-download-pending-images', function(e) {
         e.preventDefault();
-        var $btn = $(this);
-        $btn.prop('disabled', true).text('⏳ Téléchargement en cours...');
-        var $status = $('<span style="margin-left:10px;"></span>');
-        $btn.after($status);
-        downloadPendingImagesLoop($btn, $status);
+        imgDlStopping = false;
+        imgDlRunning  = true;
+        imgDlShowProgress();
+        $('#bihr-img-dl-label').text('Démarrage…');
+        $('#bihr-stop-image-download').show();
+        $('#bihr-img-dl-note').show();
+
+        // Lance le cron de secours + récupère le total
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'bihrwi_start_image_download_bg', nonce: bihrProgressData.nonce },
+            success: function(resp) {
+                if (resp.success) {
+                    var total = resp.data.total || resp.data.remaining;
+                    if (total === 0) { imgDlFinished(); return; }
+                    imgDlUpdateBar(resp.data.remaining, total);
+                    imgDlLoop(total);
+                }
+            }
+        });
     });
+
+    // Bouton stop
+    $(document).on('click', '#bihr-stop-image-download', function(e) {
+        e.preventDefault();
+        imgDlStopping = true;
+        imgDlRunning  = false;
+        $(this).prop('disabled', true).text('Arrêt en cours…');
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'bihrwi_stop_image_download_bg', nonce: bihrProgressData.nonce },
+            complete: function() {
+                imgDlShowIdle();
+                $('#bihr-stop-image-download').prop('disabled', false)
+                    .html('<span class="dashicons dashicons-controls-pause" style="vertical-align:middle;"></span> Arrêter');
+                $('#bihr-img-dl-label').html('<span style="color:#d63638;">⏹ Arrêté — reprenez quand vous voulez.</span>');
+            }
+        });
+    });
+
+    // À l'ouverture de la page : reprise automatique si téléchargement en cours
+    if ($('#bihr-pending-images-banner').length) {
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'bihrwi_image_download_status', nonce: bihrProgressData.nonce },
+            success: function(resp) {
+                if (!resp.success) return;
+                var d = resp.data;
+                if (d.remaining === 0) return; // Déjà terminé
+                if (d.stopped) return;          // Arrêté par l'utilisateur
+                if (!d.started) return;         // Jamais démarré sur cette session
+
+                // Un téléchargement était en cours → reprise auto
+                imgDlStopping = false;
+                imgDlRunning  = true;
+                imgDlShowProgress();
+                $('#bihr-img-dl-note').show();
+                imgDlUpdateBar(d.remaining, d.total);
+                imgDlLoop(d.total);
+            }
+        });
+    }
 
     // ============================================
     // TÉLÉCHARGEMENT DES IMAGES AVEC BARRE DE PROGRESSION (auto après import)

@@ -1438,13 +1438,37 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
             ),
         ) ) );
-        if ( $pending_img_count > 0 ) : ?>
-        <div id="bihr-pending-images-banner" style="margin: 10px 0; padding: 10px 15px; background: #fff3cd; border-left: 4px solid #f0ad4e; border-radius: 2px;">
-            <strong><?php echo intval( $pending_img_count ); ?> produit(s)</strong> sans image en attente de téléchargement.
-            <button id="bihr-download-pending-images" class="button button-secondary" style="margin-left: 10px;">
-                <span class="dashicons dashicons-format-image" style="vertical-align: middle;"></span>
-                Télécharger les images manquantes
-            </button>
+        <?php if ( $pending_img_count > 0 ) : ?>
+        <div id="bihr-pending-images-banner" style="margin: 10px 0; padding: 12px 15px; background: #fff3cd; border-left: 4px solid #f0ad4e; border-radius: 2px;">
+
+            <!-- Vue initiale : bouton démarrer -->
+            <div id="bihr-img-dl-idle">
+                <span id="bihr-img-dl-count"><strong><?php echo intval( $pending_img_count ); ?></strong> produit(s) sans image en attente de téléchargement.</span>
+                <button id="bihr-download-pending-images" class="button button-primary" style="margin-left: 10px;">
+                    <span class="dashicons dashicons-download" style="vertical-align: middle;"></span>
+                    Télécharger les images manquantes
+                </button>
+            </div>
+
+            <!-- Vue en cours : barre de progression + stop -->
+            <div id="bihr-img-dl-progress" style="display:none;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span id="bihr-img-dl-label" style="white-space:nowrap; font-weight:600;">Démarrage…</span>
+                    <div style="flex:1; min-width:200px; background:#e0e0e0; border-radius:4px; height:18px; overflow:hidden;">
+                        <div id="bihr-img-dl-bar" style="width:0%; height:100%; background:#2271b1; border-radius:4px; transition:width 0.4s ease; display:flex; align-items:center; justify-content:center;">
+                            <span id="bihr-img-dl-pct" style="color:#fff; font-size:11px; font-weight:bold; line-height:18px;"></span>
+                        </div>
+                    </div>
+                    <button id="bihr-stop-image-download" class="button button-secondary" style="white-space:nowrap; border-color:#d63638; color:#d63638;">
+                        <span class="dashicons dashicons-controls-pause" style="vertical-align:middle;"></span>
+                        Arrêter
+                    </button>
+                </div>
+                <div id="bihr-img-dl-note" style="margin-top:5px; font-size:12px; color:#666;">
+                    Le téléchargement continue en arrière-plan même si vous changez de page.
+                </div>
+            </div>
+
         </div>
         <?php endif; ?>
 
