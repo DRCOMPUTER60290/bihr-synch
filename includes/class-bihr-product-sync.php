@@ -1143,6 +1143,86 @@ class BihrWI_Product_Sync {
     }
 
     /**
+     * Re-synchronise _bihr_pending_image_url depuis wp_bihr_products.image_url.
+     *
+     * À appeler après un re-téléchargement + re-fusion du catalogue BIHR pour
+     * rafraîchir les tokens ?context= expirés dans les URLs d'images en attente.
+     *
+     * @return array { updated: int, skipped: int, no_code: int }
+     */
+    public function sync_pending_image_urls_from_db(): array {
+        global $wpdb;
+
+        // Récupère tous les post_id avec une image en attente + leur _bihr_product_code en une seule requête
+        $rows = $wpdb->get_results(
+            "SELECT pm_img.post_id, pm_code.meta_value AS product_code
+             FROM {$wpdb->postmeta} pm_img
+             INNER JOIN {$wpdb->postmeta} pm_code
+               ON pm_code.post_id = pm_img.post_id
+               AND pm_code.meta_key = '_bihr_product_code'
+             WHERE pm_img.meta_key = '_bihr_pending_image_url'",
+            ARRAY_A
+        );
+
+        if ( empty( $rows ) ) {
+            return array( 'updated' => 0, 'skipped' => 0, 'no_code' => 0 );
+        }
+
+        // Groupe par product_code → liste de post_ids
+        $code_to_posts = array();
+        foreach ( $rows as $row ) {
+            $code = $row['product_code'];
+            $code_to_posts[ $code ][] = (int) $row['post_id'];
+        }
+
+        // Récupère les image_url fraîches depuis wp_bihr_products en une seule requête
+        $codes       = array_keys( $code_to_posts );
+        $placeholders = implode( ',', array_fill( 0, count( $codes ), '%s' ) );
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $fresh_urls = $wpdb->get_results(
+            $wpdb->prepare(
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                "SELECT product_code, image_url FROM {$this->table_name} WHERE product_code IN ($placeholders)",
+                ...$codes
+            ),
+            OBJECT_K
+        ); // keyed by product_code
+
+        $updated  = 0;
+        $skipped  = 0;
+        $no_code  = 0;
+
+        foreach ( $code_to_posts as $code => $post_ids ) {
+            if ( ! isset( $fresh_urls[ $code ] ) || empty( $fresh_urls[ $code ]->image_url ) ) {
+                $no_code += count( $post_ids );
+                continue;
+            }
+
+            $fresh_url = $fresh_urls[ $code ]->image_url;
+            if ( ! preg_match( '#^https?://#i', $fresh_url ) ) {
+                $fresh_url = rtrim( BIHRWI_IMAGE_BASE_URL, '/' ) . '/' . ltrim( $fresh_url, '/' );
+            }
+
+            foreach ( $post_ids as $post_id ) {
+                $current = get_post_meta( $post_id, '_bihr_pending_image_url', true );
+                // Normalise l'URL courante pour comparer sans le ?context=
+                $current_base = strtok( $current, '?' );
+                $fresh_base   = strtok( $fresh_url, '?' );
+
+                if ( $current_base === $fresh_base && $current === $fresh_url ) {
+                    $skipped++;
+                    continue;
+                }
+
+                update_post_meta( $post_id, '_bihr_pending_image_url', $fresh_url );
+                $updated++;
+            }
+        }
+
+        return array( 'updated' => $updated, 'skipped' => $skipped, 'no_code' => $no_code );
+    }
+
+    /**
      * Télécharge et attache l'image en attente pour un post donné.
      * Utilisé par le cron image dédié (run_mass_image_batch).
      */

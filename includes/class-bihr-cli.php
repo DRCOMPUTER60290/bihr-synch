@@ -233,6 +233,39 @@ class BihrWI_CLI_Commands {
      *   wp bihr download-images --all
      *   wp bihr download-images --batch=2000 --concurrent=40 --all
      */
+    /**
+     * Re-synchronise _bihr_pending_image_url depuis wp_bihr_products.image_url.
+     *
+     * À utiliser après "Télécharger + Fusionner les catalogues" dans l'admin BIHR
+     * pour rafraîchir les tokens ?context= Hybris expirés dans les URLs d'images.
+     *
+     * Workflow :
+     *   1. Admin BIHR → Télécharger catalogues → Fusionner
+     *   2. wp bihr sync-image-urls
+     *   3. wp bihr download-images --all
+     *
+     * ## EXAMPLES
+     *
+     *   wp bihr sync-image-urls
+     *
+     * @subcommand sync-image-urls
+     */
+    public function sync_image_urls( $args, $assoc_args ) {
+        $logger = new BihrWI_Logger();
+        $sync   = new BihrWI_Product_Sync( $logger );
+
+        WP_CLI::log( 'Synchronisation des URLs d\'images depuis wp_bihr_products…' );
+
+        $result = $sync->sync_pending_image_urls_from_db();
+
+        WP_CLI::success( sprintf(
+            '%d URL(s) mises à jour, %d inchangée(s), %d sans correspondance dans wp_bihr_products.',
+            $result['updated'],
+            $result['skipped'],
+            $result['no_code']
+        ) );
+    }
+
     public function download_images( $args, $assoc_args ) {
         global $wpdb;
 
