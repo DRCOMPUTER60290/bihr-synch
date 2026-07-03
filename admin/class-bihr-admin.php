@@ -76,6 +76,8 @@ class BihrWI_Admin {
         // Handlers traduction catégories
         add_action( 'wp_ajax_bihrwi_analyze_categories', array( $this, 'ajax_analyze_categories' ) );
         add_action( 'wp_ajax_bihrwi_apply_french_categories', array( $this, 'ajax_apply_french_categories' ) );
+        add_action( 'wp_ajax_bihrwi_prepare_categories', array( $this, 'ajax_prepare_categories' ) );
+        add_action( 'wp_ajax_bihrwi_apply_categories_chunk', array( $this, 'ajax_apply_categories_chunk' ) );
         add_action( 'wp_ajax_bihrwi_get_category_translations', array( $this, 'ajax_get_category_translations' ) );
         add_action( 'wp_ajax_bihrwi_clear_category_mapping', array( $this, 'ajax_clear_category_mapping' ) );
         add_action( 'wp_ajax_bihrwi_export_category_mapping', array( $this, 'ajax_export_category_mapping' ) );
@@ -3461,6 +3463,40 @@ class BihrWI_Admin {
         );
 
         exit;
+    }
+
+    /**
+     * AJAX : phase 1 chunked — compte les produits et pré-crée les termes WC.
+     */
+    public function ajax_prepare_categories() {
+        check_ajax_referer( 'bihrwi_apply_french_categories_action', '_wpnonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Accès refusé', 403 );
+        }
+        set_time_limit( 60 );
+        $result = $this->category_translator->prepare_category_apply();
+        if ( isset( $result['error'] ) ) {
+            wp_send_json_error( $result['error'] );
+        }
+        wp_send_json_success( $result );
+    }
+
+    /**
+     * AJAX : phase 2 chunked — traite un lot de produits.
+     */
+    public function ajax_apply_categories_chunk() {
+        check_ajax_referer( 'bihrwi_apply_french_categories_action', '_wpnonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Accès refusé', 403 );
+        }
+        set_time_limit( 60 );
+        $offset     = isset( $_POST['offset'] ) ? max( 0, (int) $_POST['offset'] ) : 0;
+        $chunk_size = 200;
+        $result     = $this->category_translator->apply_category_chunk( $offset, $chunk_size );
+        if ( isset( $result['error'] ) ) {
+            wp_send_json_error( $result['error'] );
+        }
+        wp_send_json_success( $result );
     }
 
     /**

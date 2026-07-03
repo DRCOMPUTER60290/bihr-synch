@@ -849,81 +849,84 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         var applyLabel     = $('#bihr-apply-label');
         var applyCounter   = $('#bihr-apply-counter');
         var applySummary   = $('#bihr-apply-summary');
-        var applyLastLen   = 0;
+        var applyTotal = 0;
 
-        function processApplyLines(fullText) {
-            var newText = fullText.slice(applyLastLen);
-            applyLastLen = fullText.length;
-            if (!newText) return;
+        function applyDone(elapsed) {
+            applyBar.css({width: '100%', background: '#00a32a'}).text('100%');
+            applyIcon.text('✅');
+            applyLabel.text('Terminé !');
+            applyCounter.text('');
+            applyText.text(applyTotal.toLocaleString() + ' produits mis à jour en ' + elapsed + 's');
+            applyBtn.prop('disabled', false).text('✅ Appliquer les catégories françaises aux produits');
+            applySummary.html(
+                '<strong>Produits traités :</strong> ' + applyTotal.toLocaleString() + '<br>'
+                + '<strong>Durée :</strong> ' + elapsed + 's'
+            ).show();
+        }
 
-            newText.split('\n').forEach(function(line) {
-                try {
-                    if (!line.trim()) return;
-                    var d = JSON.parse(line);
+        function applyError(msg) {
+            applyBar.css({width: '100%', background: '#da3633'}).text('Erreur');
+            applyIcon.text('❌');
+            applyLabel.text('Erreur');
+            applyText.text(msg);
+            applyBtn.prop('disabled', false);
+        }
 
-                    if (d.type === 'status') {
-                        applyIcon.text('⚙️');
-                        applyLabel.text(d.message);
-                        applyText.text(d.message);
-                        if (d.total > 0) {
-                            applyCounter.text('0 / ' + d.total.toLocaleString() + ' produits');
-                        }
-
-                    } else if (d.type === 'progress') {
-                        var pct = d.total > 0 ? Math.round(d.current / d.total * 100) : 0;
-                        applyBar.css({width: pct + '%', background:'#0969da'}).text(pct + '%');
-                        applyCounter.text(d.current.toLocaleString() + ' / ' + d.total.toLocaleString() + ' produits');
-                        applyText.text(d.message);
-
-                    } else if (d.type === 'complete') {
-                        applyBar.css({width:'100%', background:'#00a32a'}).text('100%');
-                        applyIcon.text('✅');
-                        applyLabel.text('Terminé !');
-                        applyCounter.text('');
-                        applyText.text(d.message);
-                        applyBtn.prop('disabled', false).text('✅ Appliquer les catégories françaises aux produits');
-
-                        if (d.extra) {
-                            var e = d.extra;
-                            applySummary.html(
-                                '<strong>Produits traités :</strong> ' + (e.total || 0) + '<br>'
-                                + '<strong>Produits mis à jour :</strong> ' + (e.updated || 0) + '<br>'
-                                + '<strong>Durée :</strong> ' + (e.elapsed || '?') + 's'
-                            ).show();
-                        }
-
-                    } else if (d.type === 'error') {
-                        applyBar.css({width:'100%', background:'#da3633'}).text('Erreur');
-                        applyIcon.text('❌');
-                        applyLabel.text('Erreur');
-                        applyText.text(d.message);
-                        applyBtn.prop('disabled', false);
-                    }
-                } catch(e) {}
+        function applyNextChunk(offset) {
+            $.post(ajaxUrl, {
+                action: 'bihrwi_apply_categories_chunk',
+                _wpnonce: applyNonce,
+                offset: offset
+            }, function(resp) {
+                if (!resp || !resp.success) {
+                    applyError(resp && resp.data ? resp.data : 'Erreur inconnue');
+                    return;
+                }
+                var d = resp.data;
+                var current = d.offset;
+                var pct = applyTotal > 0 ? Math.min(99, Math.round(current / applyTotal * 100)) : 0;
+                applyBar.css({width: pct + '%', background: '#0969da'}).text(pct + '%');
+                applyCounter.text(current.toLocaleString() + ' / ' + applyTotal.toLocaleString() + ' produits');
+                applyText.text('Produits traités : ' + current.toLocaleString() + ' / ' + applyTotal.toLocaleString());
+                if (d.done) {
+                    applyDone(d.elapsed || '?');
+                } else {
+                    applyNextChunk(d.offset);
+                }
+            }).fail(function() {
+                applyError('Erreur réseau — rechargez la page et réessayez.');
             });
         }
 
         applyBtn.on('click', function() {
-            applyLastLen = 0;
+            applyTotal = 0;
             applyContainer.show();
             applySummary.hide();
             applyBtn.prop('disabled', true).text('⏳ Application en cours...');
-            applyBar.css({width:'2%', background:'#2271b1'}).text('');
+            applyBar.css({width: '2%', background: '#2271b1'}).text('');
             applyCounter.text('');
+            applyIcon.text('⚙️');
+            applyLabel.text('Préparation...');
+            applyText.text('Création des catégories françaises...');
 
-            $.ajax({
-                url: ajaxUrl,
-                type: 'POST',
-                data: { action: 'bihrwi_apply_french_categories', _wpnonce: applyNonce },
-                xhrFields: {
-                    onprogress: function() {
-                        processApplyLines(this.responseText);
-                    }
-                },
-                complete: function(xhr) {
-                    processApplyLines(xhr.responseText);
-                    applyBtn.prop('disabled', false);
+            $.post(ajaxUrl, {
+                action: 'bihrwi_prepare_categories',
+                _wpnonce: applyNonce
+            }, function(resp) {
+                if (!resp || !resp.success) {
+                    applyError(resp && resp.data ? resp.data : 'Erreur de préparation');
+                    return;
                 }
+                applyTotal = resp.data.total || 0;
+                if (applyTotal === 0) {
+                    applyDone(0);
+                    return;
+                }
+                applyLabel.text('Application...');
+                applyCounter.text('0 / ' + applyTotal.toLocaleString() + ' produits');
+                applyNextChunk(0);
+            }).fail(function() {
+                applyError('Erreur réseau — rechargez la page et réessayez.');
             });
         });
 

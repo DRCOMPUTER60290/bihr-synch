@@ -672,6 +672,189 @@ class BihrWI_Category_Translator {
     }
 
     /**
+     * Phase 1 de l'application chunked : compte les produits et pré-crée tous les termes WC.
+     * Stocke le cache combo→ttid et le total dans des transients (1h).
+     *
+     * @return array {total: int} ou {error: string}
+     */
+    public function prepare_category_apply() {
+        global $wpdb;
+
+        if ( ! taxonomy_exists( 'product_cat' ) ) {
+            return array( 'error' => 'WooCommerce non disponible' );
+        }
+
+        $mapping = $this->get_mapping();
+
+        $total = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT p.ID)
+             FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_bihr_cat_l1'
+             WHERE p.post_type = 'product' AND p.post_status != 'trash'"
+        );
+
+        if ( 0 === $total ) {
+            return array( 'total' => 0 );
+        }
+
+        $unique_combos = $wpdb->get_results(
+            "SELECT DISTINCT
+                COALESCE(pm1.meta_value,'') AS l1,
+                COALESCE(pm2.meta_value,'') AS l2,
+                COALESCE(pm3.meta_value,'') AS l3
+             FROM {$wpdb->posts} p
+             LEFT JOIN {$wpdb->postmeta} pm1 ON pm1.post_id = p.ID AND pm1.meta_key = '_bihr_cat_l1'
+             LEFT JOIN {$wpdb->postmeta} pm2 ON pm2.post_id = p.ID AND pm2.meta_key = '_bihr_cat_l2'
+             LEFT JOIN {$wpdb->postmeta} pm3 ON pm3.post_id = p.ID AND pm3.meta_key = '_bihr_cat_l3'
+             WHERE p.post_type = 'product' AND p.post_status != 'trash'",
+            ARRAY_A
+        );
+
+        $combo_ttid_cache = array();
+        foreach ( $unique_combos as $row ) {
+            $l1  = (string) $row['l1'];
+            $l2  = (string) $row['l2'];
+            $l3  = (string) $row['l3'];
+            $fr1 = ( '' !== $l1 && isset( $mapping[ $l1 ] ) && '' !== $mapping[ $l1 ] ) ? $mapping[ $l1 ] : $l1;
+            $fr2 = ( '' !== $l2 && isset( $mapping[ $l2 ] ) && '' !== $mapping[ $l2 ] ) ? $mapping[ $l2 ] : $l2;
+            $fr3 = ( '' !== $l3 && isset( $mapping[ $l3 ] ) && '' !== $mapping[ $l3 ] ) ? $mapping[ $l3 ] : $l3;
+            $key = "$fr1|||$fr2|||$fr3";
+            if ( ! isset( $combo_ttid_cache[ $key ] ) ) {
+                $term_id = BihrWI_Category_Path::ensure_product_categories( $fr1, $fr2, $fr3 );
+                $tt_id   = $term_id ? (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE term_id = %d AND taxonomy = 'product_cat'",
+                    $term_id
+                ) ) : 0;
+                $combo_ttid_cache[ $key ] = $tt_id;
+            }
+        }
+
+        set_transient( 'bihrwi_apply_combo_cache', $combo_ttid_cache, HOUR_IN_SECONDS );
+        set_transient( 'bihrwi_apply_total', $total, HOUR_IN_SECONDS );
+        set_transient( 'bihrwi_apply_started_at', microtime( true ), HOUR_IN_SECONDS );
+
+        return array( 'total' => $total );
+    }
+
+    /**
+     * Phase 2 de l'application chunked : traite un lot de produits.
+     *
+     * @param int $offset     Position de départ.
+     * @param int $chunk_size Nombre de produits à traiter.
+     * @return array {updated, offset, total, done, [elapsed, error]}
+     */
+    public function apply_category_chunk( $offset, $chunk_size = 200 ) {
+        global $wpdb;
+
+        $combo_ttid_cache = get_transient( 'bihrwi_apply_combo_cache' );
+        $total            = (int) get_transient( 'bihrwi_apply_total' );
+
+        if ( false === $combo_ttid_cache || ! $total ) {
+            return array( 'error' => 'Session expirée, relancez depuis le début.' );
+        }
+
+        $mapping = $this->get_mapping();
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT p.ID,
+                    COALESCE(pm1.meta_value,'') AS l1,
+                    COALESCE(pm2.meta_value,'') AS l2,
+                    COALESCE(pm3.meta_value,'') AS l3
+                 FROM {$wpdb->posts} p
+                 LEFT JOIN {$wpdb->postmeta} pm1 ON pm1.post_id = p.ID AND pm1.meta_key = '_bihr_cat_l1'
+                 LEFT JOIN {$wpdb->postmeta} pm2 ON pm2.post_id = p.ID AND pm2.meta_key = '_bihr_cat_l2'
+                 LEFT JOIN {$wpdb->postmeta} pm3 ON pm3.post_id = p.ID AND pm3.meta_key = '_bihr_cat_l3'
+                 WHERE p.post_type = 'product' AND p.post_status != 'trash'
+                 ORDER BY p.ID
+                 LIMIT %d OFFSET %d",
+                $chunk_size,
+                $offset
+            ),
+            ARRAY_A
+        );
+
+        if ( empty( $rows ) ) {
+            return array( 'updated' => 0, 'offset' => $offset, 'total' => $total, 'done' => true );
+        }
+
+        $pid_fr1  = array();
+        $pid_fr2  = array();
+        $pid_fr3  = array();
+        $pid_ttid = array();
+        $all_pids = array();
+
+        foreach ( $rows as $row ) {
+            $pid = (int) $row['ID'];
+            $l1  = (string) $row['l1'];
+            $l2  = (string) $row['l2'];
+            $l3  = (string) $row['l3'];
+            $fr1 = ( '' !== $l1 && isset( $mapping[ $l1 ] ) && '' !== $mapping[ $l1 ] ) ? $mapping[ $l1 ] : $l1;
+            $fr2 = ( '' !== $l2 && isset( $mapping[ $l2 ] ) && '' !== $mapping[ $l2 ] ) ? $mapping[ $l2 ] : $l2;
+            $fr3 = ( '' !== $l3 && isset( $mapping[ $l3 ] ) && '' !== $mapping[ $l3 ] ) ? $mapping[ $l3 ] : $l3;
+            $all_pids[]      = $pid;
+            $pid_fr1[ $pid ] = $fr1;
+            $pid_fr2[ $pid ] = $fr2;
+            $pid_fr3[ $pid ] = $fr3;
+            $key              = "$fr1|||$fr2|||$fr3";
+            $pid_ttid[ $pid ] = isset( $combo_ttid_cache[ $key ] ) ? $combo_ttid_cache[ $key ] : 0;
+        }
+
+        $ids_str = implode( ',', $all_pids );
+
+        foreach ( array( '_bihr_category1_fr' => $pid_fr1, '_bihr_category2_fr' => $pid_fr2, '_bihr_category3_fr' => $pid_fr3 ) as $meta_key => $pid_vals ) {
+            $cases = '';
+            foreach ( $pid_vals as $pid => $val ) {
+                $cases .= $wpdb->prepare( ' WHEN %d THEN %s', $pid, $val );
+            }
+            $wpdb->query( "UPDATE {$wpdb->postmeta} SET meta_value = CASE post_id $cases END WHERE meta_key = '$meta_key' AND post_id IN ($ids_str)" );
+            $existing = $wpdb->get_col( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '$meta_key' AND post_id IN ($ids_str)" );
+            $missing  = array_diff( $all_pids, array_map( 'intval', $existing ) );
+            if ( ! empty( $missing ) ) {
+                $ins = array();
+                foreach ( $missing as $pid ) {
+                    $ins[] = $wpdb->prepare( '(%d, %s, %s)', $pid, $meta_key, $pid_vals[ $pid ] );
+                }
+                $wpdb->query( "INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value) VALUES " . implode( ',', $ins ) );
+            }
+        }
+
+        $wpdb->query(
+            "DELETE tr FROM {$wpdb->term_relationships} tr
+             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+             WHERE tr.object_id IN ($ids_str) AND tt.taxonomy = 'product_cat'"
+        );
+
+        $rel_rows = array();
+        foreach ( $pid_ttid as $pid => $tt_id ) {
+            if ( $tt_id ) {
+                $rel_rows[] = "($pid, $tt_id, 0)";
+            }
+        }
+        if ( ! empty( $rel_rows ) ) {
+            $wpdb->query( "INSERT IGNORE INTO {$wpdb->term_relationships} (object_id, term_taxonomy_id, term_order) VALUES " . implode( ',', $rel_rows ) );
+        }
+
+        $new_offset = $offset + count( $rows );
+        $done       = ( $new_offset >= $total );
+
+        if ( $done ) {
+            $unique_ttids = array_unique( array_filter( array_values( $combo_ttid_cache ) ) );
+            if ( ! empty( $unique_ttids ) ) {
+                wp_update_term_count_now( $unique_ttids, 'product_cat' );
+            }
+            $elapsed = round( microtime( true ) - (float) get_transient( 'bihrwi_apply_started_at' ), 1 );
+            delete_transient( 'bihrwi_apply_combo_cache' );
+            delete_transient( 'bihrwi_apply_total' );
+            delete_transient( 'bihrwi_apply_started_at' );
+            return array( 'updated' => count( $rows ), 'offset' => $new_offset, 'total' => $total, 'done' => true, 'elapsed' => $elapsed );
+        }
+
+        $wpdb->flush();
+        return array( 'updated' => count( $rows ), 'offset' => $new_offset, 'total' => $total, 'done' => false );
+    }
+
+    /**
      * Retourne les traductions paginées pour l'interface admin.
      */
     public function get_all_translations( $search = '', $page = 1, $per_page = 50 ) {
