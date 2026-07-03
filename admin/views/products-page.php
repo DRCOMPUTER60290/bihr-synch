@@ -1444,6 +1444,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
             ),
         ) ) );
+        ?>
         <?php if ( $pending_img_count > 0 ) : ?>
         <div id="bihr-pending-images-banner" style="margin: 10px 0; padding: 12px 15px; background: #fff3cd; border-left: 4px solid #f0ad4e; border-radius: 2px;">
 
