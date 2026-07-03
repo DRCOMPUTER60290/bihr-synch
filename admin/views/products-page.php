@@ -865,11 +865,14 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                         applyIcon.text('⚙️');
                         applyLabel.text(d.message);
                         applyText.text(d.message);
+                        if (d.total > 0) {
+                            applyCounter.text('0 / ' + d.total.toLocaleString() + ' produits');
+                        }
 
                     } else if (d.type === 'progress') {
                         var pct = d.total > 0 ? Math.round(d.current / d.total * 100) : 0;
                         applyBar.css({width: pct + '%', background:'#0969da'}).text(pct + '%');
-                        applyCounter.text(d.current.toLocaleString() + ' / ' + d.total.toLocaleString());
+                        applyCounter.text(d.current.toLocaleString() + ' / ' + d.total.toLocaleString() + ' produits');
                         applyText.text(d.message);
 
                     } else if (d.type === 'complete') {
