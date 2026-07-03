@@ -732,6 +732,7 @@ class BihrWI_Category_Translator {
         set_transient( 'bihrwi_apply_combo_cache', $combo_ttid_cache, HOUR_IN_SECONDS );
         set_transient( 'bihrwi_apply_total', $total, HOUR_IN_SECONDS );
         set_transient( 'bihrwi_apply_started_at', microtime( true ), HOUR_IN_SECONDS );
+        set_transient( 'bihrwi_apply_processed', 0, HOUR_IN_SECONDS );
 
         return array( 'total' => $total );
     }
@@ -739,11 +740,14 @@ class BihrWI_Category_Translator {
     /**
      * Phase 2 de l'application chunked : traite un lot de produits.
      *
-     * @param int $offset     Position de départ.
+     * Utilise une pagination par curseur (keyset) sur p.ID pour éviter le ralentissement
+     * progressif des grandes valeurs d'OFFSET.
+     *
+     * @param int $last_id    Dernier product ID traité (0 pour démarrer au début).
      * @param int $chunk_size Nombre de produits à traiter.
-     * @return array {updated, offset, total, done, [elapsed, error]}
+     * @return array {updated, last_id, processed, total, done, [elapsed, error]}
      */
-    public function apply_category_chunk( $offset, $chunk_size = 200 ) {
+    public function apply_category_chunk( $last_id, $chunk_size = 200 ) {
         global $wpdb;
 
         $combo_ttid_cache = get_transient( 'bihrwi_apply_combo_cache' );
@@ -765,17 +769,17 @@ class BihrWI_Category_Translator {
                  LEFT JOIN {$wpdb->postmeta} pm1 ON pm1.post_id = p.ID AND pm1.meta_key = '_bihr_cat_l1'
                  LEFT JOIN {$wpdb->postmeta} pm2 ON pm2.post_id = p.ID AND pm2.meta_key = '_bihr_cat_l2'
                  LEFT JOIN {$wpdb->postmeta} pm3 ON pm3.post_id = p.ID AND pm3.meta_key = '_bihr_cat_l3'
-                 WHERE p.post_type = 'product' AND p.post_status != 'trash'
+                 WHERE p.post_type = 'product' AND p.post_status != 'trash' AND p.ID > %d
                  ORDER BY p.ID
-                 LIMIT %d OFFSET %d",
-                $chunk_size,
-                $offset
+                 LIMIT %d",
+                $last_id,
+                $chunk_size
             ),
             ARRAY_A
         );
 
         if ( empty( $rows ) ) {
-            return array( 'updated' => 0, 'offset' => $offset, 'total' => $total, 'done' => true );
+            return array( 'updated' => 0, 'last_id' => $last_id, 'processed' => $total, 'total' => $total, 'done' => true );
         }
 
         $pid_fr1  = array();
@@ -835,8 +839,11 @@ class BihrWI_Category_Translator {
             $wpdb->query( "INSERT IGNORE INTO {$wpdb->term_relationships} (object_id, term_taxonomy_id, term_order) VALUES " . implode( ',', $rel_rows ) );
         }
 
-        $new_offset = $offset + count( $rows );
-        $done       = ( $new_offset >= $total );
+        $count      = count( $rows );
+        $new_last_id = (int) $rows[ $count - 1 ]['ID'];
+        $processed   = (int) get_transient( 'bihrwi_apply_processed' ) + $count;
+        set_transient( 'bihrwi_apply_processed', $processed, HOUR_IN_SECONDS );
+        $done = ( $count < $chunk_size );
 
         if ( $done ) {
             $unique_ttids = array_unique( array_filter( array_values( $combo_ttid_cache ) ) );
@@ -847,11 +854,12 @@ class BihrWI_Category_Translator {
             delete_transient( 'bihrwi_apply_combo_cache' );
             delete_transient( 'bihrwi_apply_total' );
             delete_transient( 'bihrwi_apply_started_at' );
-            return array( 'updated' => count( $rows ), 'offset' => $new_offset, 'total' => $total, 'done' => true, 'elapsed' => $elapsed );
+            delete_transient( 'bihrwi_apply_processed' );
+            return array( 'updated' => $count, 'last_id' => $new_last_id, 'processed' => $processed, 'total' => $total, 'done' => true, 'elapsed' => $elapsed );
         }
 
         $wpdb->flush();
-        return array( 'updated' => count( $rows ), 'offset' => $new_offset, 'total' => $total, 'done' => false );
+        return array( 'updated' => $count, 'last_id' => $new_last_id, 'processed' => $processed, 'total' => $total, 'done' => false );
     }
 
     /**

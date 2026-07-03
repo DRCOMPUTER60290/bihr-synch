@@ -872,18 +872,18 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             applyBtn.prop('disabled', false);
         }
 
-        function applyNextChunk(offset) {
+        function applyNextChunk(lastId) {
             $.post(ajaxUrl, {
                 action: 'bihrwi_apply_categories_chunk',
                 _wpnonce: applyNonce,
-                offset: offset
+                last_id: lastId
             }, function(resp) {
                 if (!resp || !resp.success) {
                     applyError(resp && resp.data ? resp.data : 'Erreur inconnue');
                     return;
                 }
                 var d = resp.data;
-                var current = d.offset;
+                var current = d.processed;
                 var pct = applyTotal > 0 ? Math.min(99, Math.round(current / applyTotal * 100)) : 0;
                 applyBar.css({width: pct + '%', background: '#0969da'}).text(pct + '%');
                 applyCounter.text(current.toLocaleString() + ' / ' + applyTotal.toLocaleString() + ' produits');
@@ -891,7 +891,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 if (d.done) {
                     applyDone(d.elapsed || '?');
                 } else {
-                    applyNextChunk(d.offset);
+                    applyNextChunk(d.last_id);
                 }
             }).fail(function() {
                 applyError('Erreur réseau — rechargez la page et réessayez.');

@@ -3490,9 +3490,9 @@ class BihrWI_Admin {
             wp_send_json_error( 'Accès refusé', 403 );
         }
         set_time_limit( 60 );
-        $offset     = isset( $_POST['offset'] ) ? max( 0, (int) $_POST['offset'] ) : 0;
+        $last_id    = isset( $_POST['last_id'] ) ? max( 0, (int) $_POST['last_id'] ) : 0;
         $chunk_size = 200;
-        $result     = $this->category_translator->apply_category_chunk( $offset, $chunk_size );
+        $result     = $this->category_translator->apply_category_chunk( $last_id, $chunk_size );
         if ( isset( $result['error'] ) ) {
             wp_send_json_error( $result['error'] );
         }
