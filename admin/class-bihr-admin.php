@@ -3473,7 +3473,7 @@ class BihrWI_Admin {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_send_json_error( 'Accès refusé', 403 );
         }
-        set_time_limit( 60 );
+        set_time_limit( 300 );
         $result = $this->category_translator->prepare_category_apply();
         if ( isset( $result['error'] ) ) {
             wp_send_json_error( $result['error'] );
