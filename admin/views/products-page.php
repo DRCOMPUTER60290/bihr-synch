@@ -733,6 +733,23 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
         var analyzeLastLen = 0;
 
+        var analyzeStartTime = 0;
+
+        function analyzeTs() {
+            var now = new Date();
+            return now.toTimeString().slice(0, 8);
+        }
+        function analyzeElapsed() {
+            return ((Date.now() - analyzeStartTime) / 1000).toFixed(1);
+        }
+        function analyzeAddLog(msg, color) {
+            analyzeLog.append(
+                '<div><span style="color:#555;">[' + analyzeTs() + ' +' + analyzeElapsed() + 's]</span> '
+                + '<span style="color:' + (color || '#c9d1d9') + ';">' + msg + '</span></div>'
+            );
+            analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+        }
+
         function processAnalyzeLines(fullText) {
             var newText = fullText.slice(analyzeLastLen);
             analyzeLastLen = fullText.length;
@@ -751,23 +768,24 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                             .text(d.current + '/' + d.total);
                         analyzeText.text('Lecture : ' + escHtml(d.message));
                         analyzeLog.append(
-                            '<div style="display:flex;gap:8px;padding:2px 0;">'
-                            + '<span class="bihr-file-spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:bihrSpin .8s linear infinite;flex-shrink:0;"></span>'
-                            + '<span style="color:#e6edf3;">' + escHtml(d.message) + '</span>'
+                            '<div style="padding:2px 0;">'
+                            + '<span style="color:#555;">[' + analyzeTs() + ' +' + analyzeElapsed() + 's]</span> '
+                            + '<span class="bihr-file-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:bihrSpin .8s linear infinite;vertical-align:middle;"></span> '
+                            + '<span style="color:#e6edf3;">📂 ' + escHtml(d.message) + '</span>'
                             + '</div>'
                         );
                         analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
 
                     } else if (d.type === 'file_done') {
-                        analyzeLog.find('.bihr-file-spinner').last().replaceWith('<span style="color:#3fb950;flex-shrink:0;">✔</span>');
+                        analyzeLog.find('.bihr-file-spinner').last()
+                            .replaceWith('<span style="color:#3fb950;">✔</span>');
 
                     } else if (d.type === 'status') {
                         analyzeIcon.text('🔄');
                         analyzeLabel.text(d.message);
                         analyzeBar.css({width: (d.current / d.total * 100) + '%', background:'#0969da'})
                             .text(Math.round(d.current / d.total * 100) + '%');
-                        analyzeLog.append('<div style="color:#79c0ff;padding:2px 0;">ℹ ' + escHtml(d.message) + '</div>');
-                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+                        analyzeAddLog('ℹ ' + escHtml(d.message), '#79c0ff');
 
                     } else if (d.type === 'translate_progress') {
                         analyzeIcon.text('🤖');
@@ -775,18 +793,17 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                         analyzeCounter.text(d.current + ' / ' + d.total);
                         analyzeBar.css({width: (30 + (d.current / d.total * 40)) + '%', background:'#8250df'}).text('');
                         analyzeText.text(d.message);
-                        analyzeLog.append('<div style="color:#d2a8ff;padding:2px 0;">🤖 ' + escHtml(d.message) + '</div>');
-                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+                        analyzeAddLog('🤖 ' + escHtml(d.message) + ' (' + d.current + '/' + d.total + ')', '#d2a8ff');
 
                     } else if (d.type === 'wc_progress') {
                         analyzeIcon.text('🗂️');
                         analyzeLabel.text('Catégories WooCommerce');
                         analyzeBar.css({width: (70 + (d.current / d.total * 30)) + '%', background:'#1a7f37'}).text('');
                         analyzeText.text(d.message);
+                        analyzeAddLog('🗂️ ' + escHtml(d.message), '#56d364');
 
                     } else if (d.type === 'warning') {
-                        analyzeLog.append('<div style="color:#e3b341;padding:2px 0;">⚠ ' + escHtml(d.message) + '</div>');
-                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+                        analyzeAddLog('⚠ ' + escHtml(d.message), '#e3b341');
 
                     } else if (d.type === 'complete') {
                         analyzeBar.css({width:'100%', background:'#00a32a'}).text('100%');
@@ -795,9 +812,19 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                         analyzeCounter.text('');
                         analyzeText.text(d.message);
                         analyzeBtn.prop('disabled', false).text('🏷️ Analyser et traduire les catégories');
+                        analyzeAddLog('✅ ' + escHtml(d.message), '#4ec9b0');
 
                         if (d.extra) {
                             var e = d.extra;
+                            analyzeAddLog(
+                                'Catégories détectées : ' + (e.categories_detected || 0)
+                                + ' | Uniques : ' + (e.unique_strings || 0)
+                                + ' | Nouvelles traductions : ' + (e.new_translations || 0)
+                                + ' | Cache : ' + (e.cached_translations || 0)
+                                + ' | Termes WC créés : ' + (e.wc_categories || 0)
+                                + ' | Durée : ' + (e.elapsed || '?') + 's',
+                                '#9cdcfe'
+                            );
                             analyzeSummary.html(
                                 '<strong>Catégories BIHR détectées :</strong> ' + (e.categories_detected || 0) + '<br>'
                                 + '<strong>Chaînes uniques :</strong> ' + (e.unique_strings || 0) + '<br>'
@@ -814,21 +841,22 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                         analyzeLabel.text('Erreur');
                         analyzeText.text(d.message);
                         analyzeBtn.prop('disabled', false).text('🏷️ Analyser et traduire les catégories');
-                        analyzeLog.append('<div style="color:#f85149;margin-top:4px;">❌ ' + escHtml(d.message) + '</div>');
-                        analyzeLog.scrollTop(analyzeLog[0].scrollHeight);
+                        analyzeAddLog('❌ ' + escHtml(d.message), '#f48771');
                     }
                 } catch(e) {}
             });
         }
 
         analyzeBtn.on('click', function() {
-            analyzeLastLen = 0;
+            analyzeLastLen  = 0;
+            analyzeStartTime = Date.now();
             analyzeContainer.show();
-            analyzeLog.html('<div style="color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:6px;margin-bottom:4px;">BIHR Category Translator — démarrage...</div>');
+            analyzeLog.html('').show();
             analyzeSummary.hide();
             analyzeBtn.prop('disabled', true).text('⏳ Analyse en cours...');
             analyzeBar.css({width:'2%', background:'#2271b1'}).text('');
             analyzeCounter.text('');
+            analyzeAddLog('Démarrage — lecture et traduction des catégories BIHR...', '#dcdcaa');
 
             $.ajax({
                 url: ajaxUrl,
@@ -841,6 +869,9 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 },
                 complete: function(xhr) {
                     processAnalyzeLines(xhr.responseText);
+                    if (xhr.status !== 200) {
+                        analyzeAddLog('⚠ Requête terminée avec statut HTTP ' + xhr.status, '#e3b341');
+                    }
                     analyzeBtn.prop('disabled', false);
                 }
             });
