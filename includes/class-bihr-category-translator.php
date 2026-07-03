@@ -459,6 +459,8 @@ class BihrWI_Category_Translator {
      * @param callable|null $callback fn($type, $message, $current, $total, $extra=[])
      */
     public function apply_to_products( $callback = null ) {
+        global $wpdb;
+
         if ( ! taxonomy_exists( 'product_cat' ) ) {
             return array( 'error' => 'WooCommerce non disponible' );
         }
@@ -466,52 +468,193 @@ class BihrWI_Category_Translator {
         $mapping = $this->get_mapping();
         $start   = microtime( true );
 
-        $product_ids = get_posts( array(
-            'post_type'      => 'product',
-            'post_status'    => 'any',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'meta_query'     => array(
-                array(
-                    'key'     => '_bihr_cat_l1',
-                    'compare' => 'EXISTS',
-                ),
-            ),
-        ) );
-
-        $total   = count( $product_ids );
-        $updated = 0;
+        // Compte rapide via SQL direct.
+        $total = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT p.ID)
+             FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_bihr_cat_l1'
+             WHERE p.post_type = 'product' AND p.post_status != 'trash'"
+        );
 
         if ( $callback ) {
             call_user_func( $callback, 'status', "$total produits WooCommerce à traiter...", 0, $total );
         }
 
-        foreach ( $product_ids as $product_id ) {
-            $cat_l1 = (string) get_post_meta( $product_id, '_bihr_cat_l1', true );
-            $cat_l2 = (string) get_post_meta( $product_id, '_bihr_cat_l2', true );
-            $cat_l3 = (string) get_post_meta( $product_id, '_bihr_cat_l3', true );
+        if ( 0 === $total ) {
+            $stats = array( 'total' => 0, 'updated' => 0, 'elapsed' => 0 );
+            if ( $callback ) {
+                call_user_func( $callback, 'complete', '0 produit à traiter.', 0, 0, $stats );
+            }
+            return $stats;
+        }
 
-            $fr1 = ( '' !== $cat_l1 && isset( $mapping[ $cat_l1 ] ) && '' !== $mapping[ $cat_l1 ] ) ? $mapping[ $cat_l1 ] : $cat_l1;
-            $fr2 = ( '' !== $cat_l2 && isset( $mapping[ $cat_l2 ] ) && '' !== $mapping[ $cat_l2 ] ) ? $mapping[ $cat_l2 ] : $cat_l2;
-            $fr3 = ( '' !== $cat_l3 && isset( $mapping[ $cat_l3 ] ) && '' !== $mapping[ $cat_l3 ] ) ? $mapping[ $cat_l3 ] : $cat_l3;
+        // Étape 1 — Récupérer les combinaisons uniques et pré-créer les termes WC une seule fois.
+        if ( $callback ) {
+            call_user_func( $callback, 'status', 'Création des termes de catégories françaises...', 0, $total );
+            if ( ob_get_level() ) { ob_flush(); }
+            flush();
+        }
 
-            update_post_meta( $product_id, '_bihr_category1_fr', $fr1 );
-            update_post_meta( $product_id, '_bihr_category2_fr', $fr2 );
-            update_post_meta( $product_id, '_bihr_category3_fr', $fr3 );
+        $unique_combos = $wpdb->get_results(
+            "SELECT DISTINCT
+                COALESCE(pm1.meta_value,'') AS l1,
+                COALESCE(pm2.meta_value,'') AS l2,
+                COALESCE(pm3.meta_value,'') AS l3
+             FROM {$wpdb->posts} p
+             LEFT JOIN {$wpdb->postmeta} pm1 ON pm1.post_id = p.ID AND pm1.meta_key = '_bihr_cat_l1'
+             LEFT JOIN {$wpdb->postmeta} pm2 ON pm2.post_id = p.ID AND pm2.meta_key = '_bihr_cat_l2'
+             LEFT JOIN {$wpdb->postmeta} pm3 ON pm3.post_id = p.ID AND pm3.meta_key = '_bihr_cat_l3'
+             WHERE p.post_type = 'product' AND p.post_status != 'trash'",
+            ARRAY_A
+        );
 
-            $term_id = BihrWI_Category_Path::ensure_product_categories( $fr1, $fr2, $fr3 );
-            if ( $term_id ) {
-                wp_set_object_terms( $product_id, array( $term_id ), 'product_cat' );
+        // Cache combo_key → term_taxonomy_id pour l'insertion en masse.
+        $combo_ttid_cache = array();
+        foreach ( $unique_combos as $row ) {
+            $l1  = (string) $row['l1'];
+            $l2  = (string) $row['l2'];
+            $l3  = (string) $row['l3'];
+            $fr1 = ( '' !== $l1 && isset( $mapping[ $l1 ] ) && '' !== $mapping[ $l1 ] ) ? $mapping[ $l1 ] : $l1;
+            $fr2 = ( '' !== $l2 && isset( $mapping[ $l2 ] ) && '' !== $mapping[ $l2 ] ) ? $mapping[ $l2 ] : $l2;
+            $fr3 = ( '' !== $l3 && isset( $mapping[ $l3 ] ) && '' !== $mapping[ $l3 ] ) ? $mapping[ $l3 ] : $l3;
+            $key = "$fr1|||$fr2|||$fr3";
+            if ( ! isset( $combo_ttid_cache[ $key ] ) ) {
+                $term_id = BihrWI_Category_Path::ensure_product_categories( $fr1, $fr2, $fr3 );
+                $tt_id   = $term_id ? (int) $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE term_id = %d AND taxonomy = 'product_cat'",
+                        $term_id
+                    )
+                ) : 0;
+                $combo_ttid_cache[ $key ] = $tt_id;
+            }
+        }
+        unset( $unique_combos );
+
+        // Étape 2 — Traitement par lots de 500 produits.
+        $chunk_size = 500;
+        $offset     = 0;
+        $updated    = 0;
+
+        while ( $offset < $total ) {
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT p.ID,
+                        COALESCE(pm1.meta_value,'') AS l1,
+                        COALESCE(pm2.meta_value,'') AS l2,
+                        COALESCE(pm3.meta_value,'') AS l3
+                     FROM {$wpdb->posts} p
+                     LEFT JOIN {$wpdb->postmeta} pm1 ON pm1.post_id = p.ID AND pm1.meta_key = '_bihr_cat_l1'
+                     LEFT JOIN {$wpdb->postmeta} pm2 ON pm2.post_id = p.ID AND pm2.meta_key = '_bihr_cat_l2'
+                     LEFT JOIN {$wpdb->postmeta} pm3 ON pm3.post_id = p.ID AND pm3.meta_key = '_bihr_cat_l3'
+                     WHERE p.post_type = 'product' AND p.post_status != 'trash'
+                     ORDER BY p.ID
+                     LIMIT %d OFFSET %d",
+                    $chunk_size,
+                    $offset
+                ),
+                ARRAY_A
+            );
+
+            if ( empty( $rows ) ) {
+                break;
             }
 
-            $updated++;
+            // Construire les données par produit.
+            $pid_fr1    = array(); // pid => fr1
+            $pid_fr2    = array();
+            $pid_fr3    = array();
+            $pid_ttid   = array(); // pid => term_taxonomy_id
+            $all_pids   = array();
 
-            if ( $callback && 0 === $updated % 100 ) {
-                call_user_func( $callback, 'progress',
-                    "Produits mis à jour : $updated / $total",
-                    $updated, $total
+            foreach ( $rows as $row ) {
+                $pid = (int) $row['ID'];
+                $l1  = (string) $row['l1'];
+                $l2  = (string) $row['l2'];
+                $l3  = (string) $row['l3'];
+                $fr1 = ( '' !== $l1 && isset( $mapping[ $l1 ] ) && '' !== $mapping[ $l1 ] ) ? $mapping[ $l1 ] : $l1;
+                $fr2 = ( '' !== $l2 && isset( $mapping[ $l2 ] ) && '' !== $mapping[ $l2 ] ) ? $mapping[ $l2 ] : $l2;
+                $fr3 = ( '' !== $l3 && isset( $mapping[ $l3 ] ) && '' !== $mapping[ $l3 ] ) ? $mapping[ $l3 ] : $l3;
+
+                $all_pids[]    = $pid;
+                $pid_fr1[$pid] = $fr1;
+                $pid_fr2[$pid] = $fr2;
+                $pid_fr3[$pid] = $fr3;
+                $key           = "$fr1|||$fr2|||$fr3";
+                $pid_ttid[$pid] = isset( $combo_ttid_cache[ $key ] ) ? $combo_ttid_cache[ $key ] : 0;
+            }
+
+            $ids_str = implode( ',', $all_pids );
+
+            // Mise à jour des metas françaises via CASE WHEN (une requête par meta_key).
+            foreach ( array( '_bihr_category1_fr' => $pid_fr1, '_bihr_category2_fr' => $pid_fr2, '_bihr_category3_fr' => $pid_fr3 ) as $meta_key => $pid_vals ) {
+                $cases = '';
+                $args  = array();
+                foreach ( $pid_vals as $pid => $val ) {
+                    $cases .= $wpdb->prepare( ' WHEN %d THEN %s', $pid, $val );
+                    $args[] = $pid;
+                }
+                // UPDATE pour les produits qui ont déjà la meta.
+                $wpdb->query(
+                    "UPDATE {$wpdb->postmeta}
+                     SET meta_value = CASE post_id $cases END
+                     WHERE meta_key = '$meta_key' AND post_id IN ($ids_str)"
+                );
+                // INSERT pour ceux qui ne l'ont pas encore.
+                $existing = $wpdb->get_col(
+                    "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '$meta_key' AND post_id IN ($ids_str)"
+                );
+                $missing = array_diff( $all_pids, array_map( 'intval', $existing ) );
+                if ( ! empty( $missing ) ) {
+                    $inserts = array();
+                    foreach ( $missing as $pid ) {
+                        $inserts[] = $wpdb->prepare( '(%d, %s, %s)', $pid, $meta_key, $pid_vals[$pid] );
+                    }
+                    $wpdb->query( "INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value) VALUES " . implode( ',', $inserts ) );
+                }
+            }
+
+            // Supprimer les anciennes product_cat et insérer les nouvelles en masse.
+            $wpdb->query(
+                "DELETE tr FROM {$wpdb->term_relationships} tr
+                 INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+                 WHERE tr.object_id IN ($ids_str) AND tt.taxonomy = 'product_cat'"
+            );
+
+            $rel_rows = array();
+            foreach ( $pid_ttid as $pid => $tt_id ) {
+                if ( $tt_id ) {
+                    $rel_rows[] = "($pid, $tt_id, 0)";
+                }
+            }
+            if ( ! empty( $rel_rows ) ) {
+                $wpdb->query(
+                    "INSERT IGNORE INTO {$wpdb->term_relationships} (object_id, term_taxonomy_id, term_order) VALUES "
+                    . implode( ',', $rel_rows )
                 );
             }
+
+            $updated += count( $rows );
+            $offset  += $chunk_size;
+
+            if ( $callback ) {
+                call_user_func( $callback, 'progress', "Produits traités : $updated / $total", $updated, $total );
+                if ( ob_get_level() ) { ob_flush(); }
+                flush();
+            }
+
+            $wpdb->flush();
+        }
+
+        // Recalculer les compteurs de termes.
+        if ( $callback ) {
+            call_user_func( $callback, 'status', 'Recalcul des compteurs de catégories...', $updated, $total );
+            if ( ob_get_level() ) { ob_flush(); }
+            flush();
+        }
+        $unique_ttids = array_unique( array_filter( array_values( $combo_ttid_cache ) ) );
+        if ( ! empty( $unique_ttids ) ) {
+            wp_update_term_count_now( $unique_ttids, 'product_cat' );
         }
 
         $elapsed = round( microtime( true ) - $start, 1 );
@@ -522,10 +665,7 @@ class BihrWI_Category_Translator {
         );
 
         if ( $callback ) {
-            call_user_func( $callback, 'complete',
-                "$updated produits mis à jour en {$elapsed}s",
-                $total, $total, $stats
-            );
+            call_user_func( $callback, 'complete', "$updated produits mis à jour en {$elapsed}s", $total, $total, $stats );
         }
 
         return $stats;
