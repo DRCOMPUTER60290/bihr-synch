@@ -693,6 +693,13 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             </div>
             <div id="bihr-apply-text" class="bihr-progress-text" style="margin-bottom:12px;">Initialisation...</div>
 
+            <div id="bihr-apply-log" style="
+                margin-top:10px; background:#1e1e1e; color:#d4d4d4;
+                font-family:monospace; font-size:12px; line-height:1.6;
+                padding:10px 14px; border-radius:4px; max-height:220px;
+                overflow-y:auto; display:none;
+            "></div>
+
             <div id="bihr-apply-summary" style="display:none; margin-top:12px; padding:10px 14px;
                 background:#f0f6fc; border-left:4px solid #0969da; border-radius:4px; font-size:13px;">
             </div>
@@ -849,7 +856,18 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         var applyLabel     = $('#bihr-apply-label');
         var applyCounter   = $('#bihr-apply-counter');
         var applySummary   = $('#bihr-apply-summary');
-        var applyTotal = 0;
+        var applyLog       = $('#bihr-apply-log');
+        var applyTotal     = 0;
+        var applyStartTime = 0;
+        var applyChunkNum  = 0;
+
+        function applyAddLog(msg, color) {
+            var now = new Date();
+            var ts  = now.toTimeString().slice(0, 8);
+            var c   = color || '#d4d4d4';
+            applyLog.append('<div style="color:' + c + '"><span style="color:#888;">[' + ts + ']</span> ' + msg + '</div>');
+            applyLog.scrollTop(applyLog[0].scrollHeight);
+        }
 
         function applyDone(elapsed) {
             applyBar.css({width: '100%', background: '#00a32a'}).text('100%');
@@ -858,6 +876,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             applyCounter.text('');
             applyText.text(applyTotal.toLocaleString() + ' produits mis à jour en ' + elapsed + 's');
             applyBtn.prop('disabled', false).text('✅ Appliquer les catégories françaises aux produits');
+            applyAddLog('✅ Terminé ! ' + applyTotal.toLocaleString() + ' produits traités en ' + elapsed + 's.', '#4ec9b0');
             applySummary.html(
                 '<strong>Produits traités :</strong> ' + applyTotal.toLocaleString() + '<br>'
                 + '<strong>Durée :</strong> ' + elapsed + 's'
@@ -870,9 +889,12 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             applyLabel.text('Erreur');
             applyText.text(msg);
             applyBtn.prop('disabled', false);
+            applyAddLog('❌ Erreur : ' + msg, '#f48771');
         }
 
         function applyNextChunk(lastId) {
+            var chunkStart = Date.now();
+            applyChunkNum++;
             $.post(ajaxUrl, {
                 action: 'bihrwi_apply_categories_chunk',
                 _wpnonce: applyNonce,
@@ -882,32 +904,54 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     applyError(resp && resp.data ? resp.data : 'Erreur inconnue');
                     return;
                 }
-                var d = resp.data;
-                var current = d.processed;
-                var pct = applyTotal > 0 ? Math.min(99, Math.round(current / applyTotal * 100)) : 0;
+                var d        = resp.data;
+                var current  = d.processed;
+                var elapsed  = ((Date.now() - applyStartTime) / 1000).toFixed(1);
+                var chunkMs  = Date.now() - chunkStart;
+                var pct      = applyTotal > 0 ? Math.min(99, Math.round(current / applyTotal * 100)) : 0;
+                var rate     = chunkMs > 0 ? Math.round(d.updated / (chunkMs / 1000)) : 0;
+                var remaining = (rate > 0 && applyTotal > current)
+                    ? Math.round((applyTotal - current) / rate) + 's restantes'
+                    : '';
+
                 applyBar.css({width: pct + '%', background: '#0969da'}).text(pct + '%');
                 applyCounter.text(current.toLocaleString() + ' / ' + applyTotal.toLocaleString() + ' produits');
                 applyText.text('Produits traités : ' + current.toLocaleString() + ' / ' + applyTotal.toLocaleString());
+
+                applyAddLog(
+                    'Lot #' + applyChunkNum + ' — ' +
+                    d.updated + ' produits (ID &gt; ' + lastId + ') — ' +
+                    chunkMs + 'ms — ' + rate + ' prod/s — ' +
+                    pct + '% (' + current.toLocaleString() + '/' + applyTotal.toLocaleString() + ')' +
+                    (remaining ? ' — ~' + remaining : ''),
+                    '#9cdcfe'
+                );
+
                 if (d.done) {
-                    applyDone(d.elapsed || '?');
+                    applyDone(d.elapsed || elapsed);
                 } else {
                     applyNextChunk(d.last_id);
                 }
-            }).fail(function() {
-                applyError('Erreur réseau — rechargez la page et réessayez.');
+            }).fail(function(xhr) {
+                var status = xhr.status ? ' (HTTP ' + xhr.status + ')' : '';
+                applyError('Erreur réseau' + status + ' — rechargez la page et réessayez.');
             });
         }
 
         applyBtn.on('click', function() {
-            applyTotal = 0;
+            applyTotal     = 0;
+            applyStartTime = Date.now();
+            applyChunkNum  = 0;
             applyContainer.show();
             applySummary.hide();
+            applyLog.empty().show();
             applyBtn.prop('disabled', true).text('⏳ Application en cours...');
             applyBar.css({width: '2%', background: '#2271b1'}).text('');
             applyCounter.text('');
             applyIcon.text('⚙️');
             applyLabel.text('Préparation...');
             applyText.text('Création des catégories françaises...');
+            applyAddLog('Démarrage — création des termes WooCommerce...', '#dcdcaa');
 
             $.post(ajaxUrl, {
                 action: 'bihrwi_prepare_categories',
@@ -918,6 +962,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     return;
                 }
                 applyTotal = resp.data.total || 0;
+                applyAddLog('Préparation terminée — ' + applyTotal.toLocaleString() + ' produits à traiter.', '#dcdcaa');
                 if (applyTotal === 0) {
                     applyDone(0);
                     return;
@@ -925,8 +970,9 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 applyLabel.text('Application...');
                 applyCounter.text('0 / ' + applyTotal.toLocaleString() + ' produits');
                 applyNextChunk(0);
-            }).fail(function() {
-                applyError('Erreur réseau — rechargez la page et réessayez.');
+            }).fail(function(xhr) {
+                var status = xhr.status ? ' (HTTP ' + xhr.status + ')' : '';
+                applyError('Erreur réseau' + status + ' — rechargez la page et réessayez.');
             });
         });
 
