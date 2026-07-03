@@ -24,7 +24,7 @@ $ajax_url         = admin_url( 'admin-ajax.php' );
             🏷️ Analyser et traduire les catégories
         </button>
         <button type="button" id="bihr-cat-apply-btn" class="button button-secondary">
-            ✅ Appliquer aux produits
+            ✅ Renommer en français
         </button>
         <button type="button" id="bihr-cat-stop-btn" class="button" style="display:none; color:#b91c1c; border-color:#b91c1c;">
             ⛔ Arrêter
@@ -299,115 +299,47 @@ jQuery(document).ready(function($) {
         );
     });
 
-    // ─── Appliquer aux produits (chunked) ──────────────────────────────────
-
-    var applyStopRequested = false;
-
-    $('#bihr-cat-stop-btn').on('click', function() {
-        applyStopRequested = true;
-        $(this).prop('disabled', true).text('⏳ Arrêt en cours...');
-    });
+    // ─── Renommer les catégories en français (streaming) ───────────────────
 
     $('#bihr-cat-apply-btn').on('click', function() {
-        var btn        = $(this).prop('disabled', true).text('⏳ Application en cours...');
-        var stopBtn    = $('#bihr-cat-stop-btn').prop('disabled', false).text('⛔ Arrêter').show();
-        var progressWrap = $('#bihr-cat-progress-wrap');
-        var bar        = $('#bihr-cat-progress-bar');
-        var text       = $('#bihr-cat-progress-text');
-        var icon       = $('#bihr-cat-progress-icon');
-        var lbl        = $('#bihr-cat-progress-label');
-        var cnt        = $('#bihr-cat-progress-counter');
-        var logDiv     = $('#bihr-cat-log');
-        var summary    = $('#bihr-cat-summary');
+        var btn = $(this).prop('disabled', true).text('⏳ Renommage en cours...');
+        $('#bihr-cat-stop-btn').hide();
 
-        applyStopRequested = false;
-        progressWrap.show();
-        logDiv.html('<div style="color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:4px;margin-bottom:4px;">Démarrage...</div>');
-        summary.hide();
-        bar.css({width: '2%', background: '#2271b1'}).text('');
-        icon.text('⚙️'); lbl.text('Préparation...'); cnt.text(''); text.text('Initialisation...');
-
-        function finish(cancelled) {
-            btn.prop('disabled', false).text('✅ Appliquer aux produits');
-            stopBtn.hide().prop('disabled', false).text('⛔ Arrêter');
-            if (cancelled) {
-                icon.text('🛑'); lbl.text('Arrêté'); bar.css({background: '#b91c1c'});
-                logDiv.append('<div style="color:#f85149;">⛔ Traitement arrêté par l\'utilisateur.</div>');
-                logDiv.scrollTop(logDiv[0].scrollHeight);
-            }
-        }
-
-        // Phase 1 : préparer (crée les termes WC, stocke le cache)
-        $.post(ajaxUrl, {action: 'bihrwi_prepare_categories', _wpnonce: applyNonce}, function(resp) {
-            if (!resp.success) {
-                icon.text('❌'); lbl.text('Erreur'); text.text(resp.data || 'Erreur lors de la préparation.');
-                bar.css({width:'100%', background:'#da3633'});
-                finish(false);
-                return;
-            }
-
-            var total = resp.data.total || 0;
-            if (total === 0) {
-                icon.text('✅'); lbl.text('Terminé !'); text.text('Aucun produit à traiter.');
-                bar.css({width:'100%', background:'#00a32a'}).text('100%');
-                finish(false);
-                return;
-            }
-
-            cnt.text('0 / ' + total.toLocaleString());
-            text.text('Préparation terminée — traitement des produits...');
-            logDiv.append('<div style="color:#3fb950;">✔ Préparation : ' + total.toLocaleString() + ' produits à traiter</div>');
-            logDiv.scrollTop(logDiv[0].scrollHeight);
-
-            // Phase 2 : boucle de chunks
-            function processChunk(lastId) {
-                if (applyStopRequested) { finish(true); return; }
-
-                $.post(ajaxUrl, {
-                    action: 'bihrwi_apply_categories_chunk',
-                    _wpnonce: applyNonce,
-                    last_id: lastId
-                }, function(r) {
-                    if (!r.success) {
-                        icon.text('❌'); lbl.text('Erreur'); text.text(r.data || 'Erreur chunk.');
-                        bar.css({width:'100%', background:'#da3633'});
-                        finish(false);
-                        return;
-                    }
-
-                    var d   = r.data;
-                    var pct = total > 0 ? Math.round(d.processed / total * 100) : 100;
+        runStreaming('bihrwi_apply_french_categories', applyNonce,
+            function(d, bar, text, icon, lbl, cnt, log, summary) {
+                if (d.type === 'status') {
+                    icon.text('🔄'); lbl.text(d.message); text.text(d.message);
+                    bar.css({width: '5%', background: '#2271b1'});
+                    log.append('<div style="color:#79c0ff;">ℹ ' + escHtml(d.message) + '</div>');
+                } else if (d.type === 'progress') {
+                    var pct = d.total > 0 ? Math.round(d.current / d.total * 100) : 0;
                     bar.css({width: pct + '%', background: '#0969da'}).text(pct + '%');
-                    cnt.text(d.processed.toLocaleString() + ' / ' + total.toLocaleString());
-                    text.text('Produits traités : ' + d.processed.toLocaleString() + ' / ' + total.toLocaleString());
-                    logDiv.append('<div style="color:#c9d1d9;">✔ ' + d.processed.toLocaleString() + ' / ' + total.toLocaleString() + ' produits</div>');
-                    logDiv.scrollTop(logDiv[0].scrollHeight);
-
-                    if (d.done) {
-                        bar.css({width:'100%', background:'#00a32a'}).text('100%');
-                        icon.text('✅'); lbl.text('Terminé !'); cnt.text('');
-                        text.text(d.processed.toLocaleString() + ' produits mis à jour en ' + (d.elapsed||'?') + 's');
+                    cnt.text(d.current + ' / ' + d.total);
+                    text.text(d.message);
+                    log.append('<div style="color:#c9d1d9;">✔ ' + escHtml(d.message) + '</div>');
+                } else if (d.type === 'complete') {
+                    bar.css({width: '100%', background: '#00a32a'}).text('100%');
+                    icon.text('✅'); lbl.text('Terminé !'); cnt.text('');
+                    text.text(d.message);
+                    if (d.extra) {
+                        var e = d.extra;
                         summary.html(
-                            '<strong>Produits traités :</strong> ' + (d.processed||0) + ' &nbsp;|&nbsp; '
-                            + '<strong>Durée :</strong> ' + (d.elapsed||'?') + 's'
+                            '<strong>Termes renommés :</strong> ' + (e.renamed||0) + ' &nbsp;|&nbsp; '
+                            + '<strong>Déjà en français :</strong> ' + (e.skipped||0) + ' &nbsp;|&nbsp; '
+                            + '<strong>Durée :</strong> ' + (e.elapsed||'?') + 's'
                         ).show();
-                        finish(false);
-                    } else {
-                        processChunk(d.last_id);
                     }
-                }).fail(function() {
-                    icon.text('❌'); lbl.text('Erreur réseau'); text.text('Erreur réseau — réessayez.');
-                    bar.css({background:'#da3633'});
-                    finish(false);
-                });
+                } else if (d.type === 'error') {
+                    bar.css({width: '100%', background: '#da3633'});
+                    icon.text('❌'); lbl.text('Erreur'); text.text(d.message);
+                    log.append('<div style="color:#f85149;">❌ ' + escHtml(d.message) + '</div>');
+                }
+                log.scrollTop(log[0].scrollHeight);
+            },
+            function() {
+                btn.prop('disabled', false).text('✅ Renommer en français');
             }
-
-            processChunk(0);
-        }).fail(function() {
-            icon.text('❌'); lbl.text('Erreur réseau'); text.text('Erreur réseau lors de la préparation.');
-            bar.css({width:'100%', background:'#da3633'});
-            finish(false);
-        });
+        );
     });
 
 });

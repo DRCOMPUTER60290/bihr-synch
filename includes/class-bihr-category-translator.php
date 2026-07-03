@@ -863,6 +863,87 @@ class BihrWI_Category_Translator {
     }
 
     /**
+     * Renomme les termes product_cat dont le nom est en anglais BIHR vers leur équivalent français.
+     * Ne déplace aucun produit — seul le nom du terme change.
+     *
+     * @param callable|null $callback fn($type, $message, $current, $total, $extra=[])
+     */
+    public function rename_categories_to_french( $callback = null ) {
+        if ( ! taxonomy_exists( 'product_cat' ) ) {
+            if ( $callback ) {
+                call_user_func( $callback, 'error', 'WooCommerce non disponible', 0, 0 );
+            }
+            return array( 'error' => 'WooCommerce non disponible' );
+        }
+
+        $mapping = $this->get_mapping();
+        $start   = microtime( true );
+
+        $terms = get_terms( array(
+            'taxonomy'   => 'product_cat',
+            'hide_empty' => false,
+            'orderby'    => 'id',
+            'order'      => 'ASC',
+        ) );
+
+        if ( is_wp_error( $terms ) || empty( $terms ) ) {
+            if ( $callback ) {
+                call_user_func( $callback, 'complete', 'Aucun terme à traiter.', 0, 0, array( 'renamed' => 0, 'elapsed' => 0 ) );
+            }
+            return array( 'renamed' => 0 );
+        }
+
+        $total   = count( $terms );
+        $renamed = 0;
+        $skipped = 0;
+
+        if ( $callback ) {
+            call_user_func( $callback, 'status', "$total termes de catégories à analyser...", 0, $total );
+            if ( ob_get_level() ) { ob_flush(); }
+            flush();
+        }
+
+        foreach ( $terms as $i => $term ) {
+            $name_en = trim( $term->name );
+            if ( isset( $mapping[ $name_en ] ) && '' !== $mapping[ $name_en ] && $mapping[ $name_en ] !== $name_en ) {
+                $name_fr = $mapping[ $name_en ];
+                $result  = wp_update_term( $term->term_id, 'product_cat', array( 'name' => $name_fr ) );
+                if ( ! is_wp_error( $result ) ) {
+                    $renamed++;
+                    if ( $callback ) {
+                        call_user_func( $callback, 'progress',
+                            "\"$name_en\" → \"$name_fr\"",
+                            $i + 1, $total,
+                            array( 'renamed' => $renamed )
+                        );
+                        if ( ob_get_level() ) { ob_flush(); }
+                        flush();
+                    }
+                }
+            } else {
+                $skipped++;
+            }
+        }
+
+        $elapsed = round( microtime( true ) - $start, 1 );
+        $stats   = array(
+            'total'   => $total,
+            'renamed' => $renamed,
+            'skipped' => $skipped,
+            'elapsed' => $elapsed,
+        );
+
+        if ( $callback ) {
+            call_user_func( $callback, 'complete',
+                "$renamed termes renommés en français en {$elapsed}s",
+                $total, $total, $stats
+            );
+        }
+
+        return $stats;
+    }
+
+    /**
      * Retourne les traductions paginées pour l'interface admin.
      */
     public function get_all_translations( $search = '', $page = 1, $per_page = 50 ) {

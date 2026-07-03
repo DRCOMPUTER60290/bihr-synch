@@ -3428,7 +3428,7 @@ class BihrWI_Admin {
     }
 
     /**
-     * AJAX : application des catégories françaises aux produits WooCommerce (streaming JSON)
+     * AJAX : renomme les termes product_cat anglais en français via le mapping (streaming JSON)
      */
     public function ajax_apply_french_categories() {
         check_ajax_referer( 'bihrwi_apply_french_categories_action', '_wpnonce' );
@@ -3437,13 +3437,13 @@ class BihrWI_Admin {
             wp_die( 'Accès refusé', 403 );
         }
 
-        set_time_limit( 0 );
+        set_time_limit( 120 );
         ignore_user_abort( true );
         header( 'Content-Type: text/plain; charset=utf-8' );
         header( 'X-Accel-Buffering: no' );
         header( 'Cache-Control: no-cache' );
 
-        $this->category_translator->apply_to_products(
+        $this->category_translator->rename_categories_to_french(
             function( $type, $message, $current, $total, $extra = array() ) {
                 $data = array(
                     'type'    => $type,
