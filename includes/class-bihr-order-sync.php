@@ -349,14 +349,22 @@ class BihrWI_Order_Sync {
                 continue;
             }
 
-            $this->logger->log( "[{$ticket_id}]    ✅ Produit WC #{$product_id} - Code BIHR: {$bihr_code} x{$item->get_quantity()}" );
+            $qty         = $item->get_quantity();
+            $line_total  = (float) $item->get_total();           // HT total ligne
+            $line_tax    = (float) $item->get_total_tax();       // TVA total ligne
+            $unit_ht     = $qty > 0 ? round( $line_total / $qty, 4 ) : 0;
+            $unit_ttc    = $qty > 0 ? round( ( $line_total + $line_tax ) / $qty, 4 ) : 0;
+
+            $this->logger->log( "[{$ticket_id}]    ✅ Produit WC #{$product_id} - Code BIHR: {$bihr_code} x{$qty} - Prix HT: {$unit_ht}€ TTC: {$unit_ttc}€" );
 
             $lines[] = array(
                 'ProductId'         => $bihr_code,
-                'Quantity'          => $item->get_quantity(),
+                'Quantity'          => $qty,
                 'ReferenceType'     => 'Not used anymore',
                 'CustomerReference' => $product->get_name(),
                 'ReservedQuantity'  => 0,
+                'UnitPriceExclVat'  => $unit_ht,
+                'UnitPriceInclVat'  => $unit_ttc,
             );
         }
 
