@@ -487,32 +487,40 @@ class BihrWI_Order_Sync {
         }
 
         $this->logger->log( "[{$ticket_id}]    🔍 Vérification du statut avec TicketId: {$bihr_ticket_id}" );
-        
-        // Attendre 2 secondes pour laisser l'API traiter la demande
-        sleep( 2 );
-        
-        $result = $this->api_client->get_order_generation_status( $bihr_ticket_id );
-        
-        if ( ! $result ) {
-            $this->logger->log( "[{$ticket_id}]    ⚠️ Impossible de récupérer le statut" );
-            return false;
+
+        $max_attempts = 8;
+        $wait_seconds = 3;
+
+        for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+            sleep( $wait_seconds );
+
+            $result = $this->api_client->get_order_generation_status( $bihr_ticket_id );
+
+            if ( ! $result ) {
+                $this->logger->log( "[{$ticket_id}]    ⚠️ Tentative {$attempt}/{$max_attempts} : impossible de récupérer le statut" );
+                continue;
+            }
+
+            $request_status = $result['request_status'] ?? '';
+
+            if ( $request_status === 'Running' ) {
+                $this->logger->log( "[{$ticket_id}]    ⏳ Tentative {$attempt}/{$max_attempts} : Running - nouvelle tentative dans {$wait_seconds}s..." );
+                continue;
+            }
+
+            if ( $request_status === 'Cart' ) {
+                $this->logger->log( "[{$ticket_id}]    🛒 Panier créé avec succès (tentative {$attempt})" );
+            } elseif ( $request_status === 'Order' ) {
+                $this->logger->log( "[{$ticket_id}]    📦 Commande créée avec succès (tentative {$attempt})" );
+            } elseif ( ! empty( $request_status ) ) {
+                $this->logger->log( "[{$ticket_id}]    ⚠️ Statut final: {$request_status} (tentative {$attempt})" );
+            }
+
+            return $result;
         }
-        
-        $request_status = $result['request_status'] ?? '';
-        $order_url = $result['order_url'] ?? '';
-        
-        if ( $request_status === 'Running' ) {
-            $this->logger->log( "[{$ticket_id}]    ⏳ Création en cours (Running)..." );
-        } elseif ( $request_status === 'Cart' ) {
-            $this->logger->log( "[{$ticket_id}]    🛒 Panier créé avec succès" );
-        } elseif ( $request_status === 'Order' ) {
-            $this->logger->log( "[{$ticket_id}]    📦 Commande créée avec succès" );
-        } elseif ( ! empty( $request_status ) ) {
-            // Message d'erreur ou problème métier
-            $this->logger->log( "[{$ticket_id}]    ⚠️ Statut: {$request_status}" );
-        }
-        
-        return $result;
+
+        $this->logger->log( "[{$ticket_id}]    ⚠️ Statut toujours 'Running' après {$max_attempts} tentatives ({$max_attempts} x {$wait_seconds}s) - la commande est peut-être en cours côté BIHR" );
+        return $result ?? false;
     }
 
     /**
