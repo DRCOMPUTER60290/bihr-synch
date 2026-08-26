@@ -63,6 +63,10 @@ class BihrWI_Admin {
             add_action( 'wp_ajax_bihrwi_clear_compatibility', array( $this, 'ajax_clear_compatibility' ) );
             add_action( 'wp_ajax_bihrwi_upload_vehicles_zip', array( $this, 'ajax_upload_vehicles_zip' ) );
             add_action( 'wp_ajax_bihrwi_upload_links_zip', array( $this, 'ajax_upload_links_zip' ) );
+            add_action( 'wp_ajax_bihrwi_upload_new_catalog_zip', array( $this, 'ajax_upload_new_catalog_zip' ) );
+            add_action( 'wp_ajax_bihrwi_scan_catalog_folder', array( $this, 'ajax_scan_catalog_folder' ) );
+            add_action( 'wp_ajax_bihrwi_import_new_catalog_vehicles', array( $this, 'ajax_import_new_catalog_vehicles' ) );
+            add_action( 'wp_ajax_bihrwi_import_new_catalog_links', array( $this, 'ajax_import_new_catalog_links' ) );
         }
         add_action( 'wp_ajax_bihrwi_get_order_data', array( $this, 'ajax_get_order_data' ) );
         add_action( 'wp_ajax_bihr_toggle_beginner_mode', array( $this, 'ajax_toggle_beginner_mode' ) );
@@ -2699,6 +2703,173 @@ class BihrWI_Admin {
                 'message' => 'Archive LinksList.zip importée et extraite',
                 'path'    => $upload['file'],
             ) );
+        } catch ( Exception $e ) {
+            wp_send_json_error( array( 'message' => $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * AJAX: Upload d'un ZIP contenant les nouveaux dossiers BIHR (Extended / HardPart / RiderGear)
+     */
+    public function ajax_upload_new_catalog_zip() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée' ) );
+        }
+
+        $field = isset( $_FILES['catalog_zip'] ) ? 'catalog_zip' : ( isset( $_FILES['new_catalog_zip'] ) ? 'new_catalog_zip' : '' );
+        if ( empty( $field ) || ! isset( $_FILES[ $field ]['tmp_name'] ) ) {
+            wp_send_json_error( array( 'message' => 'Aucun fichier reçu' ) );
+        }
+
+        try {
+            $upload = wp_handle_upload( $_FILES[ $field ], array( 'test_form' => false ) );
+            if ( isset( $upload['error'] ) ) {
+                wp_send_json_error( array( 'message' => $upload['error'] ) );
+            }
+
+            $compatibility = new BihrWI_Vehicle_Compatibility();
+            $unzip = $compatibility->unzip_to_import_dir( $upload['file'] );
+
+            if ( ! $unzip['success'] ) {
+                wp_send_json_error( array( 'message' => $unzip['message'] ) );
+            }
+
+            // Scanner les sous-dossiers extraits
+            $import_dir = $unzip['target'];
+            $folders    = array(
+                'Extended'  => $import_dir . 'Extended/',
+                'HardPart'  => $import_dir . 'HardPart/',
+                'RiderGear' => $import_dir . 'RiderGear/',
+            );
+            $found = array_filter( $folders, 'is_dir' );
+
+            wp_send_json_success( array(
+                'message'      => 'Archive extraite. ' . count( $found ) . ' dossier(s) BIHR détecté(s): ' . implode( ', ', array_keys( $found ) ),
+                'folders_found' => array_keys( $found ),
+                'import_dir'   => $import_dir,
+            ) );
+        } catch ( Exception $e ) {
+            wp_send_json_error( array( 'message' => $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * AJAX: Scanne les dossiers du nouveau format et retourne les fichiers détectés
+     */
+    public function ajax_scan_catalog_folder() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée' ) );
+        }
+
+        $upload_dir = wp_upload_dir();
+        $import_dir = trailingslashit( $upload_dir['basedir'] ) . 'bihr-import/';
+
+        $folders = array(
+            'Extended'  => $import_dir . 'Extended/',
+            'HardPart'  => $import_dir . 'HardPart/',
+            'RiderGear' => $import_dir . 'RiderGear/',
+        );
+
+        $compatibility = new BihrWI_Vehicle_Compatibility();
+        $scan_result   = array();
+
+        foreach ( $folders as $label => $dir ) {
+            if ( ! is_dir( $dir ) ) {
+                $scan_result[ $label ] = array( 'exists' => false, 'files' => array() );
+                continue;
+            }
+            $files = $compatibility->scan_catalog_folder( $dir );
+            $scan_result[ $label ] = array( 'exists' => true, 'files' => $files );
+        }
+
+        wp_send_json_success( array( 'scan' => $scan_result, 'import_dir' => $import_dir ) );
+    }
+
+    /**
+     * AJAX: Import des véhicules depuis le nouveau format (avec auto-détection des colonnes)
+     */
+    public function ajax_import_new_catalog_vehicles() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée' ) );
+        }
+
+        $file_path = isset( $_POST['file_path'] ) ? sanitize_text_field( wp_unslash( $_POST['file_path'] ) ) : '';
+        $truncate  = ! empty( $_POST['truncate'] ) && $_POST['truncate'] !== 'false';
+
+        // Sécurité : le fichier doit être dans le dossier d'import
+        $upload_dir = wp_upload_dir();
+        $import_dir = realpath( $upload_dir['basedir'] . '/bihr-import/' );
+        $real_path  = realpath( $file_path );
+
+        if ( ! $real_path || strpos( $real_path, $import_dir ) !== 0 ) {
+            wp_send_json_error( array( 'message' => 'Chemin de fichier non autorisé' ) );
+        }
+
+        try {
+            $compatibility = new BihrWI_Vehicle_Compatibility();
+            $result        = $compatibility->import_vehicles_from_csv_autodetect( $real_path, $truncate );
+
+            if ( $result['success'] ) {
+                wp_send_json_success( array(
+                    'message'  => sprintf( '%d véhicules importés, %d erreurs', $result['imported'], $result['errors'] ),
+                    'imported' => $result['imported'],
+                    'errors'   => $result['errors'],
+                ) );
+            } else {
+                wp_send_json_error( array( 'message' => $result['message'] ) );
+            }
+        } catch ( Exception $e ) {
+            wp_send_json_error( array( 'message' => $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * AJAX: Import des liens véhicule-produit (nouveau format, avec progression par batch)
+     */
+    public function ajax_import_new_catalog_links() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée' ) );
+        }
+
+        $file_path   = isset( $_POST['file_path'] ) ? sanitize_text_field( wp_unslash( $_POST['file_path'] ) ) : '';
+        $source_name = isset( $_POST['source_name'] ) ? sanitize_text_field( $_POST['source_name'] ) : 'BIHR';
+        $batch_start = isset( $_POST['batch_start'] ) ? absint( $_POST['batch_start'] ) : 0;
+
+        // Sécurité : le fichier doit être dans le dossier d'import
+        $upload_dir = wp_upload_dir();
+        $import_dir = realpath( $upload_dir['basedir'] . '/bihr-import/' );
+        $real_path  = realpath( $file_path );
+
+        if ( ! $real_path || strpos( $real_path, $import_dir ) !== 0 ) {
+            wp_send_json_error( array( 'message' => 'Chemin de fichier non autorisé' ) );
+        }
+
+        try {
+            $compatibility = new BihrWI_Vehicle_Compatibility();
+            $result        = $compatibility->import_links_from_csv_autodetect( $real_path, $source_name, $batch_start );
+
+            if ( $result['success'] ) {
+                wp_send_json_success( array(
+                    'message'     => sprintf( '%d liens importés (batch)', $result['imported'] ),
+                    'imported'    => $result['imported'],
+                    'errors'      => $result['errors'],
+                    'total_lines' => $result['total_lines'],
+                    'processed'   => $result['processed'],
+                    'progress'    => $result['progress'],
+                    'is_complete' => $result['is_complete'],
+                    'next_batch'  => $result['next_batch'],
+                ) );
+            } else {
+                wp_send_json_error( array( 'message' => $result['message'] ) );
+            }
         } catch ( Exception $e ) {
             wp_send_json_error( array( 'message' => $e->getMessage() ) );
         }
