@@ -67,6 +67,8 @@ class BihrWI_Admin {
             add_action( 'wp_ajax_bihrwi_scan_catalog_folder', array( $this, 'ajax_scan_catalog_folder' ) );
             add_action( 'wp_ajax_bihrwi_import_new_catalog_vehicles', array( $this, 'ajax_import_new_catalog_vehicles' ) );
             add_action( 'wp_ajax_bihrwi_import_new_catalog_links', array( $this, 'ajax_import_new_catalog_links' ) );
+            add_action( 'wp_ajax_bihrwi_probe_vehicle_catalog', array( $this, 'ajax_probe_vehicle_catalog' ) );
+            add_action( 'wp_ajax_bihrwi_download_vehicle_catalog', array( $this, 'ajax_download_vehicle_catalog' ) );
         }
         add_action( 'wp_ajax_bihrwi_get_order_data', array( $this, 'ajax_get_order_data' ) );
         add_action( 'wp_ajax_bihr_toggle_beginner_mode', array( $this, 'ajax_toggle_beginner_mode' ) );
@@ -2870,6 +2872,158 @@ class BihrWI_Admin {
             } else {
                 wp_send_json_error( array( 'message' => $result['message'] ) );
             }
+        } catch ( Exception $e ) {
+            wp_send_json_error( array( 'message' => $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * AJAX: Teste plusieurs chemins de catalogue BIHR pour trouver les données véhicule.
+     * Tente POST /Catalog/ZIP/CSV/{path}/Full pour chaque chemin candidat.
+     * Retourne quels chemins ont répondu avec un TicketId valide.
+     */
+    public function ajax_probe_vehicle_catalog() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée' ) );
+        }
+
+        // Chemins candidats à tester (ordre du plus probable au moins probable)
+        $candidate_paths = array(
+            'Links'               => 'Links',
+            'VehiclesList'        => 'VehiclesList',
+            'Vehicles'            => 'Vehicles',
+            'Compatibility'       => 'Compatibility',
+            'VehicleCompatibility'=> 'VehicleCompatibility',
+            'HardPartLinks'       => 'HardPartLinks',
+            'RiderGearLinks'      => 'RiderGearLinks',
+            'VehicleLinks'        => 'VehicleLinks',
+        );
+
+        // Si un chemin spécifique est demandé, ne tester que celui-là
+        $single = isset( $_POST['catalog_path'] ) ? sanitize_text_field( $_POST['catalog_path'] ) : '';
+        if ( ! empty( $single ) ) {
+            $candidate_paths = array( $single => $single );
+        }
+
+        $results = array();
+
+        foreach ( $candidate_paths as $name => $path ) {
+            try {
+                $ticket_id = $this->api_client->start_catalog_generation( $path );
+                $results[] = array(
+                    'path'      => $path,
+                    'name'      => $name,
+                    'status'    => 'accepted',
+                    'ticket_id' => $ticket_id,
+                    'message'   => "✅ Accepté par l'API — TicketId: {$ticket_id}",
+                );
+                $this->logger->log( "Probe véhicule: {$path} → ACCEPTÉ (ticket: {$ticket_id})" );
+                // Sauvegarder pour téléchargement ultérieur
+                set_transient( 'bihrwi_vehicle_catalog_ticket_' . sanitize_key( $path ), $ticket_id, 30 * MINUTE_IN_SECONDS );
+            } catch ( Exception $e ) {
+                $msg = $e->getMessage();
+                $results[] = array(
+                    'path'    => $path,
+                    'name'    => $name,
+                    'status'  => 'rejected',
+                    'message' => '❌ ' . $msg,
+                );
+                $this->logger->log( "Probe véhicule: {$path} → REJETÉ ({$msg})" );
+            }
+            // Pause entre les requêtes pour éviter le rate limit
+            if ( count( $candidate_paths ) > 1 ) {
+                sleep( 2 );
+            }
+        }
+
+        $accepted = array_filter( $results, fn( $r ) => $r['status'] === 'accepted' );
+
+        wp_send_json_success( array(
+            'results'  => $results,
+            'accepted' => array_values( $accepted ),
+            'message'  => count( $accepted ) > 0
+                ? count( $accepted ) . ' chemin(s) trouvé(s) : ' . implode( ', ', array_column( $accepted, 'path' ) )
+                : 'Aucun chemin valide trouvé — contactez votre commercial BIHR.',
+        ) );
+    }
+
+    /**
+     * AJAX: Télécharge et extrait un catalogue véhicule via son TicketId.
+     * Une fois extrait, importe automatiquement les données détectées.
+     */
+    public function ajax_download_vehicle_catalog() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée' ) );
+        }
+
+        $catalog_path = isset( $_POST['catalog_path'] ) ? sanitize_text_field( $_POST['catalog_path'] ) : '';
+        $ticket_id    = isset( $_POST['ticket_id'] ) ? sanitize_text_field( $_POST['ticket_id'] ) : '';
+
+        if ( empty( $catalog_path ) || empty( $ticket_id ) ) {
+            wp_send_json_error( array( 'message' => 'catalog_path et ticket_id requis' ) );
+        }
+
+        try {
+            // Vérifier le statut de génération
+            $status_response = $this->api_client->get_catalog_status( $ticket_id );
+            $status          = strtoupper( $status_response['status'] ?? '' );
+
+            if ( $status === 'PROCESSING' ) {
+                wp_send_json_success( array( 'status' => 'processing', 'message' => 'Génération en cours, réessayez dans 30 secondes.' ) );
+                return;
+            }
+
+            if ( $status !== 'DONE' && $status !== 'COMPLETE' && $status !== 'COMPLETED' ) {
+                wp_send_json_error( array( 'message' => "Statut inattendu: {$status}" ) );
+                return;
+            }
+
+            $download_id = $status_response['downloadId'] ?? '';
+            if ( empty( $download_id ) || $download_id === '00000000000000000000000000000000' ) {
+                wp_send_json_error( array( 'message' => 'downloadId manquant dans la réponse API' ) );
+                return;
+            }
+
+            // Télécharger le ZIP
+            $zip_file = $this->api_client->download_catalog_file( $download_id, 'vehicle-compat-' . sanitize_key( $catalog_path ) );
+            if ( ! $zip_file ) {
+                wp_send_json_error( array( 'message' => 'Échec du téléchargement du fichier ZIP' ) );
+                return;
+            }
+
+            // Extraire dans le dossier d'import
+            $compatibility = new BihrWI_Vehicle_Compatibility();
+            $unzip = $compatibility->unzip_to_import_dir( $zip_file );
+            if ( ! $unzip['success'] ) {
+                wp_send_json_error( array( 'message' => 'Extraction ZIP échouée: ' . $unzip['message'] ) );
+                return;
+            }
+
+            // Scanner les fichiers extraits et détecter le type
+            $import_dir = $unzip['target'];
+            $scan       = $compatibility->scan_catalog_folder( $import_dir );
+
+            // Compter les véhicules et liens détectés
+            $vehicle_files = array_filter( $scan, fn( $f ) => $f['type'] === 'vehicles' );
+            $link_files    = array_filter( $scan, fn( $f ) => $f['type'] === 'links' );
+
+            wp_send_json_success( array(
+                'status'         => 'done',
+                'zip_file'       => basename( $zip_file ),
+                'files_found'    => count( $scan ),
+                'vehicle_files'  => array_values( $vehicle_files ),
+                'link_files'     => array_values( $link_files ),
+                'unknown_files'  => array_values( array_filter( $scan, fn( $f ) => $f['type'] === 'unknown' ) ),
+                'message'        => sprintf(
+                    'ZIP extrait: %d fichier(s) trouvé(s) — %d véhicules, %d liens, %d inconnus',
+                    count( $scan ), count( $vehicle_files ), count( $link_files ), count( $scan ) - count( $vehicle_files ) - count( $link_files )
+                ),
+            ) );
+
         } catch ( Exception $e ) {
             wp_send_json_error( array( 'message' => $e->getMessage() ) );
         }

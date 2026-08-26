@@ -107,6 +107,44 @@ $stats = $compatibility->get_statistics();
         <?php endif; ?>
     </div>
 
+    <!-- SONDE API BIHR - Trouver les données véhicule -->
+    <div class="bihr-section" style="margin-top: 30px; border-left: 4px solid #dc2626; background:#fff5f5;">
+        <h2 style="border-bottom-color:#dc2626; color:#dc2626;">🔍 Trouver les données véhicule via l'API BIHR</h2>
+        <p>
+            Les fichiers <code>VehiclesList.zip</code> et <code>LinksList.zip</code> n'existent plus dans leur ancienne forme.
+            Cet outil teste automatiquement tous les chemins possibles de l'API BIHR avec vos identifiants pour trouver les données de compatibilité véhicule.
+        </p>
+        <div style="background:#fef2f2; border:1px solid #fecaca; padding:12px; border-radius:6px; margin-bottom:15px; font-size:13px;">
+            <strong>⚠️ Note :</strong> Cette opération utilise vos identifiants BIHR configurés dans le plugin. Assurez-vous qu'ils sont valides avant de lancer la sonde.
+        </div>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:15px;">
+            <button type="button" class="button button-primary button-large" id="btn-probe-vehicle-api">
+                🚀 Lancer la sonde API BIHR
+            </button>
+            <span style="font-size:13px; color:#555;">Teste 8 chemins de catalogue en ~20 secondes</span>
+        </div>
+
+        <div id="probe-results" style="display:none;">
+            <h3 style="margin-top:0;">Résultats de la sonde</h3>
+            <div id="probe-results-table"></div>
+            <div id="probe-download-section" style="margin-top:15px; display:none;">
+                <h3>Télécharger les catalogues trouvés</h3>
+                <div id="probe-download-list"></div>
+                <div id="probe-download-log" style="margin-top:10px; font-size:12px; max-height:200px; overflow:auto; background:#f8fafc; border:1px solid #e2e8f0; padding:10px; border-radius:6px; display:none;"></div>
+            </div>
+            <div id="probe-no-result" style="display:none; color:#dc2626; font-weight:bold; margin-top:10px;">
+                ❌ Aucun chemin valide trouvé. Les données véhicule ne sont pas accessibles via l'API BIHR standard.<br>
+                <span style="font-weight:normal; font-size:13px;">Contactez votre commercial BIHR ou vérifiez si des fichiers sont disponibles sur <a href="https://api.bihr.net/downloads.html" target="_blank">api.bihr.net/downloads.html</a>.</span>
+            </div>
+        </div>
+
+        <div style="margin-top:15px; padding:12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:13px;">
+            <strong>💡 Alternative :</strong> Si vous avez accès au portail BIHR (<a href="https://api.bihr.net/downloads.html" target="_blank">api.bihr.net/downloads.html</a>),
+            cherchez des fichiers liés à la compatibilité véhicule ou à la liste des véhicules, téléchargez-les et uploadez-les manuellement ci-dessous.
+        </div>
+    </div>
+
     <!-- NOUVEAU FORMAT BIHR (3 dossiers : Extended / HardPart / RiderGear) -->
     <div class="bihr-section" style="margin-top: 30px; border-left: 4px solid #7c3aed;">
         <h2 style="border-bottom-color:#7c3aed;">🆕 Nouveau format BIHR (Extended / HardPart / RiderGear)</h2>
@@ -320,6 +358,125 @@ jQuery(function($) {
             textEl.text(label || pct + '%');
         }
     }
+
+    // ===== SONDE API BIHR =====
+
+    $('#btn-probe-vehicle-api').on('click', function() {
+        const btn = $(this);
+        const resultsDiv = $('#probe-results');
+        const tableDiv = $('#probe-results-table');
+        const dlSection = $('#probe-download-section');
+        const dlList = $('#probe-download-list');
+        const noResult = $('#probe-no-result');
+
+        btn.prop('disabled', true).text('⏳ Sonde en cours (~20s)...');
+        resultsDiv.show();
+        tableDiv.html('<p style="color:#888;">⏳ Test des 8 chemins de catalogue en cours...</p>');
+        dlSection.hide();
+        dlList.empty();
+        noResult.hide();
+
+        $.post(ajaxUrl, { action: 'bihrwi_probe_vehicle_catalog', nonce }, function(resp) {
+            btn.prop('disabled', false).text('🚀 Lancer la sonde API BIHR');
+
+            if (!resp.success) {
+                tableDiv.html('<span style="color:#dc2626;">❌ ' + (resp.data.message || 'Erreur') + '</span>');
+                return;
+            }
+
+            const results = resp.data.results || [];
+            const accepted = results.filter(r => r.accepted);
+
+            let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+            html += '<thead><tr style="background:#f3f4f6;"><th style="padding:8px; text-align:left; border:1px solid #ddd;">Chemin</th><th style="padding:8px; border:1px solid #ddd;">Statut</th><th style="padding:8px; border:1px solid #ddd;">Détail</th></tr></thead><tbody>';
+
+            results.forEach(r => {
+                const icon = r.accepted ? '✅' : '❌';
+                const color = r.accepted ? '#16a34a' : '#dc2626';
+                const bg = r.accepted ? '#f0fdf4' : '#fff';
+                html += '<tr style="background:' + bg + ';">';
+                html += '<td style="padding:8px; border:1px solid #ddd; font-family:monospace;">' + r.path + '</td>';
+                html += '<td style="padding:8px; border:1px solid #ddd; color:' + color + '; font-weight:bold;">' + icon + ' ' + (r.accepted ? 'Accepté' : 'Rejeté') + '</td>';
+                html += '<td style="padding:8px; border:1px solid #ddd; color:#555; font-size:12px;">' + (r.detail || '') + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            tableDiv.html(html);
+
+            if (accepted.length === 0) {
+                noResult.show();
+                return;
+            }
+
+            // Build download buttons for accepted paths
+            dlSection.show();
+            accepted.forEach(r => {
+                const btnId = 'btn-dl-' + r.path.replace(/[^a-zA-Z0-9]/g, '-');
+                dlList.append(
+                    $('<div>').css({ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }).append(
+                        $('<span>').css({ fontFamily: 'monospace', fontWeight: 'bold' }).text(r.path),
+                        $('<button>').addClass('button').attr({ type: 'button', id: btnId }).text('⬇️ Télécharger & analyser').data({ path: r.path, ticket: r.ticket_id }),
+                        $('<span>').addClass('dl-status-' + btnId).css({ fontSize: '12px' })
+                    )
+                );
+            });
+
+            $(document).off('click', '[id^="btn-dl-"]').on('click', '[id^="btn-dl-"]', function() {
+                const dlBtn = $(this);
+                const path = dlBtn.data('path');
+                const ticket = dlBtn.data('ticket');
+                const statusEl = $('.dl-status-' + dlBtn.attr('id'));
+                const logBox = $('#probe-download-log');
+                dlBtn.prop('disabled', true).text('⏳ Téléchargement...');
+                statusEl.text('');
+                logBox.show();
+
+                function pollDownload(attempt) {
+                    if (attempt > 20) {
+                        statusEl.html('<span style="color:#dc2626;">❌ Timeout - le fichier prend trop de temps à générer</span>');
+                        dlBtn.prop('disabled', false).text('⬇️ Réessayer');
+                        return;
+                    }
+                    $.post(ajaxUrl, { action: 'bihrwi_download_vehicle_catalog', nonce, catalog_path: path, ticket_id: ticket }, function(resp) {
+                        if (!resp.success) {
+                            if (resp.data && resp.data.pending) {
+                                statusEl.text('⏳ Génération en cours... (tentative ' + attempt + ')');
+                                setTimeout(() => pollDownload(attempt + 1), 5000);
+                            } else {
+                                statusEl.html('<span style="color:#dc2626;">❌ ' + (resp.data.message || 'Erreur') + '</span>');
+                                dlBtn.prop('disabled', false).text('⬇️ Réessayer');
+                            }
+                            return;
+                        }
+                        const d = resp.data;
+                        dlBtn.prop('disabled', false).text('✅ Téléchargé');
+                        logBox.append('<div>✅ <strong>' + path + '</strong> : ' + (d.message || 'Téléchargé') + '</div>');
+                        if (d.files && d.files.length > 0) {
+                            let fileHtml = '<div style="margin-top:6px; font-size:12px;"><strong>Fichiers trouvés :</strong><ul style="margin:4px 0;">';
+                            d.files.forEach(f => {
+                                const typeLabel = f.type === 'vehicles' ? '🏍️ Véhicules' : (f.type === 'links' ? '🔗 Liens' : '❓ Inconnu');
+                                fileHtml += '<li><code>' + f.name + '</code> → <strong>' + typeLabel + '</strong> (' + (f.headers || []).slice(0,4).join(', ') + ')</li>';
+                            });
+                            fileHtml += '</ul><p style="color:#16a34a;">👆 Ces fichiers sont maintenant disponibles dans <strong>Nouveau format BIHR</strong> (Étape 2 → Scanner).</p></div>';
+                            logBox.append($(fileHtml));
+                        } else {
+                            logBox.append('<div style="color:#f59e0b;">⚠️ Aucun fichier véhicule/liens détecté dans ce catalogue.</div>');
+                        }
+                    }).fail(function() {
+                        statusEl.html('<span style="color:#dc2626;">❌ Erreur de connexion</span>');
+                        dlBtn.prop('disabled', false).text('⬇️ Réessayer');
+                    });
+                }
+
+                pollDownload(1);
+            });
+        }).fail(function() {
+            btn.prop('disabled', false).text('🚀 Lancer la sonde API BIHR');
+            tableDiv.html('<span style="color:#dc2626;">❌ Erreur de connexion</span>');
+        });
+    });
+
+    // ===== FIN SONDE API BIHR =====
 
     // ===== NOUVEAU FORMAT BIHR =====
 
