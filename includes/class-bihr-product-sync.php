@@ -1422,8 +1422,8 @@ class BihrWI_Product_Sync {
         if ( ! empty( $files['extendedreferences'] ) ) {
             $this->logger->log( 'Parsing ExtendedReferences...' );
             // ExtendedReferences peut être divisé en plusieurs fichiers (_A, _B, etc.)
-            $extref_pattern = str_replace( basename( $files['extendedreferences'] ), 'cat-extref-full-*.csv', $files['extendedreferences'] );
-            $all_extref_files = glob( $extref_pattern );
+            // On cherche à la racine ET dans les sous-dossiers.
+            $all_extref_files = $this->find_files_in_dir_and_subdirs( $upload_dir, 'cat-extref-full-*.csv' );
             
             if ( ! empty( $all_extref_files ) ) {
                 $this->logger->log( 'ExtendedReferences trouvé en ' . count( $all_extref_files ) . ' parties' );
@@ -1597,15 +1597,28 @@ class BihrWI_Product_Sync {
 
     /**
      * Trouve le fichier CSV le plus récent contenant un mot clé (fallback générique).
-     * NOTE : pour References et ExtendedReferences on privilégie désormais des helpers
-     * dédiés avec des patterns stricts (cat-ref-full-*.csv / cat-extref-full-*.csv).
+     * Cherche à la racine ET dans les sous-dossiers directs (nouveau format BIHR).
+     * NOTE : pour References et ExtendedReferences on privilégie les helpers
+     * dédiés avec des patterns stricts.
      */
     protected function find_latest_catalog_file( $dir, $keyword ) {
-        $pattern = trailingslashit( $dir ) . '*' . $keyword . '*.csv';
+        $dir     = trailingslashit( $dir );
+        $files   = glob( $dir . '*' . $keyword . '*.csv' );
+        $files   = is_array( $files ) ? $files : array();
 
-        $files = glob( $pattern );
+        // Recherche dans les sous-dossiers (nouveau format BIHR)
+        $subdirs = glob( $dir . '*', GLOB_ONLYDIR );
+        if ( ! empty( $subdirs ) ) {
+            foreach ( $subdirs as $subdir ) {
+                $sub = glob( trailingslashit( $subdir ) . '*' . $keyword . '*.csv' );
+                if ( ! empty( $sub ) ) {
+                    $files = array_merge( $files, $sub );
+                }
+            }
+        }
+
         if ( empty( $files ) ) {
-            $this->logger->log( "Aucun fichier trouvé pour pattern générique: {$pattern}" );
+            $this->logger->log( "Aucun fichier trouvé pour keyword '{$keyword}' (racine + sous-dossiers)." );
             return '';
         }
 
@@ -1621,13 +1634,27 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Trouve le fichier de références principal (cat-ref-full-*.csv) le plus récent.
-     * Fallback : si aucun fichier strict n'est trouvé, on revient au comportement historique
-     * via find_latest_catalog_file( 'ref' ) pour ne rien casser.
+     * Cherche les fichiers CSV correspondant à un pattern strict dans le dossier
+     * donné ET dans ses sous-dossiers directs (nouveau format BIHR).
+     *
+     * @param string $base_dir Dossier racine.
+     * @param string $pattern  Pattern glob (ex: 'cat-ref-full-*.csv').
+     * @return string[] Chemins absolus triés du plus récent au plus ancien.
      */
-    protected function find_latest_references_file( $dir ) {
-        $strict_pattern = trailingslashit( $dir ) . 'cat-ref-full-*.csv';
-        $files          = glob( $strict_pattern );
+    private function find_files_in_dir_and_subdirs( string $base_dir, string $pattern ): array {
+        $base_dir = trailingslashit( $base_dir );
+        $files    = glob( $base_dir . $pattern );
+        $files    = is_array( $files ) ? $files : array();
+
+        $subdirs = glob( $base_dir . '*', GLOB_ONLYDIR );
+        if ( ! empty( $subdirs ) ) {
+            foreach ( $subdirs as $subdir ) {
+                $sub = glob( trailingslashit( $subdir ) . $pattern );
+                if ( ! empty( $sub ) ) {
+                    $files = array_merge( $files, $sub );
+                }
+            }
+        }
 
         if ( ! empty( $files ) ) {
             usort(
@@ -1636,31 +1663,37 @@ class BihrWI_Product_Sync {
                     return filemtime( $b ) - filemtime( $a );
                 }
             );
+        }
+
+        return $files;
+    }
+
+    /**
+     * Trouve le fichier de références principal (cat-ref-full-*.csv) le plus récent.
+     * Cherche à la racine ET dans les sous-dossiers (nouveau format BIHR).
+     * Fallback sur recherche générique *ref*.csv si aucun fichier strict trouvé.
+     */
+    protected function find_latest_references_file( $dir ) {
+        $files = $this->find_files_in_dir_and_subdirs( $dir, 'cat-ref-full-*.csv' );
+
+        if ( ! empty( $files ) ) {
             $this->logger->log( 'Fichier References (strict) trouvé: ' . basename( $files[0] ) );
             return $files[0];
         }
 
-        // Fallback documenté : on garde l'ancien comportement si aucun cat-ref-full n'est trouvé.
         $this->logger->log( 'Aucun cat-ref-full-*.csv trouvé, fallback sur recherche générique *ref*.csv' );
         return $this->find_latest_catalog_file( $dir, 'ref' );
     }
 
     /**
      * Trouve le fichier ExtendedReferences (cat-extref-full-*.csv) le plus récent.
-     * Fallback : si aucun fichier strict n'est trouvé, on revient au comportement historique
-     * via find_latest_catalog_file( 'extref' ).
+     * Cherche à la racine ET dans les sous-dossiers (nouveau format BIHR).
+     * Fallback sur recherche générique *extref*.csv si aucun fichier strict trouvé.
      */
     protected function find_latest_extreferences_file( $dir ) {
-        $strict_pattern = trailingslashit( $dir ) . 'cat-extref-full-*.csv';
-        $files          = glob( $strict_pattern );
+        $files = $this->find_files_in_dir_and_subdirs( $dir, 'cat-extref-full-*.csv' );
 
         if ( ! empty( $files ) ) {
-            usort(
-                $files,
-                function( $a, $b ) {
-                    return filemtime( $b ) - filemtime( $a );
-                }
-            );
             $this->logger->log( 'Fichier ExtendedReferences (strict) trouvé: ' . basename( $files[0] ) );
             return $files[0];
         }
@@ -1681,11 +1714,11 @@ class BihrWI_Product_Sync {
     protected function load_extended_full_categories( $dir ) {
         $extended = array();
 
-        $pattern = trailingslashit( $dir ) . 'cat-extended-full-*.csv';
-        $files   = glob( $pattern );
+        // Cherche les fichiers cat-extended-full-*.csv à la racine ET dans les sous-dossiers
+        $files = $this->find_files_in_dir_and_subdirs( $dir, 'cat-extended-full-*.csv' );
 
         if ( empty( $files ) ) {
-            $this->logger->log( 'ExtendedFull: aucun fichier cat-extended-full-*.csv trouvé dans ' . $dir );
+            $this->logger->log( 'ExtendedFull: aucun fichier cat-extended-full-*.csv trouvé dans ' . $dir . ' (racine + sous-dossiers).' );
             return $extended;
         }
 
@@ -1821,11 +1854,11 @@ class BihrWI_Product_Sync {
     protected function build_products_from_extended_full( $dir, $callback = null ) {
         $products = array();
 
-        $pattern = trailingslashit( $dir ) . 'cat-extended-full-*.csv';
-        $files   = glob( $pattern );
+        // Cherche les fichiers cat-extended-full-*.csv à la racine ET dans les sous-dossiers
+        $files = $this->find_files_in_dir_and_subdirs( $dir, 'cat-extended-full-*.csv' );
 
         if ( empty( $files ) ) {
-            $this->logger->log( 'ExtendedFull Master: aucun fichier cat-extended-full-*.csv trouvé dans ' . $dir );
+            $this->logger->log( 'ExtendedFull Master: aucun fichier cat-extended-full-*.csv trouvé dans ' . $dir . ' (racine + sous-dossiers).' );
             return $products;
         }
 
@@ -2775,12 +2808,17 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Extrait un fichier ZIP vers le dossier d'import
-     * Retourne le nombre de fichiers CSV extraits
+     * Extrait un fichier ZIP vers le dossier d'import.
+     * Gère automatiquement les ZIPs BIHR qui contiennent des sous-dossiers
+     * (Extended/, HardPart/, RiderGear/, etc.) introduits lors de la mise à jour
+     * de compatibilité BIHR : les CSV des sous-dossiers sont aplatis à la racine
+     * avec le nommage attendu par les parseurs.
+     *
+     * Retourne le nombre de fichiers CSV disponibles après extraction.
      */
     public function extract_zip_to_import_dir( $zip_file ) {
         $import_dir = WP_CONTENT_DIR . '/uploads/bihr-import/';
-        
+
         if ( ! is_dir( $import_dir ) ) {
             wp_mkdir_p( $import_dir );
         }
@@ -2790,9 +2828,7 @@ class BihrWI_Product_Sync {
             return 0;
         }
 
-        // Utilise la classe WP_Filesystem
         WP_Filesystem();
-        global $wp_filesystem;
 
         $unzipped = unzip_file( $zip_file, $import_dir );
 
@@ -2801,24 +2837,131 @@ class BihrWI_Product_Sync {
             return 0;
         }
 
-        // Compte les fichiers CSV extraits
-        $csv_files = glob( $import_dir . '*.csv' );
-        $count     = count( $csv_files );
-
-        // Log des noms de fichiers extraits pour debug
-        if ( $count > 0 && $count <= 15 ) {
-            $file_names = array_map( 'basename', $csv_files );
-            $this->logger->log( "Fichiers CSV extraits: " . implode( ', ', $file_names ) );
+        // Aplatir les sous-dossiers créés par BIHR (nouveau format de compatibilité)
+        $moved = $this->flatten_csv_subdirectories( $import_dir );
+        if ( $moved > 0 ) {
+            $this->logger->log( "Aplatissement sous-dossiers BIHR: {$moved} fichier(s) CSV déplacé(s) à la racine." );
         }
 
-        $this->logger->log( "Extraction ZIP réussie: {$count} fichiers CSV dans {$import_dir}" );
+        // Compte tous les fichiers CSV (racine + sous-dossiers résiduels)
+        $all_csv   = $this->collect_csv_files_recursive( $import_dir );
+        $count     = count( $all_csv );
 
-        // Supprime le fichier ZIP après extraction
+        if ( $count > 0 && $count <= 20 ) {
+            $this->logger->log( "Fichiers CSV disponibles: " . implode( ', ', array_map( 'basename', $all_csv ) ) );
+        }
+
+        $this->logger->log( "Extraction ZIP réussie: {$count} fichier(s) CSV dans {$import_dir}" );
+
         if ( file_exists( $zip_file ) ) {
             wp_delete_file( $zip_file );
         }
 
         return $count;
+    }
+
+    /**
+     * Aplatie les sous-dossiers générés par les nouvelles archives BIHR.
+     *
+     * BIHR organise désormais ses catalogues en sous-dossiers :
+     *   Extended/  → fichiers "Extended Full" (toutes données en un fichier)
+     *   HardPart/  → fichiers pièces détachées (catégorie B)
+     *   RiderGear/ → fichiers équipement pilote (catégorie A)
+     *
+     * Les fichiers sont renommés pour correspondre aux patterns attendus par
+     * les parseurs (cat-extended-full-*, cat-extref-full-*_A, *_B, etc.),
+     * sauf s'ils portent déjà un nom reconnu.
+     *
+     * @param string $import_dir Chemin absolu vers wp-content/uploads/bihr-import/
+     * @return int Nombre de fichiers CSV déplacés.
+     */
+    protected function flatten_csv_subdirectories( string $import_dir ): int {
+        $subdirs = glob( trailingslashit( $import_dir ) . '*', GLOB_ONLYDIR );
+        if ( empty( $subdirs ) ) {
+            return 0;
+        }
+
+        // Correspondance nom de dossier → préfixe de fichier cible + suffixe de catégorie
+        $folder_map = array(
+            'extended'  => array( 'prefix' => 'cat-extended-full', 'suffix' => '' ),
+            'hardpart'  => array( 'prefix' => 'cat-extref-full',   'suffix' => '_B' ),
+            'ridergear' => array( 'prefix' => 'cat-extref-full',   'suffix' => '_A' ),
+        );
+
+        $timestamp = gmdate( 'Ymd-His' );
+        $moved     = 0;
+
+        foreach ( $subdirs as $subdir ) {
+            $folder_key  = strtolower( basename( $subdir ) );
+            $csv_files   = glob( trailingslashit( $subdir ) . '*.csv' );
+
+            if ( empty( $csv_files ) ) {
+                $this->logger->log( "Sous-dossier vide ou sans CSV: " . basename( $subdir ) );
+                @rmdir( $subdir );
+                continue;
+            }
+
+            $this->logger->log( "Sous-dossier BIHR détecté: " . basename( $subdir ) . " (" . count( $csv_files ) . " fichier(s) CSV)" );
+
+            foreach ( $csv_files as $csv_path ) {
+                $original_base = pathinfo( $csv_path, PATHINFO_FILENAME );
+
+                // Si le fichier porte déjà un nom reconnu, on le conserve tel quel.
+                if ( preg_match( '/^cat-(extended|extref|ref)-full-/i', $original_base ) ) {
+                    $target_name = $original_base . '.csv';
+                } elseif ( isset( $folder_map[ $folder_key ] ) ) {
+                    $map    = $folder_map[ $folder_key ];
+                    $target_name = $map['prefix'] . '-BIHR-' . $timestamp . $map['suffix'] . '-' . sanitize_file_name( $original_base ) . '.csv';
+                } else {
+                    // Sous-dossier inconnu : on déplace avec un préfixe générique.
+                    $target_name = 'bihr-catalog-' . $folder_key . '-' . sanitize_file_name( $original_base ) . '.csv';
+                }
+
+                $destination = trailingslashit( $import_dir ) . $target_name;
+
+                // Évite d'écraser un fichier plus récent déjà présent.
+                if ( file_exists( $destination ) && filemtime( $destination ) > filemtime( $csv_path ) ) {
+                    $destination = trailingslashit( $import_dir ) . pathinfo( $target_name, PATHINFO_FILENAME ) . '-' . uniqid() . '.csv';
+                }
+
+                if ( rename( $csv_path, $destination ) ) {
+                    $this->logger->log( "  → " . basename( $subdir ) . '/' . basename( $csv_path ) . " renommé en " . basename( $destination ) );
+                    $moved++;
+                } else {
+                    $this->logger->log( "  ✗ Erreur déplacement: " . $csv_path );
+                }
+            }
+
+            // Tente de supprimer le sous-dossier maintenant vide.
+            @rmdir( $subdir );
+        }
+
+        return $moved;
+    }
+
+    /**
+     * Collecte récursivement tous les fichiers CSV depuis un dossier
+     * (racine + sous-dossiers directs, profondeur 1).
+     *
+     * @param string $dir Dossier racine.
+     * @return string[] Chemins absolus des fichiers CSV.
+     */
+    protected function collect_csv_files_recursive( string $dir ): array {
+        $dir     = trailingslashit( $dir );
+        $files   = glob( $dir . '*.csv' );
+        $files   = is_array( $files ) ? $files : array();
+
+        $subdirs = glob( $dir . '*', GLOB_ONLYDIR );
+        if ( ! empty( $subdirs ) ) {
+            foreach ( $subdirs as $subdir ) {
+                $sub_csv = glob( trailingslashit( $subdir ) . '*.csv' );
+                if ( ! empty( $sub_csv ) ) {
+                    $files = array_merge( $files, $sub_csv );
+                }
+            }
+        }
+
+        return $files;
     }
 
     /**
