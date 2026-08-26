@@ -631,6 +631,478 @@ class BihrWI_Vehicle_Compatibility {
     }
 
     /**
+     * Mappe les en-têtes CSV vers les colonnes connues (insensible à la casse et aux espaces)
+     */
+    protected function normalize_header( string $h ): string {
+        return strtolower( preg_replace( '/[\s_\-]+/', '', $h ) );
+    }
+
+    /**
+     * Détecte si un ensemble de headers correspond à des données véhicules ou à des liens
+     * Retourne 'vehicles', 'links', ou 'unknown'
+     */
+    protected function detect_csv_type( array $headers ): string {
+        $norm = array_map( array( $this, 'normalize_header' ), $headers );
+        $norm = array_flip( $norm );
+
+        $vehicle_keys  = array( 'vehiclecode', 'manufacturercode', 'manufacturername', 'commercialmodelname', 'vehicleyear' );
+        $link_keys     = array( 'vehiclecode', 'partnumber' );
+
+        $has_vehicle = count( array_intersect( $vehicle_keys, array_keys( $norm ) ) ) >= 3;
+        $has_link    = isset( $norm['vehiclecode'] ) && isset( $norm['partnumber'] );
+
+        if ( $has_vehicle ) return 'vehicles';
+        if ( $has_link )    return 'links';
+        return 'unknown';
+    }
+
+    /**
+     * Retourne un tableau [field => col_index] pour les colonnes véhicules connues
+     */
+    protected function map_vehicle_headers( array $headers ): array {
+        $aliases = array(
+            'vehicle_code'          => array( 'vehiclecode', 'vehicle_code', 'vehicleid', 'id' ),
+            'version_code'          => array( 'versioncode', 'version_code' ),
+            'commercial_model_code' => array( 'commercialmodelcode', 'modelcode', 'commercial_model_code' ),
+            'manufacturer_code'     => array( 'manufacturercode', 'manufacturer_code', 'brandcode' ),
+            'vehicle_year'          => array( 'vehicleyear', 'vehicle_year', 'year', 'annee', 'modelyear' ),
+            'version_name'          => array( 'versionname', 'version_name', 'version' ),
+            'commercial_model_name' => array( 'commercialmodelname', 'commercial_model_name', 'modelname', 'model' ),
+            'manufacturer_name'     => array( 'manufacturername', 'manufacturer_name', 'brand', 'make', 'marque' ),
+            'universe_name'         => array( 'universename', 'universe_name', 'universe' ),
+            'category_name'         => array( 'categoryname', 'category_name', 'category', 'categorie' ),
+            'displacement_cm3'      => array( 'displacementcm3', 'displacement_cm3', 'displacement', 'cylindree', 'cc' ),
+        );
+
+        $map = array();
+        $norm_map = array();
+        foreach ( $headers as $i => $h ) {
+            $norm_map[ $this->normalize_header( $h ) ] = $i;
+        }
+
+        foreach ( $aliases as $field => $variants ) {
+            foreach ( $variants as $v ) {
+                if ( isset( $norm_map[ $v ] ) ) {
+                    $map[ $field ] = $norm_map[ $v ];
+                    break;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Retourne un tableau [field => col_index] pour les colonnes de liens connus
+     */
+    protected function map_link_headers( array $headers ): array {
+        $aliases = array(
+            'vehicle_code'             => array( 'vehiclecode', 'vehicle_code', 'vehicleid' ),
+            'part_number'              => array( 'partnumber', 'part_number', 'productcode', 'product_code', 'sku', 'reference' ),
+            'barcode'                  => array( 'barcode', 'ean', 'ean13', 'gtin' ),
+            'manufacturer_part_number' => array( 'manufacturerpartnumber', 'manufacturer_part_number', 'oem', 'oemreference' ),
+            'position_id'              => array( 'positionid', 'position_id', 'position' ),
+            'position_value'           => array( 'positionvalue', 'position_value', 'positionlabel' ),
+            'attributes'               => array( 'attributes', 'attribute', 'options' ),
+        );
+
+        $map = array();
+        $norm_map = array();
+        foreach ( $headers as $i => $h ) {
+            $norm_map[ $this->normalize_header( $h ) ] = $i;
+        }
+
+        foreach ( $aliases as $field => $variants ) {
+            foreach ( $variants as $v ) {
+                if ( isset( $norm_map[ $v ] ) ) {
+                    $map[ $field ] = $norm_map[ $v ];
+                    break;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Importe les véhicules depuis un CSV en détectant automatiquement les colonnes.
+     * Remplace la table entière si $truncate = true.
+     */
+    public function import_vehicles_from_csv_autodetect( string $file_path, bool $truncate = false ): array {
+        global $wpdb;
+
+        $this->logger->log( "=== IMPORT VÉHICULES (auto-detect) : {$file_path} ===" );
+
+        if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
+            return array( 'success' => false, 'message' => "Fichier introuvable : {$file_path}", 'imported' => 0, 'errors' => 0 );
+        }
+
+        $handle = fopen( $file_path, 'r' );
+        if ( false === $handle ) {
+            return array( 'success' => false, 'message' => 'Impossible d\'ouvrir le fichier', 'imported' => 0, 'errors' => 0 );
+        }
+
+        // Détecter le délimiteur (virgule ou point-virgule)
+        $first_line = fgets( $handle );
+        rewind( $handle );
+        $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+
+        $headers = fgetcsv( $handle, 0, $delimiter );
+        if ( ! $headers ) {
+            fclose( $handle );
+            return array( 'success' => false, 'message' => 'Header CSV manquant', 'imported' => 0, 'errors' => 0 );
+        }
+
+        $map = $this->map_vehicle_headers( $headers );
+        $this->logger->log( 'Colonnes détectées : ' . wp_json_encode( $map ) );
+
+        if ( ! isset( $map['vehicle_code'] ) || ! isset( $map['manufacturer_name'] ) ) {
+            fclose( $handle );
+            return array(
+                'success' => false,
+                'message' => 'Colonnes requises manquantes (vehicle_code, manufacturer_name). Headers trouvés: ' . implode( ', ', $headers ),
+                'imported' => 0,
+                'errors'   => 0,
+            );
+        }
+
+        if ( $truncate ) {
+            $wpdb->query( "TRUNCATE TABLE {$this->vehicles_table}" );
+            $this->logger->log( 'Table véhicules vidée avant import' );
+        }
+
+        $count  = 0;
+        $errors = 0;
+        $batch  = array();
+        $batch_size = 500;
+
+        while ( ( $row = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
+            if ( empty( $row ) || ( count( $row ) === 1 && trim( $row[0] ) === '' ) ) continue;
+
+            $vehicle_code = sanitize_text_field( trim( $row[ $map['vehicle_code'] ] ?? '' ) );
+            if ( empty( $vehicle_code ) ) continue;
+
+            $batch[] = array(
+                'vehicle_code'          => $vehicle_code,
+                'version_code'          => sanitize_text_field( trim( $row[ $map['version_code'] ?? -1 ] ?? '' ) ),
+                'commercial_model_code' => sanitize_text_field( trim( $row[ $map['commercial_model_code'] ?? -1 ] ?? '' ) ),
+                'manufacturer_code'     => sanitize_text_field( trim( $row[ $map['manufacturer_code'] ?? -1 ] ?? '' ) ),
+                'vehicle_year'          => absint( $row[ $map['vehicle_year'] ?? -1 ] ?? 0 ),
+                'version_name'          => sanitize_text_field( trim( $row[ $map['version_name'] ?? -1 ] ?? '' ) ),
+                'commercial_model_name' => sanitize_text_field( trim( $row[ $map['commercial_model_name'] ?? -1 ] ?? '' ) ),
+                'manufacturer_name'     => sanitize_text_field( trim( $row[ $map['manufacturer_name'] ] ) ),
+                'universe_name'         => sanitize_text_field( trim( $row[ $map['universe_name'] ?? -1 ] ?? '' ) ),
+                'category_name'         => sanitize_text_field( trim( $row[ $map['category_name'] ?? -1 ] ?? '' ) ),
+                'displacement_cm3'      => absint( $row[ $map['displacement_cm3'] ?? -1 ] ?? 0 ),
+            );
+
+            if ( count( $batch ) >= $batch_size ) {
+                $res = $this->flush_vehicles_batch( $batch );
+                $count  += $res['inserted'];
+                $errors += $res['errors'];
+                $batch   = array();
+            }
+        }
+        fclose( $handle );
+
+        if ( ! empty( $batch ) ) {
+            $res    = $this->flush_vehicles_batch( $batch );
+            $count  += $res['inserted'];
+            $errors += $res['errors'];
+        }
+
+        $this->logger->log( "✓ Véhicules importés: {$count}, erreurs: {$errors}" );
+        return array( 'success' => true, 'message' => "{$count} véhicules importés, {$errors} erreurs", 'imported' => $count, 'errors' => $errors );
+    }
+
+    /**
+     * Insère un batch de véhicules en base via INSERT … ON DUPLICATE KEY UPDATE
+     */
+    protected function flush_vehicles_batch( array $batch ): array {
+        global $wpdb;
+
+        $values_parts = array();
+        $all_values   = array();
+        $table        = esc_sql( $this->vehicles_table );
+
+        foreach ( $batch as $d ) {
+            $values_parts[] = '(%s, %s, %s, %s, %d, %s, %s, %s, %s, %s, %d)';
+            array_push(
+                $all_values,
+                $d['vehicle_code'], $d['version_code'], $d['commercial_model_code'],
+                $d['manufacturer_code'], $d['vehicle_year'], $d['version_name'],
+                $d['commercial_model_name'], $d['manufacturer_name'],
+                $d['universe_name'], $d['category_name'], $d['displacement_cm3']
+            );
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $sql = $wpdb->prepare(
+            "INSERT INTO `{$table}`
+             (vehicle_code, version_code, commercial_model_code, manufacturer_code,
+              vehicle_year, version_name, commercial_model_name, manufacturer_name,
+              universe_name, category_name, displacement_cm3)
+             VALUES " . implode( ', ', $values_parts ) . "
+             ON DUPLICATE KEY UPDATE
+               version_code=VALUES(version_code), commercial_model_code=VALUES(commercial_model_code),
+               manufacturer_code=VALUES(manufacturer_code), vehicle_year=VALUES(vehicle_year),
+               version_name=VALUES(version_name), commercial_model_name=VALUES(commercial_model_name),
+               manufacturer_name=VALUES(manufacturer_name), universe_name=VALUES(universe_name),
+               category_name=VALUES(category_name), displacement_cm3=VALUES(displacement_cm3)",
+            $all_values
+        );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $result = $wpdb->query( $sql );
+
+        if ( false === $result ) {
+            $this->logger->log( 'Erreur batch véhicules: ' . $wpdb->last_error );
+            return array( 'inserted' => 0, 'errors' => count( $batch ) );
+        }
+        return array( 'inserted' => count( $batch ), 'errors' => 0 );
+    }
+
+    /**
+     * Importe des liens véhicule-produit depuis un CSV en détectant automatiquement les colonnes.
+     * Supporte l'import par batch (batch_start / batch_size).
+     */
+    public function import_links_from_csv_autodetect( string $file_path, string $source_name, int $batch_start = 0 ): array {
+        global $wpdb;
+
+        if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
+            return array(
+                'success' => false, 'message' => "Fichier introuvable : {$file_path}",
+                'imported' => 0, 'errors' => 0, 'total_lines' => 0,
+                'processed' => 0, 'progress' => 0, 'is_complete' => true,
+            );
+        }
+
+        // Cache du total de lignes
+        $transient_key = 'bihr_links_total_' . md5( $file_path );
+        $total_lines   = get_transient( $transient_key );
+        if ( false === $total_lines ) {
+            $total_lines = $this->count_csv_lines( $file_path );
+            set_transient( $transient_key, $total_lines, HOUR_IN_SECONDS );
+        }
+
+        $handle = fopen( $file_path, 'r' );
+        if ( false === $handle ) {
+            return array(
+                'success' => false, 'message' => 'Impossible d\'ouvrir le fichier',
+                'imported' => 0, 'errors' => 0, 'total_lines' => $total_lines,
+                'processed' => 0, 'progress' => 0, 'is_complete' => true,
+            );
+        }
+
+        $first_line = fgets( $handle );
+        rewind( $handle );
+        $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
+
+        $headers = fgetcsv( $handle, 0, $delimiter );
+        if ( ! $headers ) {
+            fclose( $handle );
+            return array(
+                'success' => false, 'message' => 'Header CSV manquant',
+                'imported' => 0, 'errors' => 0, 'total_lines' => $total_lines,
+                'processed' => 0, 'progress' => 0, 'is_complete' => true,
+            );
+        }
+
+        $map = $this->map_link_headers( $headers );
+
+        if ( ! isset( $map['vehicle_code'] ) || ! isset( $map['part_number'] ) ) {
+            fclose( $handle );
+            return array(
+                'success' => false,
+                'message' => 'Colonnes requises manquantes (vehicle_code, part_number). Headers trouvés: ' . implode( ', ', $headers ),
+                'imported' => 0, 'errors' => 0, 'total_lines' => $total_lines,
+                'processed' => 0, 'progress' => 0, 'is_complete' => true,
+            );
+        }
+
+        // Désactiver les index au premier batch
+        if ( $batch_start === 0 ) {
+            $wpdb->query( "ALTER TABLE {$this->compatibility_table} DISABLE KEYS" );
+        }
+
+        // Sauter les lignes déjà traitées
+        for ( $i = 0; $i < $batch_start; $i++ ) {
+            if ( false === fgetcsv( $handle, 0, $delimiter ) ) break;
+        }
+
+        $batch_size   = 50000;
+        $batch        = array();
+        $current_line = $batch_start;
+
+        while ( $current_line < $batch_start + $batch_size ) {
+            $row = fgetcsv( $handle, 0, $delimiter );
+            if ( false === $row ) break;
+
+            $vehicle_code = trim( $row[ $map['vehicle_code'] ] ?? '' );
+            $part_number  = trim( $row[ $map['part_number'] ] ?? '' );
+            if ( empty( $vehicle_code ) || empty( $part_number ) ) {
+                $current_line++;
+                continue;
+            }
+
+            $batch[] = array(
+                'vehicle_code'             => sanitize_text_field( $vehicle_code ),
+                'part_number'              => sanitize_text_field( $part_number ),
+                'barcode'                  => sanitize_text_field( trim( $row[ $map['barcode'] ?? -1 ] ?? '' ) ),
+                'manufacturer_part_number' => sanitize_text_field( trim( $row[ $map['manufacturer_part_number'] ?? -1 ] ?? '' ) ),
+                'position_id'              => sanitize_text_field( trim( $row[ $map['position_id'] ?? -1 ] ?? '' ) ),
+                'position_value'           => sanitize_text_field( trim( $row[ $map['position_value'] ?? -1 ] ?? '' ) ),
+                'attributes'               => sanitize_textarea_field( trim( $row[ $map['attributes'] ?? -1 ] ?? '' ) ),
+                'source_brand'             => $source_name,
+            );
+            $current_line++;
+        }
+        fclose( $handle );
+
+        $count  = 0;
+        $errors = 0;
+
+        if ( ! empty( $batch ) ) {
+            $table        = esc_sql( $this->compatibility_table );
+            $values_parts = array();
+            $all_values   = array();
+
+            foreach ( $batch as $d ) {
+                $values_parts[] = '(%s, %s, %s, %s, %s, %s, %s, %s)';
+                array_push(
+                    $all_values,
+                    $d['vehicle_code'], $d['part_number'], $d['barcode'],
+                    $d['manufacturer_part_number'], $d['position_id'],
+                    $d['position_value'], $d['attributes'], $d['source_brand']
+                );
+            }
+
+            $wpdb->query( 'START TRANSACTION' );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $sql = $wpdb->prepare(
+                "INSERT INTO `{$table}`
+                 (vehicle_code, part_number, barcode, manufacturer_part_number,
+                  position_id, position_value, attributes, source_brand)
+                 VALUES " . implode( ', ', $values_parts ),
+                $all_values
+            );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $result = $wpdb->query( $sql );
+
+            if ( false !== $result ) {
+                $count = $result;
+                $wpdb->query( 'COMMIT' );
+            } else {
+                $wpdb->query( 'ROLLBACK' );
+                $errors = count( $batch );
+                $this->logger->log( 'Erreur liens batch: ' . $wpdb->last_error );
+            }
+        }
+
+        $processed   = $current_line;
+        $progress    = $total_lines > 0 ? min( 100, round( ( $processed / $total_lines ) * 100 ) ) : 100;
+        $is_complete = $processed >= $total_lines || count( $batch ) < $batch_size;
+
+        if ( $is_complete ) {
+            delete_transient( $transient_key );
+            $wpdb->query( "ALTER TABLE {$this->compatibility_table} ENABLE KEYS" );
+            wp_cache_flush();
+        }
+
+        return array(
+            'success'     => true,
+            'imported'    => $count,
+            'errors'      => $errors,
+            'total_lines' => $total_lines,
+            'processed'   => $processed,
+            'progress'    => $progress,
+            'is_complete' => $is_complete,
+            'next_batch'  => $is_complete ? 0 : $processed,
+        );
+    }
+
+    /**
+     * Scanne un dossier et retourne tous les fichiers CSV trouvés avec leur type détecté.
+     */
+    public function scan_catalog_folder( string $folder ): array {
+        $result = array();
+        if ( ! is_dir( $folder ) ) return $result;
+
+        $files = glob( rtrim( $folder, '/\\' ) . '/*.csv' );
+        if ( empty( $files ) ) {
+            $files = glob( rtrim( $folder, '/\\' ) . '/*.CSV' );
+        }
+        if ( empty( $files ) ) return $result;
+
+        foreach ( $files as $file ) {
+            $handle = fopen( $file, 'r' );
+            if ( ! $handle ) continue;
+
+            $first  = fgets( $handle );
+            rewind( $handle );
+            $delim  = ( substr_count( $first, ';' ) > substr_count( $first, ',' ) ) ? ';' : ',';
+            $header = fgetcsv( $handle, 0, $delim );
+            fclose( $handle );
+
+            $type = $header ? $this->detect_csv_type( $header ) : 'unknown';
+            $result[] = array(
+                'path'    => $file,
+                'name'    => basename( $file ),
+                'type'    => $type,
+                'headers' => $header ?: array(),
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * Point d'entrée : import depuis la nouvelle structure 3 dossiers BIHR.
+     * $folders = [ 'extended' => '/path/', 'hardpart' => '/path/', 'ridergear' => '/path/' ]
+     * ou un seul dossier contenant tout.
+     */
+    public function import_from_folder_structure( array $folders, bool $truncate_vehicles = true ): array {
+        $vehicles_total = 0;
+        $links_total    = 0;
+        $report         = array();
+        $all_dirs       = array_filter( $folders, 'is_dir' );
+
+        if ( empty( $all_dirs ) ) {
+            return array( 'success' => false, 'message' => 'Aucun dossier valide trouvé', 'report' => array() );
+        }
+
+        if ( $truncate_vehicles ) {
+            global $wpdb;
+            $wpdb->query( "TRUNCATE TABLE {$this->vehicles_table}" );
+            $this->logger->log( 'Table véhicules vidée (import nouveau format)' );
+        }
+
+        foreach ( $all_dirs as $label => $dir ) {
+            $files = $this->scan_catalog_folder( $dir );
+            foreach ( $files as $f ) {
+                if ( $f['type'] === 'vehicles' ) {
+                    $res = $this->import_vehicles_from_csv_autodetect( $f['path'], false );
+                    $vehicles_total += $res['imported'];
+                    $report[]        = array( 'file' => $f['name'], 'type' => 'vehicles', 'imported' => $res['imported'], 'errors' => $res['errors'] );
+                } elseif ( $f['type'] === 'links' ) {
+                    $res = $this->import_links_from_csv_autodetect( $f['path'], $label );
+                    $links_total += $res['imported'];
+                    $report[]     = array( 'file' => $f['name'], 'type' => 'links', 'imported' => $res['imported'], 'errors' => $res['errors'] );
+                } else {
+                    $report[] = array( 'file' => $f['name'], 'type' => 'unknown', 'headers' => implode( ', ', array_slice( $f['headers'], 0, 5 ) ) );
+                }
+            }
+        }
+
+        return array(
+            'success'  => true,
+            'vehicles' => $vehicles_total,
+            'links'    => $links_total,
+            'report'   => $report,
+        );
+    }
+
+    /**
      * Obtient des statistiques sur les compatibilités
      */
     public function get_statistics() {

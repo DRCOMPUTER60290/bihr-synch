@@ -107,9 +107,42 @@ $stats = $compatibility->get_statistics();
         <?php endif; ?>
     </div>
 
+    <!-- NOUVEAU FORMAT BIHR (3 dossiers : Extended / HardPart / RiderGear) -->
+    <div class="bihr-section" style="margin-top: 30px; border-left: 4px solid #7c3aed;">
+        <h2 style="border-bottom-color:#7c3aed;">🆕 Nouveau format BIHR (Extended / HardPart / RiderGear)</h2>
+        <p>
+            Utilisez cette section si BIHR vous fournit des dossiers <strong>Extended</strong>, <strong>HardPart</strong> et <strong>RiderGear</strong>
+            à la place des anciens <code>VehiclesList.zip</code> et <code>LinksList.zip</code>.<br>
+            Le plugin détecte automatiquement les colonnes de chaque fichier CSV.
+        </p>
+
+        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+            <div style="flex:1; min-width:280px; background:#f5f3ff; padding:15px; border-radius:8px; border:1px solid #c4b5fd;">
+                <h3 style="margin-top:0; color:#7c3aed;">Étape 1 — Uploader le ZIP</h3>
+                <p style="font-size:13px;">Créez un ZIP contenant vos 3 dossiers (Extended, HardPart, RiderGear) et uploadez-le ici.</p>
+                <input type="file" id="new-catalog-zip" accept=".zip" />
+                <button type="button" class="button" id="btn-upload-new-catalog-zip" style="margin-top:6px;">⬆️ Envoyer & décompresser</button>
+                <div id="new-catalog-zip-status" style="font-size:12px; color:#555; margin-top:6px;"></div>
+            </div>
+
+            <div style="flex:1; min-width:280px; background:#f0fdf4; padding:15px; border-radius:8px; border:1px solid #86efac;">
+                <h3 style="margin-top:0; color:#16a34a;">Étape 2 — Scanner les dossiers</h3>
+                <p style="font-size:13px;">Analysez les fichiers trouvés dans <code>/bihr-import/Extended/</code>, <code>/HardPart/</code> et <code>/RiderGear/</code>.</p>
+                <button type="button" class="button button-primary" id="btn-scan-catalog-folders">🔍 Scanner les dossiers</button>
+                <div id="scan-result" style="margin-top:10px; font-size:12px;"></div>
+            </div>
+        </div>
+
+        <div id="new-catalog-import-panel" style="display:none;">
+            <h3>Étape 3 — Importer les fichiers détectés</h3>
+            <div id="new-catalog-files-list"></div>
+            <div id="new-catalog-import-log" style="margin-top:10px; font-size:12px; max-height:220px; overflow:auto; background:#f8fafc; border:1px solid #e2e8f0; padding:10px; border-radius:6px; display:none;"></div>
+        </div>
+    </div>
+
     <!-- Import de la liste des véhicules -->
     <div class="bihr-section" style="margin-top: 30px;">
-        <h2>1️⃣ Importer la liste des véhicules</h2>
+        <h2>1️⃣ Ancien format — Importer la liste des véhicules</h2>
         <p>
             Importez le fichier <code>VehiclesList.csv</code> pour charger tous les véhicules disponibles.
             <br><strong>⚠️ Cette opération remplace toutes les données existantes de véhicules.</strong>
@@ -287,6 +320,187 @@ jQuery(function($) {
             textEl.text(label || pct + '%');
         }
     }
+
+    // ===== NOUVEAU FORMAT BIHR =====
+
+    // Upload du ZIP nouveau format
+    $('#btn-upload-new-catalog-zip').on('click', function() {
+        const file = $('#new-catalog-zip')[0].files[0];
+        const status = $('#new-catalog-zip-status');
+        if (!file) { status.text('Sélectionnez un fichier ZIP'); return; }
+        const formData = new FormData();
+        formData.append('action', 'bihrwi_upload_new_catalog_zip');
+        formData.append('nonce', nonce);
+        formData.append('catalog_zip', file);
+        status.html('⏳ Upload en cours...');
+        $.ajax({
+            url: ajaxUrl, type: 'POST', data: formData,
+            processData: false, contentType: false,
+            success: function(resp) {
+                if (resp.success) {
+                    status.html('<span style="color:#16a34a;">✅ ' + resp.data.message + '</span>');
+                } else {
+                    status.html('<span style="color:#dc2626;">❌ ' + resp.data.message + '</span>');
+                }
+            },
+            error: function() { status.html('<span style="color:#dc2626;">❌ Erreur de connexion</span>'); }
+        });
+    });
+
+    // Scanner les dossiers
+    $('#btn-scan-catalog-folders').on('click', function() {
+        const btn = $(this);
+        const scanDiv = $('#scan-result');
+        const panel = $('#new-catalog-import-panel');
+        btn.prop('disabled', true).text('⏳ Scan...');
+        scanDiv.html('');
+        $.post(ajaxUrl, { action: 'bihrwi_scan_catalog_folder', nonce }, function(resp) {
+            if (!resp.success) {
+                scanDiv.html('<span style="color:#dc2626;">❌ ' + resp.data.message + '</span>');
+                return;
+            }
+            const scan = resp.data.scan;
+            let html = '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+            html += '<tr><th style="text-align:left; padding:4px; border-bottom:1px solid #ddd;">Dossier</th><th>Fichier</th><th>Type détecté</th><th>Colonnes (5 premières)</th></tr>';
+            let filesFound = [];
+            Object.entries(scan).forEach(([folder, data]) => {
+                if (!data.exists) {
+                    html += '<tr><td style="padding:4px; color:#888;">' + folder + '</td><td colspan="3" style="color:#888;">dossier absent</td></tr>';
+                    return;
+                }
+                if (!data.files || data.files.length === 0) {
+                    html += '<tr><td style="padding:4px;">' + folder + '</td><td colspan="3" style="color:#888;">aucun CSV trouvé</td></tr>';
+                    return;
+                }
+                data.files.forEach(f => {
+                    const color = f.type === 'vehicles' ? '#16a34a' : (f.type === 'links' ? '#0073aa' : '#888');
+                    const label = f.type === 'vehicles' ? '🏍️ Véhicules' : (f.type === 'links' ? '🔗 Liens' : '❓ Inconnu');
+                    html += '<tr><td style="padding:4px; font-weight:bold;">' + folder + '</td>';
+                    html += '<td style="padding:4px;">' + f.name + '</td>';
+                    html += '<td style="padding:4px; color:' + color + ';">' + label + '</td>';
+                    html += '<td style="padding:4px; color:#555; font-size:11px;">' + f.headers.slice(0,5).join(', ') + '</td></tr>';
+                    filesFound.push({ path: f.path, type: f.type, name: f.name, folder: folder });
+                });
+            });
+            html += '</table>';
+            scanDiv.html(html);
+
+            // Construire le panel d'import
+            if (filesFound.length > 0) {
+                panel.show();
+                let listHtml = '';
+                const vehicleFiles = filesFound.filter(f => f.type === 'vehicles');
+                const linkFiles    = filesFound.filter(f => f.type === 'links');
+
+                if (vehicleFiles.length > 0) {
+                    listHtml += '<div style="margin-bottom:12px;"><strong>Fichiers véhicules :</strong><br>';
+                    vehicleFiles.forEach((f, i) => {
+                        const truncateCheck = i === 0 ? 'checked' : '';
+                        listHtml += '<div style="margin:6px 0; display:flex; align-items:center; gap:10px;">';
+                        listHtml += '<span>' + f.folder + '/' + f.name + '</span>';
+                        listHtml += '<label style="font-size:12px;"><input type="checkbox" class="vehicle-truncate" ' + truncateCheck + ' data-index="' + i + '"> Vider d\'abord la table</label>';
+                        listHtml += '<button type="button" class="button btn-import-vehicle-file" data-path="' + $('<div>').text(f.path).html() + '" style="margin:0;">📥 Importer</button>';
+                        listHtml += '<span class="vehicle-import-status" data-index="' + i + '" style="font-size:12px;"></span>';
+                        listHtml += '</div>';
+                    });
+                    listHtml += '</div>';
+                }
+
+                if (linkFiles.length > 0) {
+                    listHtml += '<div><strong>Fichiers liens (compatibilité) :</strong><br>';
+                    linkFiles.forEach(f => {
+                        listHtml += '<div style="margin:6px 0; display:flex; align-items:center; gap:10px;">';
+                        listHtml += '<span>' + f.folder + '/' + f.name + '</span>';
+                        listHtml += '<button type="button" class="button btn-import-links-file" data-path="' + $('<div>').text(f.path).html() + '" data-source="' + f.folder + '">📥 Importer</button>';
+                        listHtml += '<div class="links-progress-bar-wrap" style="flex:1; background:#eee; height:12px; border-radius:6px; overflow:hidden;"><div class="links-progress-bar" style="height:100%; width:0%; background:#0073aa; transition:width .3s;"></div></div>';
+                        listHtml += '<span class="links-import-status" style="font-size:12px; white-space:nowrap;"></span>';
+                        listHtml += '</div>';
+                    });
+                    listHtml += '</div>';
+                }
+
+                if (vehicleFiles.length === 0 && linkFiles.length === 0) {
+                    listHtml = '<p style="color:#888;">Aucun fichier reconnu (véhicules ou liens). Vérifiez le format des colonnes dans vos CSV.</p>';
+                }
+
+                $('#new-catalog-files-list').html(listHtml);
+                $('#new-catalog-import-log').show().empty();
+            }
+        }).fail(function() {
+            scanDiv.html('<span style="color:#dc2626;">❌ Erreur de connexion</span>');
+        }).always(function() {
+            btn.prop('disabled', false).text('🔍 Scanner les dossiers');
+        });
+    });
+
+    // Import d'un fichier véhicules
+    $(document).on('click', '.btn-import-vehicle-file', function() {
+        const btn = $(this);
+        const filePath = btn.data('path');
+        const idx = btn.closest('div').find('.vehicle-truncate').data('index');
+        const truncate = btn.closest('div').find('.vehicle-truncate').is(':checked');
+        const statusEl = btn.closest('div').find('.vehicle-import-status');
+        btn.prop('disabled', true).text('⏳...');
+        statusEl.text('');
+        const logBox = $('#new-catalog-import-log');
+        $.post(ajaxUrl, { action: 'bihrwi_import_new_catalog_vehicles', nonce, file_path: filePath, truncate: truncate ? '1' : '0' }, function(resp) {
+            if (resp.success) {
+                statusEl.html('<span style="color:#16a34a;">✅ ' + resp.data.message + '</span>');
+                logBox.append('<div>✅ Véhicules : ' + resp.data.message + '</div>');
+            } else {
+                statusEl.html('<span style="color:#dc2626;">❌ ' + resp.data.message + '</span>');
+                logBox.append('<div style="color:#dc2626;">❌ ' + resp.data.message + '</div>');
+            }
+        }).fail(function() {
+            statusEl.html('<span style="color:#dc2626;">❌ Erreur</span>');
+        }).always(function() {
+            btn.prop('disabled', false).text('📥 Importer');
+        });
+    });
+
+    // Import d'un fichier liens (avec batching)
+    $(document).on('click', '.btn-import-links-file', function() {
+        const btn = $(this);
+        const filePath = btn.data('path');
+        const sourceName = btn.data('source') || 'BIHR';
+        const wrap = btn.closest('div');
+        const bar = wrap.find('.links-progress-bar');
+        const statusEl = wrap.find('.links-import-status');
+        const logBox = $('#new-catalog-import-log');
+        btn.prop('disabled', true);
+
+        function doImportBatch(batchStart) {
+            $.post(ajaxUrl, {
+                action: 'bihrwi_import_new_catalog_links', nonce,
+                file_path: filePath, source_name: sourceName, batch_start: batchStart
+            }, function(resp) {
+                if (resp.success) {
+                    const d = resp.data;
+                    bar.css('width', d.progress + '%');
+                    statusEl.html(d.progress + '% (' + d.processed + '/' + d.total_lines + ')');
+                    if (!d.is_complete && d.next_batch !== undefined) {
+                        doImportBatch(d.next_batch);
+                    } else {
+                        bar.css('background', '#16a34a');
+                        statusEl.html('<span style="color:#16a34a;">✅ ' + d.imported + ' liens importés</span>');
+                        logBox.append('<div>✅ Liens [' + sourceName + '] : ' + d.imported + ' importés</div>');
+                        btn.prop('disabled', false).text('📥 Importer');
+                    }
+                } else {
+                    statusEl.html('<span style="color:#dc2626;">❌ ' + resp.data.message + '</span>');
+                    logBox.append('<div style="color:#dc2626;">❌ Liens [' + sourceName + '] : ' + resp.data.message + '</div>');
+                    btn.prop('disabled', false).text('📥 Importer');
+                }
+            }).fail(function() {
+                statusEl.html('<span style="color:#dc2626;">❌ Erreur connexion</span>');
+                btn.prop('disabled', false).text('📥 Importer');
+            });
+        }
+
+        doImportBatch(0);
+    });
+
+    // ===== FIN NOUVEAU FORMAT =====
 
     // Créer/Recréer tables
     $('#btn-create-tables').on('click', function() {
