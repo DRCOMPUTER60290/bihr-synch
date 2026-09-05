@@ -75,7 +75,7 @@ if ( ! function_exists( 'bwi_fs' ) ) {
     do_action( 'bwi_fs_loaded' );
 }
 // Constantes
-define( 'BIHRWI_VERSION', '2.0.0' );
+define( 'BIHRWI_VERSION', '2.1.0' );
 define( 'BIHRWI_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BIHRWI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BIHRWI_LOG_FILE', WP_CONTENT_DIR . '/uploads/bihr-import/bihr-import.log' );

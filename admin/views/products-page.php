@@ -61,7 +61,20 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 ?>
 
 <div class="wrap">
-    <h1>Bihr Import – Produits Bihr</h1>
+
+    <!-- Header premium -->
+    <div class="bihr-page-header">
+        <div class="bihr-page-header-left">
+            <div class="bihr-page-header-icon">🏍</div>
+            <div>
+                <h1>BIHR Import</h1>
+                <div class="bihr-page-header-subtitle">Synchronisation &amp; gestion du catalogue produits</div>
+            </div>
+        </div>
+        <div class="bihr-page-header-badge">
+            <?php echo intval( $total ); ?>&nbsp;produits
+        </div>
+    </div>
 
     <?php if ( ! empty( $bihrwi_debug ) && current_user_can( 'manage_woocommerce' ) ) : ?>
         <div class="notice notice-info" style="padding:10px;">
@@ -1266,8 +1279,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             }
         }
         ?>
-        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center;">
-            <strong style="margin-right:4px; font-size:13px; color:#444;">Raccourcis :</strong>
+        <?php /* Raccourcis preset désactivés — décommenter pour réafficher
+        <div class="bihr-preset-chips">
             <?php foreach ( $presets as $p ) :
                 $url = add_query_arg( array(
                     'page'                    => 'bihr-products',
@@ -1280,19 +1293,16 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 $is_active = ( $active_preset === $p['label'] );
             ?>
                 <a href="<?php echo esc_url( $url ); ?>"
-                   style="display:inline-block; padding:5px 12px; border-radius:4px; font-size:13px; text-decoration:none; border:2px solid <?php echo esc_attr( $p['color'] ); ?>;
-                          background:<?php echo $is_active ? esc_attr( $p['color'] ) : '#fff'; ?>;
-                          color:<?php echo $is_active ? '#fff' : esc_attr( $p['color'] ); ?>; font-weight:600;">
+                   class="bihr-preset-chip<?php echo $is_active ? ' active' : ''; ?>">
                     <?php echo esc_html( $p['label'] ); ?>
                 </a>
             <?php endforeach; ?>
             <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-products' ) ); ?>"
-               style="display:inline-block; padding:5px 12px; border-radius:4px; font-size:13px; text-decoration:none; border:2px solid #999;
-                      background:<?php echo empty( $active_preset ) && empty( $filter_cat_l1 ) && empty( $filter_cat_l2 ) ? '#999' : '#fff'; ?>;
-                      color:<?php echo empty( $active_preset ) && empty( $filter_cat_l1 ) && empty( $filter_cat_l2 ) ? '#fff' : '#666'; ?>; font-weight:600;">
+               class="bihr-preset-chip chip-reset<?php echo ( empty( $active_preset ) && empty( $filter_cat_l1 ) && empty( $filter_cat_l2 ) ) ? ' active' : ''; ?>">
                 ✕ Tout afficher
             </a>
         </div>
+        */ ?>
 
         <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="bihr-filters-form" id="bihr-products-filters">
             <input type="hidden" name="page" value="bihr-products" />
@@ -1375,13 +1385,17 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     <input type="hidden" name="cat_l1" id="cat_l1_value" value="<?php echo esc_attr( $filter_cat_l1 ); ?>" />
                     <div id="cat_l1_box" class="bihr-cat-checkbox-list" style="max-height: 160px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 6px; background: #fff;">
                         <?php if ( ! empty( $available_cat_l1 ) ) : ?>
-                            <?php foreach ( $available_cat_l1 as $cat_l1_value ) : ?>
+                            <?php
+                            $cat_translator = new BihrWI_Category_Translator();
+                            foreach ( $available_cat_l1 as $cat_l1_value ) :
+                                $cat_l1_label = $cat_translator->translate_name( $cat_l1_value );
+                            ?>
                                 <label class="bihr-cat-checkbox-item" style="display:block; margin-bottom:2px;">
                                     <input type="checkbox"
                                            class="bihr-cat-l1-checkbox"
                                            data-value="<?php echo esc_attr( $cat_l1_value ); ?>"
                                            <?php checked( $filter_cat_l1, $cat_l1_value ); ?> />
-                                    <?php echo esc_html( $cat_l1_value ); ?>
+                                    <?php echo esc_html( $cat_l1_label ); ?>
                                 </label>
                             <?php endforeach; ?>
                         <?php else : ?>
@@ -1397,13 +1411,19 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     <input type="hidden" name="cat_l2" id="cat_l2_value" value="<?php echo esc_attr( $filter_cat_l2 ); ?>" />
                     <div id="cat_l2_box" class="bihr-cat-checkbox-list" style="max-height: 160px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 6px; background: #fff; <?php echo empty( $available_cat_l2 ) ? 'opacity:0.6;' : ''; ?>">
                         <?php if ( ! empty( $available_cat_l2 ) ) : ?>
-                            <?php foreach ( $available_cat_l2 as $cat_l2_value ) : ?>
+                            <?php
+                            if ( ! isset( $cat_translator ) ) {
+                                $cat_translator = new BihrWI_Category_Translator();
+                            }
+                            foreach ( $available_cat_l2 as $cat_l2_value ) :
+                                $cat_l2_label = $cat_translator->translate_name( $cat_l2_value );
+                            ?>
                                 <label class="bihr-cat-checkbox-item" style="display:block; margin-bottom:2px;">
                                     <input type="checkbox"
                                            class="bihr-cat-l2-checkbox"
                                            data-value="<?php echo esc_attr( $cat_l2_value ); ?>"
                                            <?php checked( $filter_cat_l2, $cat_l2_value ); ?> />
-                                    <?php echo esc_html( $cat_l2_value ); ?>
+                                    <?php echo esc_html( $cat_l2_label ); ?>
                                 </label>
                             <?php endforeach; ?>
                         <?php else : ?>
@@ -1419,13 +1439,19 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     <input type="hidden" name="cat_l3" id="cat_l3_value" value="<?php echo esc_attr( $filter_cat_l3 ); ?>" />
                     <div id="cat_l3_box" class="bihr-cat-checkbox-list" style="max-height: 160px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 6px; background: #fff; <?php echo empty( $available_cat_l3 ) ? 'opacity:0.6;' : ''; ?>">
                         <?php if ( ! empty( $available_cat_l3 ) ) : ?>
-                            <?php foreach ( $available_cat_l3 as $cat_l3_value ) : ?>
+                            <?php
+                            if ( ! isset( $cat_translator ) ) {
+                                $cat_translator = new BihrWI_Category_Translator();
+                            }
+                            foreach ( $available_cat_l3 as $cat_l3_value ) :
+                                $cat_l3_label = $cat_translator->translate_name( $cat_l3_value );
+                            ?>
                                 <label class="bihr-cat-checkbox-item" style="display:block; margin-bottom:2px;">
                                     <input type="checkbox"
                                            class="bihr-cat-l3-checkbox"
                                            data-value="<?php echo esc_attr( $cat_l3_value ); ?>"
                                            <?php checked( $filter_cat_l3, $cat_l3_value ); ?> />
-                                    <?php echo esc_html( $cat_l3_value ); ?>
+                                    <?php echo esc_html( $cat_l3_label ); ?>
                                 </label>
                             <?php endforeach; ?>
                         <?php else : ?>
@@ -1627,13 +1653,12 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     <td>
                         <?php echo ! empty( $row->cat_l3 ) ? esc_html( $row->cat_l3 ) : '&mdash;'; ?>
                     </td>
-                    <td>
+                    <td class="col-description">
                         <?php
                         $desc = $row->description;
                         if ( $desc ) {
-                            // On tronque un peu pour l'affichage
-                            $desc = wp_trim_words( $desc, 30, '…' );
-                            echo nl2br( esc_html( $desc ) );
+                            $desc_short = wp_trim_words( $desc, 20, '…' );
+                            echo '<div class="cell-desc" title="' . esc_attr( wp_strip_all_tags( $desc ) ) . '">' . esc_html( $desc_short ) . '</div>';
                         } else {
                             echo '&mdash;';
                         }

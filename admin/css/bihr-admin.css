@@ -1,46 +1,77 @@
 /* ============================================================
-   DESIGN SYSTEM - VARIABLES CSS
+   DESIGN SYSTEM - VARIABLES CSS  (Premium v2)
    ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 :root {
-    /* Couleurs */
-    --primary: #2563eb;
-    --primary-dark: #1e40af;
-    --primary-light: #dbeafe;
-    --success: #10b981;
+    /* Palette principale — Navy profond + Or premium */
+    --primary: #1e3a5f;
+    --primary-mid: #2c5282;
+    --primary-dark: #152a45;
+    --primary-light: #e8f0fe;
+    --primary-glow: rgba(30, 58, 95, 0.12);
+
+    /* Accent or / amber — CTA premium */
+    --accent: #b45309;
+    --accent-bright: #d97706;
+    --accent-light: #fef3c7;
+    --accent-bg: #fffbeb;
+
+    /* Status */
+    --success: #059669;
     --success-light: #d1fae5;
-    --warning: #f59e0b;
+    --success-dark: #047857;
+    --warning: #d97706;
     --warning-light: #fef3c7;
-    --danger: #ef4444;
+    --danger: #dc2626;
     --danger-light: #fee2e2;
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-600: #4b5563;
-    --gray-700: #374151;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
-    
-    /* Espacements */
-    --spacing-xs: 4px;
-    --spacing-sm: 8px;
-    --spacing-md: 12px;
-    --spacing-lg: 16px;
-    --spacing-xl: 24px;
+    --danger-dark: #b91c1c;
+    --info: #0284c7;
+    --info-light: #e0f2fe;
+
+    /* Neutrals */
+    --gray-50:  #f8fafc;
+    --gray-100: #f1f5f9;
+    --gray-150: #e9edf2;
+    --gray-200: #e2e8f0;
+    --gray-300: #cbd5e1;
+    --gray-400: #94a3b8;
+    --gray-500: #64748b;
+    --gray-600: #475569;
+    --gray-700: #334155;
+    --gray-800: #1e293b;
+    --gray-900: #0f172a;
+
+    /* Espacement */
+    --spacing-xs:  4px;
+    --spacing-sm:  8px;
+    --spacing-md:  12px;
+    --spacing-lg:  16px;
+    --spacing-xl:  24px;
     --spacing-2xl: 32px;
-    
-    /* Border */
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    
-    /* Shadow */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    --spacing-3xl: 48px;
+
+    /* Rayons */
+    --radius-sm:  6px;
+    --radius-md:  10px;
+    --radius-lg:  14px;
+    --radius-xl:  20px;
+    --radius-full: 9999px;
+
+    /* Ombres premium */
+    --shadow-xs:  0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-sm:  0 2px 4px rgba(15, 23, 42, 0.08);
+    --shadow-md:  0 4px 12px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+    --shadow-lg:  0 10px 24px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
+    --shadow-xl:  0 20px 40px rgba(15, 23, 42, 0.14), 0 4px 10px rgba(15, 23, 42, 0.08);
+    --shadow-primary: 0 4px 14px rgba(30, 58, 95, 0.30);
+    --shadow-accent:  0 4px 14px rgba(180, 83, 9, 0.30);
+
+    /* Transitions */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-fast: 150ms var(--ease-out);
+    --transition-base: 220ms var(--ease-out);
+    --transition-slow: 350ms var(--ease-out);
 }
 
 /* ============================================================
@@ -51,69 +82,195 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* ============================================================
    LAYOUT PRINCIPAL
    ============================================================ */
 .wrap {
-    max-width: 1200px;
+    max-width: 1240px;
     margin: 0 auto;
 }
 
-.wrap h1 {
+/* ─── Header premium ─── */
+.bihr-page-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-mid) 60%, #2d6a9f 100%);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl) var(--spacing-2xl);
+    margin: var(--spacing-xl) 0 var(--spacing-2xl);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-xl);
+    box-shadow: var(--shadow-primary), inset 0 1px 0 rgba(255,255,255,0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+.bihr-page-header::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(255,255,255,0.07) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.bihr-page-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.bihr-page-header-icon {
+    width: 48px; height: 48px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.bihr-page-header h1 {
+    color: #fff !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+}
+
+.bihr-page-header-subtitle {
+    color: rgba(255,255,255,0.70);
+    font-size: 13px;
+    margin-top: 3px;
+}
+
+.bihr-page-header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: var(--radius-full);
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.20);
+    color: rgba(255,255,255,0.90);
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* Fallback si pas de .bihr-page-header */
+.wrap > h1:first-of-type {
     color: var(--gray-900);
-    font-size: 28px;
-    font-weight: 700;
+    font-size: 26px;
+    font-weight: 800;
     margin: var(--spacing-2xl) 0 var(--spacing-xl) 0;
     letter-spacing: -0.5px;
 }
 
 /* ============================================================
-   SECTIONS
+   SECTIONS premium
    ============================================================ */
-.bihr-section {
-    background: white;
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-xl);
-    margin-bottom: var(--spacing-xl);
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-200);
-    transition: all 0.3s ease;
+
+/* Compteur automatique pour les titres h2 hors section */
+.wrap {
+    counter-reset: bihr-step;
 }
 
-.bihr-section:hover {
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary-light);
-}
-
-.bihr-section h2 {
+.wrap > h2 {
+    counter-increment: bihr-step;
     color: var(--gray-900);
-    font-size: 18px;
-    font-weight: 600;
-    margin: 0 0 var(--spacing-lg) 0;
-    padding-bottom: var(--spacing-md);
-    border-bottom: 2px solid var(--primary);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--gray-500);
+    margin: var(--spacing-2xl) 0 var(--spacing-sm) 0;
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
 }
 
+.wrap > h2::before {
+    content: "ÉTAPE " counter(bihr-step);
+    display: inline-block;
+    background: var(--primary);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 9px;
+    border-radius: var(--radius-full);
+}
+
+.bihr-section {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl) var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-200);
+    border-top: 3px solid var(--primary);
+    transition: box-shadow var(--transition-base), border-color var(--transition-base), transform var(--transition-base);
+    position: relative;
+}
+
+.bihr-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(30,58,95,0.025) 0%, transparent 60px);
+    pointer-events: none;
+}
+
+.bihr-section:hover {
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-mid);
+    transform: translateY(-1px);
+}
+
+.bihr-section h2 {
+    color: var(--gray-900);
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 var(--spacing-lg) 0;
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--gray-150);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    letter-spacing: -0.2px;
+}
+
 .bihr-section h3 {
-    color: var(--gray-800);
-    font-size: 14px;
-    font-weight: 600;
+    color: var(--primary-mid);
+    font-size: 12px;
+    font-weight: 700;
     margin: var(--spacing-xl) 0 var(--spacing-md) 0;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--primary);
+    letter-spacing: 0.8px;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.bihr-section h3::before {
+    content: '';
+    display: inline-block;
+    width: 3px; height: 14px;
+    background: var(--accent-bright);
+    border-radius: 2px;
+    flex-shrink: 0;
 }
 
 .bihr-section p {
-    color: var(--gray-700);
-    font-size: 14px;
-    line-height: 1.6;
+    color: var(--gray-600);
+    font-size: 13.5px;
+    line-height: 1.65;
     margin: var(--spacing-md) 0;
 }
 
@@ -309,76 +466,117 @@ body {
 }
 
 /* ============================================================
-   BOUTONS
+   BOUTONS premium
    ============================================================ */
 .button,
 button,
 input[type="button"],
 input[type="submit"] {
-    background: var(--primary);
-    color: white;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-mid) 100%);
+    color: #fff;
     border: none;
     border-radius: var(--radius-md);
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: 10px var(--spacing-lg);
     font-size: 13px;
     font-weight: 600;
+    font-family: 'Inter', sans-serif;
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
+    box-shadow: var(--shadow-primary);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-sm);
+    letter-spacing: 0.1px;
+    position: relative;
+    overflow: hidden;
+}
+
+.button::after,
+button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 100%);
+    pointer-events: none;
 }
 
 .button:hover,
 button:hover,
 input[type="button"]:hover,
 input[type="submit"]:hover {
-    background: var(--primary-dark);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, var(--primary-mid) 0%, var(--primary-dark) 100%);
+    box-shadow: var(--shadow-lg), var(--shadow-primary);
+    transform: translateY(-2px);
+    color: #fff;
 }
 
 .button:active,
-button:active {
+button:active,
+input[type="button"]:active,
+input[type="submit"]:active {
     transform: translateY(0);
     box-shadow: var(--shadow-sm);
 }
 
+/* Bouton secondaire */
+.button-secondary,
 .button.secondary {
-    background: var(--gray-200);
-    color: var(--gray-900);
+    background: var(--gray-100) !important;
+    color: var(--gray-700) !important;
+    border: 1px solid var(--gray-300) !important;
+    box-shadow: var(--shadow-xs) !important;
 }
 
+.button-secondary:hover,
 .button.secondary:hover {
-    background: var(--gray-300);
+    background: var(--gray-200) !important;
+    border-color: var(--gray-400) !important;
+    box-shadow: var(--shadow-sm) !important;
+    color: var(--gray-900) !important;
+    transform: translateY(-1px);
 }
 
-.button.success {
-    background: var(--success);
+/* Bouton CTA accent or */
+.button-accent {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%) !important;
+    color: #fff !important;
+    box-shadow: var(--shadow-accent) !important;
+    border: none !important;
 }
 
-.button.success:hover {
-    background: #059669;
+.button-accent:hover {
+    filter: brightness(1.08);
+    box-shadow: var(--shadow-lg), var(--shadow-accent) !important;
 }
 
-.button.danger {
-    background: var(--danger);
-}
-
-.button.danger:hover {
-    background: #dc2626;
-}
-
-.button.large {
-    padding: var(--spacing-lg) var(--spacing-2xl);
-    font-size: 14px;
+/* Grand bouton CTA */
+.button.large,
+.button-large {
+    padding: 13px var(--spacing-2xl) !important;
+    font-size: 14px !important;
     height: auto !important;
+    letter-spacing: 0.2px;
+    font-weight: 700 !important;
+}
+
+/* Bouton danger */
+.button.danger,
+.button-link-delete,
+input.delete {
+    background: linear-gradient(135deg, var(--danger) 0%, var(--danger-dark) 100%) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(220,38,38,0.25) !important;
+}
+
+.button.danger:hover,
+.button-link-delete:hover {
+    filter: brightness(1.06);
 }
 
 /* ============================================================
-   FORMULAIRES
+   FORMULAIRES premium
    ============================================================ */
 form {
     display: flex;
@@ -389,31 +587,50 @@ form {
 input[type="text"],
 input[type="email"],
 input[type="number"],
+input[type="time"],
 textarea,
 select {
-    background: white;
-    border: 1px solid var(--gray-300);
+    background: var(--gray-50);
+    border: 1.5px solid var(--gray-200);
     border-radius: var(--radius-md);
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: 10px var(--spacing-lg);
     font-size: 13px;
-    font-family: inherit;
-    transition: all 0.2s ease;
+    font-family: 'Inter', sans-serif;
+    color: var(--gray-800);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+input[type="text"]:hover,
+input[type="email"]:hover,
+input[type="number"]:hover,
+select:hover {
+    border-color: var(--gray-400);
+    background: #fff;
 }
 
 input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="number"]:focus,
+input[type="time"]:focus,
 textarea:focus,
 select:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-light);
+    border-color: var(--primary-mid);
+    box-shadow: 0 0 0 3px rgba(44, 82, 130, 0.15);
+    background: #fff;
+}
+
+input[type="text"]::placeholder,
+textarea::placeholder {
+    color: var(--gray-400);
 }
 
 label {
-    color: var(--gray-900);
+    color: var(--gray-700);
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
     margin-bottom: var(--spacing-sm);
     display: block;
 }
@@ -425,35 +642,35 @@ label {
     margin-bottom: var(--spacing-lg);
 }
 
-/* Styles pour les barres de progression */
+/* Styles pour les barres de progression premium */
 .bihr-progress-container {
     display: none;
     margin: var(--spacing-lg) 0;
     padding: var(--spacing-lg);
-    background: var(--gray-50);
+    background: linear-gradient(180deg, var(--gray-50) 0%, #fff 100%);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 }
 
 .bihr-progress-bar-wrapper {
     width: 100%;
-    height: 32px;
-    background: white;
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-md);
+    height: 10px;
+    background: var(--gray-150);
+    border-radius: var(--radius-full);
     overflow: hidden;
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
     position: relative;
-    box-shadow: var(--shadow-sm);
 }
 
 .bihr-progress-bar {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-mid) 50%, #4a90d9 100%);
+    transition: width 0.4s var(--ease-out);
     position: relative;
     overflow: hidden;
+    border-radius: var(--radius-full);
 }
 
 .bihr-progress-bar::after {
@@ -466,10 +683,10 @@ label {
     background: linear-gradient(
         90deg,
         transparent,
-        rgba(255, 255, 255, 0.3),
+        rgba(255, 255, 255, 0.35),
         transparent
     );
-    animation: shimmer 2s infinite;
+    animation: shimmer 1.6s infinite;
 }
 
 @keyframes shimmer {
@@ -544,76 +761,106 @@ label {
 }
 
 /* ============================================================
-   TABLEAUX
+   TABLEAUX premium
    ============================================================ */
 table.widefat {
     border-collapse: collapse;
     width: 100%;
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
     overflow: hidden;
+    box-shadow: var(--shadow-sm);
 }
 
 table.widefat thead th {
-    background: linear-gradient(135deg, var(--gray-100), var(--gray-50));
-    color: var(--gray-900);
-    font-weight: 600;
-    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-mid) 100%);
+    color: rgba(255,255,255,0.92);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 11px var(--spacing-lg);
     text-align: left;
-    border-bottom: 2px solid var(--gray-300);
+    border-bottom: none;
+}
+
+table.widefat thead th:first-child {
+    border-radius: var(--radius-lg) 0 0 0;
+}
+table.widefat thead th:last-child {
+    border-radius: 0 var(--radius-lg) 0 0;
 }
 
 table.widefat tbody tr {
-    border-bottom: 1px solid var(--gray-200);
-    transition: background-color 0.2s ease;
-}
-
-table.widefat tbody tr:hover {
-    background-color: var(--gray-50);
-}
-
-table.widefat td {
-    padding: var(--spacing-md) var(--spacing-lg);
-    color: var(--gray-700);
-    font-size: 13px;
+    border-bottom: 1px solid var(--gray-100);
+    transition: background-color var(--transition-fast);
 }
 
 table.widefat tbody tr:last-child {
     border-bottom: none;
 }
 
+table.widefat tbody tr:hover {
+    background-color: var(--primary-light);
+}
+
+table.widefat tbody tr:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+table.widefat tbody tr:nth-child(even):hover {
+    background-color: var(--primary-light);
+}
+
+table.widefat td {
+    padding: 10px var(--spacing-lg);
+    color: var(--gray-700);
+    font-size: 13px;
+}
+
 /* ============================================================
-   BADGES & ÉTIQUETTES
+   BADGES & ÉTIQUETTES premium
    ============================================================ */
 .badge {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-xs);
-    padding: var(--spacing-xs) var(--spacing-md);
-    border-radius: var(--radius-sm);
-    font-size: 12px;
-    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
 }
 
 .badge-success {
     background: var(--success-light);
-    color: #059669;
+    color: var(--success-dark);
 }
 
 .badge-warning {
     background: var(--warning-light);
-    color: #b45309;
+    color: #92400e;
 }
 
 .badge-danger {
     background: var(--danger-light);
-    color: #b91c1c;
+    color: var(--danger-dark);
 }
 
 .badge-info {
+    background: var(--info-light);
+    color: #0369a1;
+}
+
+.badge-primary {
     background: var(--primary-light);
     color: var(--primary-dark);
 }
+
+/* Puce de stock */
+.bihr-stock-in  { color: var(--success); font-weight: 700; }
+.bihr-stock-out { color: var(--danger);  font-weight: 700; }
 
 /* ============================================================
    PRÉ & CODE
@@ -640,68 +887,103 @@ code {
 }
 
 /* ============================================================
-   MESSAGES & ALERTES
+   MESSAGES & ALERTES premium
    ============================================================ */
 .notice,
 .notice-success,
 .notice-error,
 .notice-warning,
 .notice-info {
-    border-left: 4px solid var(--primary) !important;
-    background-color: var(--primary-light) !important;
-    padding: var(--spacing-lg) !important;
+    border-left: 4px solid var(--primary-mid) !important;
+    background: linear-gradient(135deg, var(--primary-light) 0%, rgba(232,240,254,0.4) 100%) !important;
+    padding: 14px var(--spacing-lg) !important;
     border-radius: var(--radius-md) !important;
     margin-bottom: var(--spacing-lg) !important;
-    box-shadow: var(--shadow-sm) !important;
+    box-shadow: var(--shadow-xs) !important;
 }
 
 .notice-success {
     border-left-color: var(--success) !important;
-    background-color: var(--success-light) !important;
+    background: linear-gradient(135deg, var(--success-light) 0%, rgba(209,250,229,0.4) 100%) !important;
 }
 
 .notice-error {
     border-left-color: var(--danger) !important;
-    background-color: var(--danger-light) !important;
+    background: linear-gradient(135deg, var(--danger-light) 0%, rgba(254,226,226,0.4) 100%) !important;
 }
 
 .notice-warning {
     border-left-color: var(--warning) !important;
-    background-color: var(--warning-light) !important;
+    background: linear-gradient(135deg, var(--warning-light) 0%, rgba(254,243,199,0.4) 100%) !important;
 }
 
 .notice p {
     margin: 0 !important;
     color: var(--gray-800) !important;
     font-size: 13px !important;
+    line-height: 1.5 !important;
 }
 
 /* ============================================================
-   CHAMPS DE TEXTE & SELECT
+   CHAMPS DE TEXTE & SELECT (dans sections)
    ============================================================ */
 .bihr-section input[type="text"],
 .bihr-section input[type="email"],
 .bihr-section input[type="number"],
+.bihr-section input[type="time"],
 .bihr-section textarea,
 .bihr-section select {
     width: 100%;
-    max-width: 500px;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border: 1px solid var(--gray-300);
+    max-width: 520px;
+    padding: 10px var(--spacing-lg);
+    border: 1.5px solid var(--gray-200);
     border-radius: var(--radius-md);
     font-size: 13px;
-    background: white;
-    transition: all 0.2s ease;
+    background: var(--gray-50);
+    transition: all var(--transition-fast);
+    font-family: 'Inter', sans-serif;
 }
 
 .bihr-section input[type="text"]:focus,
 .bihr-section input[type="email"]:focus,
 .bihr-section input[type="number"]:focus,
+.bihr-section input[type="time"]:focus,
 .bihr-section textarea:focus,
 .bihr-section select:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-light);
+    border-color: var(--primary-mid);
+    box-shadow: 0 0 0 3px rgba(44,82,130,0.15);
+    background: #fff;
+}
+
+/* ─── Séparateur horizontal premium ─── */
+.wrap hr {
+    border: none;
+    border-top: 1px solid var(--gray-150);
+    margin: var(--spacing-2xl) 0;
+}
+
+/* ─── Code inline ─── */
+code {
+    background: var(--gray-100);
+    color: var(--primary-mid);
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    border: 1px solid var(--gray-200);
+}
+
+/* ─── Progress text ─── */
+.bihr-progress-text {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-align: left;
+    margin-top: var(--spacing-sm);
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 /* ============================================================
@@ -767,10 +1049,83 @@ li {
 }
 
 /* ============================================================
+   FILTRES PRESET — CHIPS premium
+   ============================================================ */
+.bihr-preset-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.bihr-preset-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 13px;
+    border-radius: var(--radius-full);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1.5px solid var(--primary-mid);
+    background: #fff;
+    color: var(--primary-mid);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.bihr-preset-chip:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-primary);
+}
+
+.bihr-preset-chip.active {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-mid) 100%);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: var(--shadow-primary);
+}
+
+.bihr-preset-chip.chip-reset {
+    border-color: var(--gray-300);
+    color: var(--gray-500);
+    background: var(--gray-50);
+}
+
+.bihr-preset-chip.chip-reset:hover {
+    background: var(--gray-200);
+    color: var(--gray-800);
+    border-color: var(--gray-400);
+    box-shadow: var(--shadow-sm);
+}
+
+.bihr-preset-chip.chip-reset.active {
+    background: var(--gray-600);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: none;
+}
+
+/* ============================================================
    ANIMATIONS D'ENTRÉE
    ============================================================ */
 .bihrwi-section {
     animation: slideIn 0.3s ease-out;
+}
+
+/* Entrée des bihr-section */
+.bihr-section {
+    animation: bihrFadeUp 0.28s var(--ease-out) both;
+}
+
+@keyframes bihrFadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================
@@ -999,6 +1354,24 @@ li {
     font-weight: 700;
     color: #2271b1;
     width: 40px;
+}
+
+/* Colonne description — largeur contrainte + truncature */
+.col-description {
+    width: 200px;
+    max-width: 200px;
+}
+
+.cell-desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.45;
+    max-height: calc(1.45em * 3);
+    color: var(--gray-600);
+    font-size: 12px;
+    cursor: help;
 }
 
 .cell-product {

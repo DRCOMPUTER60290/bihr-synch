@@ -3474,12 +3474,13 @@ class BihrWI_Admin {
             wp_send_json_error( array( 'message' => 'Niveau invalide (2 ou 3 requis).' ) );
         }
 
-        // Formater en {value, label}
-        $formatted = array();
+        // Formater en {value, label} avec traduction française si disponible
+        $translator = new BihrWI_Category_Translator();
+        $formatted  = array();
         foreach ( $options as $opt ) {
             $formatted[] = array(
                 'value' => esc_attr( $opt ),
-                'label' => esc_html( $opt ),
+                'label' => esc_html( $translator->translate_name( $opt ) ),
             );
         }
 
