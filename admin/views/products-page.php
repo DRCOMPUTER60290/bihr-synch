@@ -1633,6 +1633,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     <span class="dashicons dashicons-controls-pause" style="vertical-align:middle;"></span> Arrêter
                 </button>
             </div>
+            <div id="bihr-bi-count" style="font-size:15px; font-weight:700; color:#23282d; margin-bottom:4px; display:none;"></div>
             <div id="bihr-bi-stats" style="font-size:12px; color:#777;"></div>
         </div>
 
@@ -1705,12 +1706,17 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                             return;
                         }
                         var d = resp.data;
+                        var processed = d.success + d.errors;
                         $('#bihr-bi-bar').css('width', d.percent + '%');
                         $('#bihr-bi-pct').text(d.percent + '%');
-                        $('#bihr-bi-stats').text('✓ ' + d.success + '  ✗ ' + d.errors + '  Total : ' + d.total + '  Restants : ' + d.pending);
+                        $('#bihr-bi-count').show().text(
+                            processed.toLocaleString('fr-FR') + ' / ' + d.total.toLocaleString('fr-FR') + ' produits traités'
+                        );
+                        $('#bihr-bi-stats').text('✓ Succès : ' + d.success.toLocaleString('fr-FR') + '   ✗ Erreurs : ' + d.errors + '   Restants : ' + d.pending.toLocaleString('fr-FR'));
 
                         if (d.done) {
-                            $('#bihr-bi-label').text('✓ Import terminé ! ' + d.success + ' produits importés.');
+                            $('#bihr-bi-label').text('✓ Import terminé !');
+                            $('#bihr-bi-count').text(d.success.toLocaleString('fr-FR') + ' / ' + d.total.toLocaleString('fr-FR') + ' produits importés.');
                             bihrBIRunning = false;
                             $('#bihr-browser-import-btn').prop('disabled', false);
                             return;
@@ -1718,7 +1724,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
                         var etaMin = d.pending > 0 ? Math.round(d.pending / 200 * 45 / 60) : 0;
                         var etaStr = etaMin > 0 ? ' (~' + etaMin + ' min restantes)' : '';
-                        $('#bihr-bi-label').text('Import en cours… ' + d.pending + ' produits restants' + etaStr);
+                        $('#bihr-bi-label').text('Import en cours…' + etaStr);
                         setTimeout(function() { runNextChunk(nonce); }, 200);
                     })
                     .fail(function() {
