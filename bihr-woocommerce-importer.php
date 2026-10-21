@@ -105,6 +105,8 @@ require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-filters.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-category-translator.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-product-validator.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-rate-limiter.php';
+require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-csv-parser.php';
+require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin-category-ajax.php';
 require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-admin.php';
 require_once BIHRWI_PLUGIN_DIR . 'admin/class-bihr-tools.php';
 require_once BIHRWI_PLUGIN_DIR . 'includes/class-bihr-rest-controller.php';

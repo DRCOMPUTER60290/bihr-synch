@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -11,6 +11,7 @@ class BihrWI_Product_Sync {
     protected $product_rows_cache   = array(); // bihr_id => row object, chargé par preload_product_rows()
     protected $ai_enrichment        = null;
     protected static $margin_settings_cache = null;
+    protected $csv_parser;
 
     public function __construct( BihrWI_Logger $logger ) {
         global $wpdb;
@@ -18,6 +19,7 @@ class BihrWI_Product_Sync {
         $this->table_name    = $wpdb->prefix . 'bihr_products';
         // Instancié une seule fois pour éviter un get_option() par produit importé.
         $this->ai_enrichment = new BihrWI_AI_Enrichment( $logger );
+        $this->csv_parser    = new BihrWI_CSV_Parser( $logger );
     }
 
     /**
@@ -1423,7 +1425,7 @@ class BihrWI_Product_Sync {
 
         if ( ! empty( $files['references'] ) ) {
             $this->logger->log( 'Parsing References...' );
-            $references_data = $this->parse_references_csv( $files['references'] );
+            $references_data = $this->csv_parser->parse_references_csv( $files['references'] );
             $this->logger->log( "✓ References: " . count( $references_data ) . " produits" );
         } else {
             $this->logger->log( '⚠ ATTENTION: Fichier References manquant - les noms de produits ne seront pas disponibles!' );
@@ -1439,7 +1441,7 @@ class BihrWI_Product_Sync {
                 $this->logger->log( 'ExtendedReferences trouvé en ' . count( $all_extref_files ) . ' parties' );
                 foreach ( $all_extref_files as $extref_file ) {
                     $this->logger->log( '  - Lecture: ' . basename( $extref_file ) );
-                    $partial_data = $this->parse_extendedreferences_csv( $extref_file );
+                    $partial_data = $this->csv_parser->parse_extendedreferences_csv( $extref_file );
                     $this->logger->log( '    → ' . count( $partial_data ) . ' produits' );
                     
                     // Merge intelligent : ne pas écraser la catégorie si elle existe déjà
@@ -1461,7 +1463,7 @@ class BihrWI_Product_Sync {
                 }
                 $this->logger->log( "✓ ExtendedReferences total: " . count( $extendedreferences_data ) . " produits" );
             } else {
-                $extendedreferences_data = $this->parse_extendedreferences_csv( $files['extendedreferences'] );
+                $extendedreferences_data = $this->csv_parser->parse_extendedreferences_csv( $files['extendedreferences'] );
                 $this->logger->log( "✓ ExtendedReferences: " . count( $extendedreferences_data ) . " produits" );
             }
         } else {
@@ -1470,7 +1472,7 @@ class BihrWI_Product_Sync {
 
         if ( ! empty( $files['prices'] ) ) {
             $this->logger->log( 'Parsing Prices...' );
-            $prices_data = $this->parse_prices_csv( $files['prices'] );
+            $prices_data = $this->csv_parser->parse_prices_csv( $files['prices'] );
             $this->logger->log( "✓ Prices: " . count( $prices_data ) . " produits" );
         } else {
             $this->logger->log( '⚠ ATTENTION: Fichier Prices manquant!' );
@@ -1478,7 +1480,7 @@ class BihrWI_Product_Sync {
 
         if ( ! empty( $files['images'] ) ) {
             $this->logger->log( 'Parsing Images...' );
-            $images_data = $this->parse_images_csv( $files['images'] );
+            $images_data = $this->csv_parser->parse_images_csv( $files['images'] );
             $this->logger->log( "✓ Images: " . count( $images_data ) . " produits" );
         } else {
             $this->logger->log( '⚠ ATTENTION: Fichier Images manquant!' );
@@ -1486,7 +1488,7 @@ class BihrWI_Product_Sync {
 
         if ( ! empty( $files['inventory'] ) ) {
             $this->logger->log( 'Parsing Inventory (Stock)...' );
-            $inventory_data = $this->parse_inventory_csv( $files['inventory'] );
+            $inventory_data = $this->csv_parser->parse_inventory_csv( $files['inventory'] );
             $this->logger->log( "✓ Inventory: " . count( $inventory_data ) . " produits" );
         } else {
             $this->logger->log( '⚠ ATTENTION: Fichier Inventory manquant!' );
@@ -1494,7 +1496,7 @@ class BihrWI_Product_Sync {
 
         if ( ! empty( $files['attributes'] ) ) {
             $this->logger->log( 'Parsing Attributes...' );
-            $attributes_data = $this->parse_attributes_csv( $files['attributes'] );
+            $attributes_data = $this->csv_parser->parse_attributes_csv( $files['attributes'] );
             $this->logger->log( "✓ Attributes: " . count( $attributes_data ) . " produits" );
         } else {
             $this->logger->log( '⚠ ATTENTION: Fichier Attributes manquant!' );
@@ -2107,479 +2109,6 @@ class BihrWI_Product_Sync {
         }
 
         return $rows;
-    }
-
-    /**
-     * Parcourt un CSV et appelle un callback pour chaque ligne.
-     * Délègue à iterate_csv_rows_stream() (fopen/fgetcsv) pour tous les fichiers :
-     * gestion correcte du BOM UTF-8, CRLF, champs entre guillemets, sans charger
-     * le fichier entier en mémoire.
-     */
-    protected function iterate_csv_rows( $file_path, callable $callback ) {
-        return $this->iterate_csv_rows_stream( $file_path, $callback );
-    }
-
-    /**
-     * Ouvre un CSV en streaming et retourne handle + délimiteur + en-tête.
-     * Gère le BOM UTF-8 et la détection automatique du séparateur (; ou ,).
-     *
-     * @param string $file_path Chemin absolu vers le fichier CSV.
-     * @return array{handle:resource,delimiter:string,header:string[]}|null null si le fichier est illisible.
-     */
-    protected function open_csv_stream( string $file_path ): ?array {
-        if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
-            return null;
-        }
-
-        $handle = fopen( $file_path, 'r' );
-        if ( false === $handle ) {
-            return null;
-        }
-
-        // BOM UTF-8 éventuel
-        $bom = fread( $handle, 3 );
-        if ( $bom !== "\xEF\xBB\xBF" ) {
-            rewind( $handle );
-        }
-
-        // Détection du séparateur sur la première ligne
-        $first_line = fgets( $handle );
-        rewind( $handle );
-        if ( $bom === "\xEF\xBB\xBF" ) {
-            fread( $handle, 3 ); // reskip BOM
-        }
-        $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
-
-        // En-tête
-        $header = fgetcsv( $handle, 0, $delimiter );
-        if ( false === $header ) {
-            fclose( $handle );
-            return null;
-        }
-
-        $header = array_map(
-            function( $h ) {
-                return strtolower( trim( $h ) );
-            },
-            $header
-        );
-
-        return array(
-            'handle'    => $handle,
-            'delimiter' => $delimiter,
-            'header'    => $header,
-        );
-    }
-
-    /**
-     * Parcourt un CSV en streaming (fopen/fgetcsv) et appelle un callback par ligne.
-     * Correctement gère BOM UTF-8, CRLF et champs entre guillemets.
-     */
-    protected function iterate_csv_rows_stream( $file_path, callable $callback ) {
-        $stream = $this->open_csv_stream( $file_path );
-        if ( null === $stream ) {
-            return 0;
-        }
-
-        [ 'handle' => $handle, 'delimiter' => $delimiter, 'header' => $header ] = $stream;
-
-        $count = 0;
-
-        while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
-            if ( empty( $data ) || count( $data ) !== count( $header ) ) {
-                continue;
-            }
-
-            $row = array();
-            foreach ( $header as $j => $key ) {
-                $row[ $key ] = isset( $data[ $j ] ) ? $data[ $j ] : '';
-            }
-
-            $callback( $row, $count );
-            $count++;
-        }
-
-        fclose( $handle );
-
-        return $count;
-    }
-
-    /**
-     * Essaie de récupérer le code produit à partir d'une ligne CSV
-     * (ProductCode, ProductId, etc.)
-     */
-    protected function get_product_code_from_row( $row ) {
-        if ( isset( $row['productcode'] ) && $row['productcode'] !== '' ) {
-            return trim( $row['productcode'] );
-        }
-        if ( isset( $row['productid'] ) && $row['productid'] !== '' ) {
-            return trim( $row['productid'] );
-        }
-        if ( isset( $row['code'] ) && $row['code'] !== '' ) {
-            return trim( $row['code'] );
-        }
-
-        return '';
-    }
-
-    /* ======== PARSING DES DIFFÉRENTS CATALOGUES ======== */
-
-    /**
-     * Parsing du catalog References
-     * Fichier : ProductCode, NewPartNumber, ShortDescription, FurtherDescription, ...
-     */
-    protected function parse_references_csv( $file_path ) {
-        $this->logger->log( 'Parsing References CSV : ' . $file_path );
-
-        $result               = array();
-        $first_logged         = false;
-        $cat_levels_filled    = 0;
-        $cat_levels_empty     = 0;
-
-        $count = $this->iterate_csv_rows(
-            $file_path,
-            function( $row ) use ( &$result, &$first_logged, &$cat_levels_filled, &$cat_levels_empty ) {
-                $code = $this->get_product_code_from_row( $row );
-                if ( $code === '' ) {
-                    return;
-                }
-
-                if ( ! $first_logged ) {
-                    $first_logged = true;
-                    $this->logger->log( 'En-têtes CSV References : ' . implode( ', ', array_keys( $row ) ) );
-                    $first_long1 = isset( $row['longdescription1'] ) ? $row['longdescription1'] : 'N/A';
-                    $first_short = isset( $row['shortdescription'] ) ? $row['shortdescription'] : 'N/A';
-                    $this->logger->log( "Première ligne - Code: {$code}, LongDescription1: {$first_long1}, ShortDescription: {$first_short}" );
-                }
-
-                $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
-                $name            = '';
-
-                // À partir de maintenant, on ne remplit plus cat_l1/2/3 depuis References.
-                // La hiérarchie détaillée vient exclusivement des catalogues cat-extended-full.
-                $cat_l1          = '';
-                $cat_l2          = '';
-                $cat_l3          = '';
-
-                // Utiliser LongDescription1 pour le nom du produit
-                if ( ! empty( $row['longdescription1'] ) ) {
-                    $name = trim( $row['longdescription1'] );
-                } elseif ( ! empty( $row['shortdescription'] ) ) {
-                    $name = trim( $row['shortdescription'] );
-                } elseif ( ! empty( $row['furtherdescription'] ) ) {
-                    $name = trim( $row['furtherdescription'] );
-                }
-
-                $description = '';
-                if ( ! empty( $row['furtherdescription'] ) ) {
-                    $description = trim( $row['furtherdescription'] );
-                }
-
-                // On ignore désormais complètement CategoryPath dans References.
-                // Toute la hiérarchie sera fournie par les fichiers cat-extended-full-*.csv.
-
-                $result[ $code ] = array(
-                    'product_code'    => $code,
-                    'new_part_number' => $new_part_number ?: null,
-                    'name'            => $name ?: null,
-                    'description'     => $description ?: null,
-                    'cat_l1'          => $cat_l1 ?: null,
-                    'cat_l2'          => $cat_l2 ?: null,
-                    'cat_l3'          => $cat_l3 ?: null,
-                );
-            }
-        );
-
-        $this->logger->log( 'Parsing References: ' . $count . ' lignes.' );
-        $this->logger->log( 'References: hiérarchie non utilisée (cat_l1/2/3 gérés uniquement via cat-extended-full-*.csv).' );
-
-        return $result;
-    }
-
-    /**
-     * Mapping des codes de catégorie vers leurs noms complets
-     */
-    protected function get_category_mapping() {
-        return array(
-            'A' => 'RIDER GEAR',
-            'B' => 'VEHICLE PARTS & ACCESSORIES',
-            'C' => 'LIQUIDS & LUBRICANTS',
-            'D' => 'TIRES & ACCESSORIES',
-            'E' => 'TOOLING & WS',
-            'G' => 'OTHER PRODUCTS & SERVICES',
-        );
-    }
-
-    /**
-     * Extrait le code de catégorie depuis le nom du fichier
-     * Ex: cat-extref-full-FR01-FR001-fr-2025_12_04_01_15_01_A.csv → A
-     */
-    protected function extract_category_from_filename( $file_path ) {
-        $basename = basename( $file_path );
-        
-        // Pattern: cat-extref-full-..._X.csv où X est A, B, C, D, E ou G
-        if ( preg_match( '/_([A-G])\.csv$/i', $basename, $matches ) ) {
-            $code = strtoupper( $matches[1] );
-            $mapping = $this->get_category_mapping();
-            
-            if ( isset( $mapping[ $code ] ) ) {
-                return $mapping[ $code ];
-            }
-        }
-        
-        return null;
-    }
-
-    /**
-     * Parsing du catalog ExtendedReferences
-     * Fichier : ProductCode, Description, LongDescription, TechnicalDescription, FurtherDescription
-     * Catégorie extraite depuis le nom du fichier (ex: *_A.csv = RIDER GEAR)
-     */
-    protected function parse_extendedreferences_csv( $file_path ) {
-        $this->logger->log( 'Parsing ExtendedReferences CSV : ' . $file_path );
-
-        $result = array();
-        $first_logged = false;
-        $category = $this->extract_category_from_filename( $file_path );
-
-        $count = $this->iterate_csv_rows(
-            $file_path,
-            function( $row ) use ( &$result, &$first_logged, $category ) {
-                $code = $this->get_product_code_from_row( $row );
-                if ( $code === '' ) {
-                    return;
-                }
-
-                if ( ! $first_logged ) {
-                    $first_logged = true;
-                    $this->logger->log( 'En-têtes CSV ExtendedReferences : ' . implode( ', ', array_keys( $row ) ) );
-                    $first_long1 = isset( $row['longdescription1'] ) ? substr( $row['longdescription1'], 0, 50 ) : 'N/A';
-                    $first_long  = isset( $row['longdescription'] ) ? substr( $row['longdescription'], 0, 50 ) : 'N/A';
-                    $this->logger->log( "Première ligne ExtendedRef - Code: {$code}, LongDescription1: {$first_long1}, LongDescription: {$first_long}" );
-                }
-
-                // Tentative de récupération de la description la plus complète
-                $description = '';
-                
-                // Priorité : LongDescription > TechnicalDescription > Description
-                if ( ! empty( $row['longdescription'] ) ) {
-                    $description = trim( $row['longdescription'] );
-                } elseif ( ! empty( $row['technicaldescription'] ) ) {
-                    $description = trim( $row['technicaldescription'] );
-                } elseif ( ! empty( $row['description'] ) ) {
-                    $description = trim( $row['description'] );
-                }
-
-                // Nom : utiliser LongDescription1 en priorité (pour le nom du produit WooCommerce)
-                $name = '';
-                if ( ! empty( $row['longdescription1'] ) ) {
-                    $name = trim( $row['longdescription1'] );
-                } elseif ( ! empty( $row['furtherdescription'] ) ) {
-                    $name = trim( $row['furtherdescription'] );
-                } elseif ( ! empty( $row['shortdescription'] ) ) {
-                    $name = trim( $row['shortdescription'] );
-                } elseif ( ! empty( $row['name'] ) ) {
-                    $name = trim( $row['name'] );
-                }
-
-                $result[ $code ] = array(
-                    'description' => $description ?: null,
-                    'category'    => $category,
-                );
-
-                // On écrase toujours le nom avec celui d'ExtendedReferences (priorité absolue)
-                if ( $name ) {
-                    $result[ $code ]['name'] = $name;
-                }
-            }
-        );
-
-        $this->logger->log( 'Parsing ExtendedReferences: ' . $count . ' lignes.' );
-
-        return $result;
-    }
-
-    /**
-     * Parsing du catalog Prices
-     * Fichier : ProductCode, DealerPrice, ...
-     */
-    protected function parse_prices_csv( $file_path ) {
-        $this->logger->log( 'Parsing Prices CSV : ' . $file_path );
-
-        $result = array();
-
-        $count = $this->iterate_csv_rows(
-            $file_path,
-            function( $row ) use ( &$result ) {
-                $code = $this->get_product_code_from_row( $row );
-                if ( $code === '' ) {
-                    return;
-                }
-
-                // Colonne DealerPrice, parfois DealerPriceHT, etc.
-                $price = null;
-                if ( isset( $row['dealerprice'] ) && $row['dealerprice'] !== '' ) {
-                    $price = (float) str_replace( ',', '.', $row['dealerprice'] );
-                } elseif ( isset( $row['dealerpriceht'] ) && $row['dealerpriceht'] !== '' ) {
-                    $price = (float) str_replace( ',', '.', $row['dealerpriceht'] );
-                }
-
-                if ( $price === null ) {
-                    return;
-                }
-
-                $result[ $code ] = array(
-                    'dealer_price_ht' => $price,
-                );
-            }
-        );
-
-        $this->logger->log( 'Parsing Prices: ' . $count . ' lignes.' );
-
-        return $result;
-    }
-
-    /**
-     * Parsing du catalog Images
-     * On récupère simplement le chemin (colonne Url) sans préfixe.
-     * Le préfixe https://api.mybihr.com sera ajouté plus tard.
-     * Fichier : ProductCode, Url, IsDefault, NewPartNumber
-     */
-    protected function parse_images_csv( $file_path ) {
-        $this->logger->log( 'Parsing Images CSV : ' . $file_path );
-
-        $result = array();
-
-        $count = $this->iterate_csv_rows(
-            $file_path,
-            function( $row ) use ( &$result ) {
-                $code = $this->get_product_code_from_row( $row );
-                if ( $code === '' ) {
-                    return;
-                }
-
-                // Colonne URL du CSV (en minuscules -> 'url')
-                $url_path = isset( $row['url'] ) ? trim( $row['url'] ) : '';
-                if ( $url_path === '' ) {
-                    return;
-                }
-
-                // Colonne IsDefault (facultative) :
-                // On ne filtre pas sur ce champ pour l'instant,
-                // on prendra simplement la première image trouvée pour chaque produit.
-
-                // Si une image existe déjà pour ce code, on ne la remplace pas
-                if ( isset( $result[ $code ] ) ) {
-                    return;
-                }
-
-                $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
-
-                $result[ $code ] = array(
-                    'image_url' => $url_path, // chemin brut, sans préfixe
-                );
-
-                if ( $new_part_number !== '' ) {
-                    $result[ $code ]['new_part_number'] = $new_part_number;
-                }
-            }
-        );
-
-        $this->logger->log( 'Parsing Images: ' . $count . ' lignes.' );
-
-        return $result;
-    }
-
-    /**
-     * Parsing du catalog Inventory (Stock)
-     * Fichier : ProductId, StockLevel, StockLevelDescription, NewPartNumber
-     */
-    protected function parse_inventory_csv( $file_path ) {
-        $this->logger->log( 'Parsing Inventory CSV : ' . $file_path );
-
-        $result = array();
-        $first_logged = false;
-
-        $count = $this->iterate_csv_rows(
-            $file_path,
-            function( $row ) use ( &$result, &$first_logged ) {
-                $code = $this->get_product_code_from_row( $row );
-                if ( $code === '' ) {
-                    return;
-                }
-
-                if ( ! $first_logged ) {
-                    $first_logged = true;
-                    $this->logger->log( 'En-têtes CSV Inventory : ' . implode( ', ', array_keys( $row ) ) );
-                    $first_stock = isset( $row['stocklevel'] ) ? $row['stocklevel'] : 'N/A';
-                    $this->logger->log( "Première ligne Inventory - Code: {$code}, StockLevel: {$first_stock}" );
-                }
-
-                $stock_level       = isset( $row['stocklevel'] ) ? (int) $row['stocklevel'] : null;
-                $stock_description = isset( $row['stockleveldescription'] ) ? trim( $row['stockleveldescription'] ) : '';
-
-                $new_part_number = isset( $row['newpartnumber'] ) ? trim( $row['newpartnumber'] ) : '';
-
-                $result[ $code ] = array(
-                    'stock_level'       => $stock_level,
-                    'stock_description' => $stock_description ?: null,
-                );
-
-                if ( $new_part_number !== '' ) {
-                    $result[ $code ]['new_part_number'] = $new_part_number;
-                }
-            }
-        );
-
-        $this->logger->log( 'Parsing Inventory: ' . $count . ' lignes.' );
-
-        return $result;
-    }
-
-    /**
-     * Parsing du catalog Attributes (optionnel)
-     * Ici, on se contente de concaténer les attributs dans la description.
-     */
-    protected function parse_attributes_csv( $file_path ) {
-        $this->logger->log( 'Parsing Attributes CSV : ' . $file_path );
-
-        $result = array();
-
-        $count = $this->iterate_csv_rows(
-            $file_path,
-            function( $row ) use ( &$result ) {
-                $code = $this->get_product_code_from_row( $row );
-                if ( $code === '' ) {
-                    return;
-                }
-
-                // On concatène grossièrement tous les champs (sauf le code) en texte
-                $parts = array();
-                foreach ( $row as $key => $value ) {
-                    if ( in_array( $key, array( 'productcode', 'productid', 'code' ), true ) ) {
-                        continue;
-                    }
-                    if ( $value === '' ) {
-                        continue;
-                    }
-                    $parts[] = $key . '=' . $value;
-                }
-
-                if ( empty( $parts ) ) {
-                    return;
-                }
-
-                $attr_text = 'Attributs Bihr : ' . implode( ' | ', $parts );
-
-                $result[ $code ] = array(
-                    'attributes_text' => $attr_text,
-                );
-            }
-        );
-
-        $this->logger->log( 'Parsing Attributes: ' . $count . ' lignes.' );
-
-        return $result;
     }
 
     /**

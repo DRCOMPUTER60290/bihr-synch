@@ -15,6 +15,7 @@ class BihrWI_Admin {
         $this->api_client           = new BihrWI_API_Client( $this->logger );
         $this->product_sync         = new BihrWI_Product_Sync( $this->logger );
         $this->category_translator  = new BihrWI_Category_Translator( $this->logger );
+        new BihrWI_Admin_Category_Ajax( $this->category_translator );
 
         add_action( 'admin_menu', array( $this, 'register_menus' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
@@ -77,14 +78,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihr_get_all_filtered_ids', array( $this, 'ajax_get_all_filtered_ids' ) );
         add_action( 'wp_ajax_bihr_test_openai_key', array( $this, 'ajax_test_openai_key' ) );
 
-        // Handlers traduction catégories
-        add_action( 'wp_ajax_bihrwi_analyze_categories', array( $this, 'ajax_analyze_categories' ) );
-        add_action( 'wp_ajax_bihrwi_apply_french_categories', array( $this, 'ajax_apply_french_categories' ) );
-        add_action( 'wp_ajax_bihrwi_prepare_categories', array( $this, 'ajax_prepare_categories' ) );
-        add_action( 'wp_ajax_bihrwi_apply_categories_chunk', array( $this, 'ajax_apply_categories_chunk' ) );
-        add_action( 'wp_ajax_bihrwi_get_category_translations', array( $this, 'ajax_get_category_translations' ) );
-        add_action( 'wp_ajax_bihrwi_clear_category_mapping', array( $this, 'ajax_clear_category_mapping' ) );
-        add_action( 'wp_ajax_bihrwi_export_category_mapping', array( $this, 'ajax_export_category_mapping' ) );
+        // Handlers traduction catégories — délégués à BihrWI_Admin_Category_Ajax (instancié ci-dessus)
 
         // Handlers pour synchronisation automatique des stocks
         add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
@@ -1948,9 +1942,7 @@ class BihrWI_Admin {
         delete_option( 'bihrwi_image_dl_stopped' );
 
         // Lance le cron de secours (tourne même si la page est fermée)
-        if ( ! wp_next_scheduled( 'bihrwi_mass_image_event' ) ) {
-            wp_schedule_single_event( time() + 5, 'bihrwi_mass_image_event' );
-        }
+        $this->schedule_bihr_action( 'bihrwi_mass_image_event', 5 );
 
         wp_send_json_success( array(
             'remaining' => $remaining,
@@ -2034,6 +2026,25 @@ class BihrWI_Admin {
     }
 
     /**
+     * Planifie une action unique via Action Scheduler (si disponible) ou WP-Cron.
+     * Action Scheduler offre retry automatique et n'est pas bloqué par les requêtes HTTP.
+     *
+     * @param string $hook  Nom du hook WP-Cron / AS.
+     * @param int    $delay Délai en secondes avant l'exécution.
+     */
+    private function schedule_bihr_action( string $hook, int $delay = 60 ): void {
+        if ( function_exists( 'as_schedule_single_action' ) ) {
+            if ( ! as_next_scheduled_action( $hook, array(), 'bihr-synch' ) ) {
+                as_schedule_single_action( time() + $delay, $hook, array(), 'bihr-synch' );
+            }
+            return;
+        }
+        if ( ! wp_next_scheduled( $hook ) ) {
+            wp_schedule_single_event( time() + $delay, $hook );
+        }
+    }
+
+    /**
      * Handler du formulaire "Import massif en tâche de fond"
      *
      * Lance un job WP‑Cron qui va importer tous les produits correspondant aux
@@ -2114,13 +2125,9 @@ class BihrWI_Admin {
         ) );
 
         // Planifier le premier batch produits
-        if ( ! wp_next_scheduled( 'bihrwi_mass_import_event' ) ) {
-            wp_schedule_single_event( time() + 10, 'bihrwi_mass_import_event' );
-        }
+        $this->schedule_bihr_action( 'bihrwi_mass_import_event', 10 );
         // Planifier le cron image en parallèle (démarre 30s après)
-        if ( ! wp_next_scheduled( 'bihrwi_mass_image_event' ) ) {
-            wp_schedule_single_event( time() + 30, 'bihrwi_mass_image_event' );
-        }
+        $this->schedule_bihr_action( 'bihrwi_mass_image_event', 30 );
 
         wp_safe_redirect(
             add_query_arg(
@@ -2220,7 +2227,7 @@ class BihrWI_Admin {
             // Replanifier
             $remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
             if ( $remaining > 0 ) {
-                wp_schedule_single_event( time() + 60, 'bihrwi_mass_import_event' );
+                $this->schedule_bihr_action( 'bihrwi_mass_import_event', 60 );
             }
             return;
         }
@@ -2322,7 +2329,7 @@ class BihrWI_Admin {
         // Replanifier à +60s (minimum du vrai cron o2switch)
         $remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
         if ( $remaining > 0 ) {
-            wp_schedule_single_event( time() + 60, 'bihrwi_mass_import_event' );
+            $this->schedule_bihr_action( 'bihrwi_mass_import_event', 60 );
         } else {
             $this->logger->log( '[Mass Import] Tous les produits ont été traités.' );
         }
@@ -2369,7 +2376,7 @@ class BihrWI_Admin {
 
         if ( $remaining > 0 ) {
             $this->logger->log( sprintf( '[Mass Image] %d restantes — prochain run dans 30s', $remaining ) );
-            wp_schedule_single_event( time() + 30, 'bihrwi_mass_image_event' );
+            $this->schedule_bihr_action( 'bihrwi_mass_image_event', 30 );
         } else {
             $this->logger->log( '[Mass Image] Toutes les images téléchargées.' );
             delete_option( 'bihrwi_image_dl_total' );
@@ -3561,163 +3568,5 @@ class BihrWI_Admin {
         include BIHRWI_PLUGIN_DIR . 'admin/views/categories-page.php';
     }
 
-    /**
-     * AJAX : analyse des CSV + traduction IA (streaming JSON)
-     */
-    public function ajax_analyze_categories() {
-        check_ajax_referer( 'bihrwi_analyze_categories_action', '_wpnonce' );
-
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_die( 'Accès refusé', 403 );
-        }
-
-        set_time_limit( 0 );
-        ignore_user_abort( true );
-        header( 'Content-Type: text/plain; charset=utf-8' );
-        header( 'X-Accel-Buffering: no' );
-        header( 'Cache-Control: no-cache' );
-
-        $this->category_translator->analyze_and_translate(
-            function( $type, $message, $current, $total, $extra = array() ) {
-                $data = array(
-                    'type'    => $type,
-                    'message' => $message,
-                    'current' => $current,
-                    'total'   => $total,
-                );
-                if ( ! empty( $extra ) ) {
-                    $data['extra'] = $extra;
-                }
-                echo wp_json_encode( $data ) . "\n";
-                if ( ob_get_level() ) {
-                    ob_flush();
-                }
-                flush();
-            }
-        );
-
-        exit;
-    }
-
-    /**
-     * AJAX : renomme les termes product_cat anglais en français via le mapping (streaming JSON)
-     */
-    public function ajax_apply_french_categories() {
-        check_ajax_referer( 'bihrwi_apply_french_categories_action', '_wpnonce' );
-
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_die( 'Accès refusé', 403 );
-        }
-
-        set_time_limit( 120 );
-        ignore_user_abort( true );
-        header( 'Content-Type: text/plain; charset=utf-8' );
-        header( 'X-Accel-Buffering: no' );
-        header( 'Cache-Control: no-cache' );
-
-        $this->category_translator->rename_categories_to_french(
-            function( $type, $message, $current, $total, $extra = array() ) {
-                $data = array(
-                    'type'    => $type,
-                    'message' => $message,
-                    'current' => $current,
-                    'total'   => $total,
-                );
-                if ( ! empty( $extra ) ) {
-                    $data['extra'] = $extra;
-                }
-                echo wp_json_encode( $data ) . "\n";
-                if ( ob_get_level() ) {
-                    ob_flush();
-                }
-                flush();
-            }
-        );
-
-        exit;
-    }
-
-    /**
-     * AJAX : phase 1 chunked — compte les produits et pré-crée les termes WC.
-     */
-    public function ajax_prepare_categories() {
-        check_ajax_referer( 'bihrwi_apply_french_categories_action', '_wpnonce' );
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( 'Accès refusé', 403 );
-        }
-        set_time_limit( 300 );
-        $result = $this->category_translator->prepare_category_apply();
-        if ( isset( $result['error'] ) ) {
-            wp_send_json_error( $result['error'] );
-        }
-        wp_send_json_success( $result );
-    }
-
-    /**
-     * AJAX : phase 2 chunked — traite un lot de produits.
-     */
-    public function ajax_apply_categories_chunk() {
-        check_ajax_referer( 'bihrwi_apply_french_categories_action', '_wpnonce' );
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( 'Accès refusé', 403 );
-        }
-        set_time_limit( 60 );
-        $last_id    = isset( $_POST['last_id'] ) ? max( 0, (int) $_POST['last_id'] ) : 0;
-        $chunk_size = 200;
-        $result     = $this->category_translator->apply_category_chunk( $last_id, $chunk_size );
-        if ( isset( $result['error'] ) ) {
-            wp_send_json_error( $result['error'] );
-        }
-        wp_send_json_success( $result );
-    }
-
-    /**
-     * AJAX : liste paginée des traductions pour l'interface admin
-     */
-    public function ajax_get_category_translations() {
-        check_ajax_referer( 'bihrwi_categories_nonce', '_wpnonce' );
-
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( 'Accès refusé' );
-        }
-
-        $search   = isset( $_GET['search'] ) ? sanitize_text_field( wp_unslash( $_GET['search'] ) ) : '';
-        $page     = isset( $_GET['page_num'] ) ? max( 1, intval( $_GET['page_num'] ) ) : 1;
-        $per_page = 50;
-
-        $result = $this->category_translator->get_all_translations( $search, $page, $per_page );
-        wp_send_json_success( $result );
-    }
-
-    /**
-     * AJAX : suppression du cache de traductions
-     */
-    public function ajax_clear_category_mapping() {
-        check_ajax_referer( 'bihrwi_categories_nonce', '_wpnonce' );
-
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( 'Accès refusé' );
-        }
-
-        $this->category_translator->clear_mapping();
-        wp_send_json_success( array( 'message' => 'Cache des traductions supprimé.' ) );
-    }
-
-    /**
-     * AJAX : export CSV du mapping
-     */
-    public function ajax_export_category_mapping() {
-        check_ajax_referer( 'bihrwi_categories_nonce', '_wpnonce' );
-
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_die( 'Accès refusé', 403 );
-        }
-
-        $csv = $this->category_translator->export_mapping_as_csv();
-        header( 'Content-Type: text/csv; charset=utf-8' );
-        header( 'Content-Disposition: attachment; filename="bihr-categories-traductions.csv"' );
-        header( 'Cache-Control: no-cache' );
-        echo $csv; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-        exit;
-    }
 }
+
