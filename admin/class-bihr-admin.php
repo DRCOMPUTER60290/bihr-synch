@@ -83,6 +83,8 @@ class BihrWI_Admin {
         // Handlers pour synchronisation automatique des stocks
         add_action( 'admin_post_bihrwi_save_stock_sync_settings', array( $this, 'handle_save_stock_sync_settings' ) );
         add_action( 'wp_ajax_bihrwi_manual_stock_sync', array( $this, 'ajax_manual_stock_sync' ) );
+        add_action( 'wp_ajax_bihrwi_browser_start_import', array( $this, 'ajax_browser_start_import' ) );
+        add_action( 'wp_ajax_bihrwi_browser_import_chunk', array( $this, 'ajax_browser_import_chunk' ) );
         
         // WP-Cron hooks pour synchronisation automatique
         add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
@@ -2139,6 +2141,226 @@ class BihrWI_Admin {
             )
         );
         exit;
+    }
+
+    /**
+     * AJAX : initialise la queue pour l'import navigateur, sans redirection.
+     * Même logique que handle_start_mass_import() mais retourne JSON.
+     */
+    public function ajax_browser_start_import() {
+        check_ajax_referer( 'bihrwi_browser_import_nonce', '_wpnonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Accès refusé', 403 );
+        }
+
+        $filter_search     = isset( $_POST['search'] )          ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
+        $filter_stock      = isset( $_POST['stock_filter'] )    ? sanitize_text_field( wp_unslash( $_POST['stock_filter'] ) ) : '';
+        $filter_price_min  = isset( $_POST['price_min'] )       ? sanitize_text_field( wp_unslash( $_POST['price_min'] ) ) : '';
+        $filter_price_max  = isset( $_POST['price_max'] )       ? sanitize_text_field( wp_unslash( $_POST['price_max'] ) ) : '';
+        $filter_category   = isset( $_POST['category_filter'] ) ? sanitize_text_field( wp_unslash( $_POST['category_filter'] ) ) : '';
+        $filter_cat_l1     = isset( $_POST['cat_l1'] )          ? sanitize_text_field( wp_unslash( $_POST['cat_l1'] ) ) : '';
+        $filter_cat_l2     = isset( $_POST['cat_l2'] )          ? sanitize_text_field( wp_unslash( $_POST['cat_l2'] ) ) : '';
+        $filter_cat_l3     = isset( $_POST['cat_l3'] )          ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
+        $filter_cat_l2_not = isset( $_POST['cat_l2_not'] )      ? sanitize_text_field( wp_unslash( $_POST['cat_l2_not'] ) ) : '';
+
+        $ids = $this->product_sync->get_all_filtered_product_ids(
+            $filter_search, $filter_stock, $filter_price_min, $filter_price_max,
+            $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3, $filter_cat_l2_not
+        );
+
+        if ( empty( $ids ) ) {
+            wp_send_json_error( 'Aucun produit ne correspond aux filtres sélectionnés.' );
+            return;
+        }
+
+        global $wpdb;
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+        $wpdb->query( "TRUNCATE TABLE `{$queue_table}`" );
+
+        foreach ( array_chunk( array_map( 'intval', $ids ), 500 ) as $chunk ) {
+            $placeholders = implode( ',', array_fill( 0, count( $chunk ), '(%d, %s)' ) );
+            $flat_values  = array();
+            foreach ( $chunk as $id ) {
+                $flat_values[] = $id;
+                $flat_values[] = 'pending';
+            }
+            $wpdb->query( $wpdb->prepare(
+                "INSERT INTO `{$queue_table}` (bihr_id, status) VALUES {$placeholders}",
+                $flat_values
+            ) );
+        }
+
+        update_option( 'bihrwi_mass_import_stats', array(
+            'total'      => count( $ids ),
+            'started_at' => time(),
+            'success'    => 0,
+            'errors'     => 0,
+        ) );
+
+        wp_send_json_success( array(
+            'total'   => count( $ids ),
+            'message' => sprintf( '%d produits ajoutés à la file d\'attente.', count( $ids ) ),
+        ) );
+    }
+
+    /**
+     * AJAX : traite un batch depuis la queue sans planifier de cron (mode navigateur).
+     * Appelé en boucle par JavaScript jusqu'à ce que done=true soit retourné.
+     */
+    public function ajax_browser_import_chunk() {
+        check_ajax_referer( 'bihrwi_browser_import_nonce', '_wpnonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Accès refusé', 403 );
+        }
+
+        @set_time_limit( 360 );
+        global $wpdb;
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+        $batch_size  = 200;
+
+        $pending = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = %s",
+            'pending'
+        ) );
+
+        if ( 0 === $pending ) {
+            $stats = get_option( 'bihrwi_mass_import_stats', array() );
+            delete_option( 'bihrwi_mass_import_stats' );
+            wp_send_json_success( array(
+                'done'    => true,
+                'pending' => 0,
+                'success' => (int) ( $stats['success'] ?? 0 ),
+                'errors'  => (int) ( $stats['errors'] ?? 0 ),
+                'total'   => (int) ( $stats['total'] ?? 0 ),
+                'percent' => 100.0,
+            ) );
+            return;
+        }
+
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT id, bihr_id FROM `{$queue_table}` WHERE status = 'pending' ORDER BY id ASC LIMIT %d",
+            $batch_size
+        ) );
+
+        if ( empty( $rows ) ) {
+            wp_send_json_success( array( 'done' => true, 'pending' => 0, 'percent' => 100.0 ) );
+            return;
+        }
+
+        $stats   = get_option( 'bihrwi_mass_import_stats', array( 'total' => 0, 'success' => 0, 'errors' => 0 ) );
+        $success = (int) ( $stats['success'] ?? 0 );
+        $errors  = (int) ( $stats['errors'] ?? 0 );
+        $total   = (int) ( $stats['total'] ?? 0 );
+
+        $batch_bihr_ids = array_map( function( $r ) { return (int) $r->bihr_id; }, $rows );
+        $unimported_ids = $this->product_sync->filter_unimported_products( $batch_bihr_ids );
+        $unimported_set = array_flip( $unimported_ids );
+        $rows_to_skip    = array();
+        $rows_to_process = array();
+        foreach ( $rows as $r ) {
+            if ( isset( $unimported_set[ (int) $r->bihr_id ] ) ) {
+                $rows_to_process[] = $r;
+            } else {
+                $rows_to_skip[] = $r;
+            }
+        }
+
+        if ( ! empty( $rows_to_skip ) ) {
+            $skip_ids = array_map( function( $r ) { return (int) $r->id; }, $rows_to_skip );
+            $ph = implode( ',', array_fill( 0, count( $skip_ids ), '%d' ) );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='done' WHERE id IN ({$ph})", $skip_ids ) );
+            $success += count( $rows_to_skip );
+        }
+
+        if ( ! empty( $rows_to_process ) ) {
+            $proc_bihr_ids = array_map( function( $r ) { return (int) $r->bihr_id; }, $rows_to_process );
+            $this->product_sync->preload_product_rows( $proc_bihr_ids );
+            $this->product_sync->preload_product_lookup( $proc_bihr_ids );
+
+            if ( function_exists( 'wc_defer_product_counting' ) ) {
+                wc_defer_product_counting( true );
+            }
+            if ( function_exists( 'wc_defer_transaction_requests' ) ) {
+                wc_defer_transaction_requests( true );
+            }
+            wp_defer_term_counting( true );
+
+            $this->logger->set_min_level( BihrWI_Logger::LEVEL_WARN );
+            $this->logger->enable_buffer();
+            $this->product_sync->reset_margin_cache();
+
+            $done_ids  = array();
+            $error_ids = array();
+            $i = 0;
+            foreach ( $rows_to_process as $row ) {
+                $queue_id   = (int) $row->id;
+                $product_id = (int) $row->bihr_id;
+                try {
+                    $wc_id = $this->product_sync->import_to_woocommerce( $product_id, true );
+                    if ( $wc_id ) {
+                        $success++;
+                        $done_ids[] = $queue_id;
+                    } else {
+                        $errors++;
+                        $error_ids[] = $queue_id;
+                    }
+                } catch ( Throwable $e ) {
+                    $errors++;
+                    $error_ids[] = $queue_id;
+                }
+                $i++;
+                if ( 0 === $i % 50 ) {
+                    wp_cache_flush();
+                    if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
+                        $wpdb->queries = array();
+                    }
+                }
+            }
+
+            if ( ! empty( $done_ids ) ) {
+                $ph = implode( ',', array_fill( 0, count( $done_ids ), '%d' ) );
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='done' WHERE id IN ({$ph})", $done_ids ) );
+            }
+            if ( ! empty( $error_ids ) ) {
+                $ph = implode( ',', array_fill( 0, count( $error_ids ), '%d' ) );
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='error' WHERE id IN ({$ph})", $error_ids ) );
+            }
+
+            $wpdb->flush();
+
+            if ( function_exists( 'wc_defer_product_counting' ) ) {
+                wc_defer_product_counting( false );
+            }
+            wp_defer_term_counting( false );
+
+            $this->logger->flush_buffer();
+            $this->logger->disable_buffer();
+            $this->logger->set_min_level( BihrWI_Logger::LEVEL_DEBUG );
+        }
+
+        $stats['success'] = $success;
+        $stats['errors']  = $errors;
+        update_option( 'bihrwi_mass_import_stats', $stats );
+
+        $new_pending = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = %s",
+            'pending'
+        ) );
+
+        $done_count = $total > 0 ? ( $total - $new_pending ) : count( $rows );
+        $percent    = $total > 0 ? round( $done_count / $total * 100, 1 ) : 0.0;
+
+        wp_send_json_success( array(
+            'done'    => ( 0 === $new_pending ),
+            'pending' => $new_pending,
+            'total'   => $total,
+            'success' => $success,
+            'errors'  => $errors,
+            'percent' => $percent,
+        ) );
     }
 
     /**

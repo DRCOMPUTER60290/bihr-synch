@@ -1601,6 +1601,133 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 Import massif en tâche de fond (tous les produits filtrés)
             </button>
         </form>
+
+        <!-- Import rapide navigateur — sans délai cron, JS drive le loop -->
+        <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <button type="button" id="bihr-browser-import-btn" class="button button-primary"
+                    data-nonce="<?php echo esc_attr( wp_create_nonce( 'bihrwi_browser_import_nonce' ) ); ?>"
+                    data-search="<?php echo esc_attr( $filter_search ); ?>"
+                    data-stock="<?php echo esc_attr( $filter_stock ); ?>"
+                    data-price-min="<?php echo esc_attr( $filter_price_min ); ?>"
+                    data-price-max="<?php echo esc_attr( $filter_price_max ); ?>"
+                    data-category="<?php echo esc_attr( $filter_category ); ?>"
+                    data-cat-l1="<?php echo esc_attr( $filter_cat_l1 ); ?>"
+                    data-cat-l2="<?php echo esc_attr( $filter_cat_l2 ); ?>"
+                    data-cat-l3="<?php echo esc_attr( $filter_cat_l3 ); ?>"
+                    data-cat-l2-not="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>">
+                <span class="dashicons dashicons-performance" style="vertical-align:middle;"></span>
+                Import rapide (navigateur) — sans délai cron
+            </button>
+            <span style="color:#666; font-size:12px;">Gardez cet onglet ouvert. Les images sont téléchargées séparément.</span>
+        </div>
+
+        <!-- Barre de progression import rapide navigateur -->
+        <div id="bihr-bi-wrap" style="display:none; margin-top:12px; padding:14px 16px; background:#fff; border:1px solid #ccd0d4; border-radius:4px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
+                <strong id="bihr-bi-label" style="min-width:220px;">Initialisation…</strong>
+                <div style="flex:1; min-width:160px; background:#e0e0e0; border-radius:3px; height:16px; overflow:hidden;">
+                    <div id="bihr-bi-bar" style="width:0%; height:100%; background:#0073aa; border-radius:3px; transition:width 0.4s;"></div>
+                </div>
+                <span id="bihr-bi-pct" style="min-width:36px; font-weight:700; text-align:right;">0%</span>
+                <button type="button" id="bihr-bi-stop" class="button" style="border-color:#d63638; color:#d63638;">
+                    <span class="dashicons dashicons-controls-pause" style="vertical-align:middle;"></span> Arrêter
+                </button>
+            </div>
+            <div id="bihr-bi-stats" style="font-size:12px; color:#777;"></div>
+        </div>
+
+        <script>
+        (function($) {
+            var bihrBIRunning = false, bihrBIStop = false;
+
+            $('#bihr-browser-import-btn').on('click', function() {
+                if (bihrBIRunning) return;
+                var btn   = $(this);
+                var nonce = btn.data('nonce');
+                var filters = {
+                    search:          btn.data('search')     || '',
+                    stock_filter:    btn.data('stock')      || '',
+                    price_min:       btn.data('price-min')  || '',
+                    price_max:       btn.data('price-max')  || '',
+                    category_filter: btn.data('category')   || '',
+                    cat_l1:          btn.data('cat-l1')     || '',
+                    cat_l2:          btn.data('cat-l2')     || '',
+                    cat_l3:          btn.data('cat-l3')     || '',
+                    cat_l2_not:      btn.data('cat-l2-not') || ''
+                };
+
+                bihrBIRunning = true;
+                bihrBIStop    = false;
+                btn.prop('disabled', true);
+                $('#bihr-bi-wrap').show();
+                $('#bihr-bi-label').text('Initialisation de la file d\'attente…');
+                $('#bihr-bi-bar').css('width', '0%');
+                $('#bihr-bi-pct').text('0%');
+                $('#bihr-bi-stats').text('');
+
+                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce}, filters))
+                    .done(function(resp) {
+                        if (!resp.success) {
+                            $('#bihr-bi-label').text('Erreur : ' + (resp.data || 'impossible de démarrer'));
+                            bihrBIRunning = false;
+                            btn.prop('disabled', false);
+                            return;
+                        }
+                        $('#bihr-bi-label').text(resp.data.message + ' — démarrage…');
+                        runNextChunk(nonce);
+                    })
+                    .fail(function() {
+                        $('#bihr-bi-label').text('Erreur réseau lors de l\'initialisation.');
+                        bihrBIRunning = false;
+                        btn.prop('disabled', false);
+                    });
+            });
+
+            $('#bihr-bi-stop').on('click', function() {
+                bihrBIStop = true;
+                $('#bihr-bi-label').text('Arrêt en cours… (le batch actuel se termine)');
+            });
+
+            function runNextChunk(nonce) {
+                if (bihrBIStop) {
+                    $('#bihr-bi-label').text('Import arrêté. Cliquez sur « Import rapide » pour reprendre.');
+                    bihrBIRunning = false;
+                    $('#bihr-browser-import-btn').prop('disabled', false);
+                    return;
+                }
+
+                $.post(ajaxurl, {action: 'bihrwi_browser_import_chunk', _wpnonce: nonce})
+                    .done(function(resp) {
+                        if (!resp.success) {
+                            $('#bihr-bi-label').text('Erreur serveur. Cliquez sur « Import rapide » pour reprendre.');
+                            bihrBIRunning = false;
+                            $('#bihr-browser-import-btn').prop('disabled', false);
+                            return;
+                        }
+                        var d = resp.data;
+                        $('#bihr-bi-bar').css('width', d.percent + '%');
+                        $('#bihr-bi-pct').text(d.percent + '%');
+                        $('#bihr-bi-stats').text('✓ ' + d.success + '  ✗ ' + d.errors + '  Total : ' + d.total + '  Restants : ' + d.pending);
+
+                        if (d.done) {
+                            $('#bihr-bi-label').text('✓ Import terminé ! ' + d.success + ' produits importés.');
+                            bihrBIRunning = false;
+                            $('#bihr-browser-import-btn').prop('disabled', false);
+                            return;
+                        }
+
+                        var etaMin = d.pending > 0 ? Math.round(d.pending / 200 * 45 / 60) : 0;
+                        var etaStr = etaMin > 0 ? ' (~' + etaMin + ' min restantes)' : '';
+                        $('#bihr-bi-label').text('Import en cours… ' + d.pending + ' produits restants' + etaStr);
+                        setTimeout(function() { runNextChunk(nonce); }, 200);
+                    })
+                    .fail(function() {
+                        setTimeout(function() { runNextChunk(nonce); }, 10000);
+                    });
+            }
+        })(jQuery);
+        </script>
+
     </div>
 
     <table class="widefat fixed striped">
