@@ -1045,7 +1045,6 @@ class BihrWI_Product_Sync {
                     CURLOPT_CONNECTTIMEOUT => 10,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_MAXREDIRS      => 3,
-                    CURLOPT_SSL_VERIFYPEER => false,
                 ) );
                 curl_multi_add_handle( $mh, $ch );
                 $curl_handles[ $i ] = $ch;
@@ -1583,6 +1582,10 @@ class BihrWI_Product_Sync {
         $this->logger->log( 'Inventory: ' . count( $inventory_data ) . ' entrées' );
         $this->logger->log( 'Attributes: ' . count( $attributes_data ) . ' entrées' );
         $this->logger->log( 'TOTAL FUSIONNÉ: ' . count( $merged ) . ' produits uniques' );
+
+        // Libérer la mémoire des arrays source — plus nécessaires pour la sauvegarde
+        unset( $references_data, $extendedreferences_data, $prices_data, $images_data, $inventory_data, $attributes_data );
+        gc_collect_cycles();
 
         // Écriture dans la table wp_bihr_products
         $this->logger->log( '--- Sauvegarde dans la base de données ---' );

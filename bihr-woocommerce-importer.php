@@ -130,11 +130,18 @@ function bihrwi_activate_plugin() {
     if ( ! file_exists( $log_dir ) ) {
         wp_mkdir_p( $log_dir );
     }
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    WP_Filesystem();
+    global $wp_filesystem;
     if ( ! file_exists( BIHRWI_LOG_FILE ) ) {
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        WP_Filesystem();
-        global $wp_filesystem;
         $wp_filesystem->put_contents( BIHRWI_LOG_FILE, '' );
+    }
+    // Protéger le dossier contre l'accès web direct et l'exécution PHP
+    if ( ! $wp_filesystem->exists( $log_dir . '/.htaccess' ) ) {
+        $wp_filesystem->put_contents( $log_dir . '/.htaccess', "deny from all\n" );
+    }
+    if ( ! $wp_filesystem->exists( $log_dir . '/index.php' ) ) {
+        $wp_filesystem->put_contents( $log_dir . '/index.php', '<?php // Silence is golden.' );
     }
 
     // Exécuter les migrations de schéma

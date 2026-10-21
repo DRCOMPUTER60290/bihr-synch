@@ -2227,6 +2227,7 @@ class BihrWI_Admin {
         }
 
         $batch_bihr_ids = $unimported_ids;
+        $this->product_sync->preload_product_rows( $batch_bihr_ids );
         $this->product_sync->preload_product_lookup( $batch_bihr_ids );
 
         // Désactiver les recomptages WooCommerce et WordPress pendant le batch

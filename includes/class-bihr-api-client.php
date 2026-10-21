@@ -141,7 +141,7 @@ class BihrWI_API_Client {
      * Lance la génération d’un catalog (References, Prices, Images, Attributes, Stocks, etc.)
      * Exemple type: 'Prices/Full' -> Catalog/LZMA/CSV/Prices/Full
      */
-    public function start_catalog_generation( $catalog_path ) {
+    public function start_catalog_generation( string $catalog_path, int $max_retries = 3 ) {
         $token = $this->get_token();
 
         // L'API attend le format: /Catalog/ZIP/CSV/{CatalogName}/Full
