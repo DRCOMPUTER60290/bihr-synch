@@ -1722,7 +1722,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                             return;
                         }
 
-                        var etaMin = d.pending > 0 ? Math.round(d.pending / 200 * 45 / 60) : 0;
+                        var etaMin = d.pending > 0 ? Math.round(d.pending / 50 * 12 / 60) : 0;
                         var etaStr = etaMin > 0 ? ' (~' + etaMin + ' min restantes)' : '';
                         $('#bihr-bi-label').text('Import en cours…' + etaStr);
                         setTimeout(function() { runNextChunk(nonce); }, 200);

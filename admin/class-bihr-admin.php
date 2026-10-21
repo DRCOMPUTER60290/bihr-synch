@@ -2216,7 +2216,7 @@ class BihrWI_Admin {
         @set_time_limit( 360 );
         global $wpdb;
         $queue_table = $wpdb->prefix . 'bihr_import_queue';
-        $batch_size  = 200;
+        $batch_size  = 50; // o2switch: ~0,25s/produit → 50×0,25s = ~12s, sous tout timeout Apache
 
         $pending = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = %s",
