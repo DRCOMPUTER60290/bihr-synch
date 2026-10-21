@@ -702,6 +702,17 @@ class BihrWI_Product_Sync {
             throw new Exception( 'Produit introuvable dans wp_bihr_products.' );
         }
 
+        // Validation des champs obligatoires avant tout traitement WooCommerce.
+        if ( class_exists( 'BihrWI_Product_Validator' ) ) {
+            $validator  = new BihrWI_Product_Validator();
+            $val_errors = $validator->validate( (array) $row );
+            if ( ! empty( $val_errors ) ) {
+                $this->logger->log(
+                    "Validation produit {$row->product_code} : " . implode( ' | ', $val_errors )
+                );
+            }
+        }
+
         if ( ! class_exists( 'WC_Product_Simple' ) ) {
             throw new Exception( "WooCommerce n'est pas chargé." );
         }
@@ -2100,114 +2111,50 @@ class BihrWI_Product_Sync {
 
     /**
      * Parcourt un CSV et appelle un callback pour chaque ligne.
-     * Retourne le nombre de lignes lues.
-     *
-     * NOTE : pour limiter les risques de régression, on distingue deux chemins :
-     * - pour les fichiers cat-ref-full-*.csv (References), on utilise un parsing robuste
-     *   basé sur fopen() + fgetcsv() (comme Excel) via iterate_csv_rows_stream().
-     * - pour les autres fichiers historiques, on conserve la logique existante
-     *   basée sur get_contents() + str_getcsv(), qui a déjà été validée en production.
+     * Délègue à iterate_csv_rows_stream() (fopen/fgetcsv) pour tous les fichiers :
+     * gestion correcte du BOM UTF-8, CRLF, champs entre guillemets, sans charger
+     * le fichier entier en mémoire.
      */
     protected function iterate_csv_rows( $file_path, callable $callback ) {
-        $basename = basename( $file_path );
-
-        // Chemin robuste uniquement pour cat-ref-full-*.csv (contient CategoryPath)
-        if ( preg_match( '/^cat-ref-full-.*\.csv$/i', $basename ) ) {
-            return $this->iterate_csv_rows_stream( $file_path, $callback );
-        }
-
-        // Comportement historique pour tous les autres fichiers (compatibilité maximale)
-        $wp_filesystem = $this->get_wp_filesystem();
-
-        if ( ! $wp_filesystem->exists( $file_path ) ) {
-            return 0;
-        }
-
-        $content = $wp_filesystem->get_contents( $file_path );
-        if ( false === $content ) {
-            return 0;
-        }
-
-        $lines = explode( "\n", $content );
-        if ( empty( $lines ) ) {
-            return 0;
-        }
-
-        // Détection du séparateur ; ou ,
-        $first_line = $lines[0];
-        $delimiter  = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
-
-        $header = str_getcsv( $first_line, $delimiter );
-        if ( ! $header ) {
-            return 0;
-        }
-
-        $header = array_map(
-            function( $h ) {
-                return strtolower( trim( $h ) );
-            },
-            $header
-        );
-
-        $count = 0;
-
-        for ( $i = 1; $i < count( $lines ); $i++ ) {
-            $line = trim( $lines[ $i ] );
-            if ( '' === $line ) {
-                continue;
-            }
-
-            $data = str_getcsv( $line, $delimiter );
-            if ( count( $data ) !== count( $header ) ) {
-                continue;
-            }
-
-            $row = array();
-            foreach ( $header as $j => $key ) {
-                $row[ $key ] = isset( $data[ $j ] ) ? $data[ $j ] : '';
-            }
-
-            $callback( $row, $count );
-            $count++;
-        }
-
-        return $count;
+        return $this->iterate_csv_rows_stream( $file_path, $callback );
     }
 
     /**
-     * Version robuste de iterate_csv_rows() utilisant fopen() + fgetcsv().
-     * Utilisée principalement pour cat-ref-full-*.csv afin de parser CategoryPath
-     * de manière fiable (BOM, CRLF, champs entre guillemets, etc.).
+     * Ouvre un CSV en streaming et retourne handle + délimiteur + en-tête.
+     * Gère le BOM UTF-8 et la détection automatique du séparateur (; ou ,).
+     *
+     * @param string $file_path Chemin absolu vers le fichier CSV.
+     * @return array{handle:resource,delimiter:string,header:string[]}|null null si le fichier est illisible.
      */
-    protected function iterate_csv_rows_stream( $file_path, callable $callback ) {
+    protected function open_csv_stream( string $file_path ): ?array {
         if ( ! file_exists( $file_path ) || ! is_readable( $file_path ) ) {
-            return 0;
+            return null;
         }
 
         $handle = fopen( $file_path, 'r' );
         if ( false === $handle ) {
-            return 0;
+            return null;
         }
 
-        // Gestion éventuelle du BOM UTF-8
+        // BOM UTF-8 éventuel
         $bom = fread( $handle, 3 );
         if ( $bom !== "\xEF\xBB\xBF" ) {
             rewind( $handle );
         }
 
-        // Détection du séparateur sur la première ligne lisible
+        // Détection du séparateur sur la première ligne
         $first_line = fgets( $handle );
         rewind( $handle );
         if ( $bom === "\xEF\xBB\xBF" ) {
-            fread( $handle, 3 ); // Skip BOM
+            fread( $handle, 3 ); // reskip BOM
         }
         $delimiter = ( substr_count( $first_line, ';' ) > substr_count( $first_line, ',' ) ) ? ';' : ',';
 
-        // Lecture de l'en-tête
+        // En-tête
         $header = fgetcsv( $handle, 0, $delimiter );
         if ( false === $header ) {
             fclose( $handle );
-            return 0;
+            return null;
         }
 
         $header = array_map(
@@ -2217,10 +2164,28 @@ class BihrWI_Product_Sync {
             $header
         );
 
+        return array(
+            'handle'    => $handle,
+            'delimiter' => $delimiter,
+            'header'    => $header,
+        );
+    }
+
+    /**
+     * Parcourt un CSV en streaming (fopen/fgetcsv) et appelle un callback par ligne.
+     * Correctement gère BOM UTF-8, CRLF et champs entre guillemets.
+     */
+    protected function iterate_csv_rows_stream( $file_path, callable $callback ) {
+        $stream = $this->open_csv_stream( $file_path );
+        if ( null === $stream ) {
+            return 0;
+        }
+
+        [ 'handle' => $handle, 'delimiter' => $delimiter, 'header' => $header ] = $stream;
+
         $count = 0;
 
         while ( ( $data = fgetcsv( $handle, 0, $delimiter ) ) !== false ) {
-            // Sauter les lignes vides ou mal formées
             if ( empty( $data ) || count( $data ) !== count( $header ) ) {
                 continue;
             }

@@ -78,6 +78,46 @@ class BihrWI_API_Client {
     }
 
     /**
+     * Exécute $do_request() et relance automatiquement en cas de rate-limit (429)
+     * ou d'erreur serveur transitoire (5xx), avec backoff linéaire de 2s par tentative.
+     *
+     * @param string   $label       Préfixe de log (ex : 'Catalog start').
+     * @param callable $do_request  Retourne une réponse WP_HTTP ou WP_Error.
+     * @param int      $max_retries Nombre maximum de nouvelles tentatives (0 = aucune).
+     * @return array{0:int,1:string} [code HTTP, body]
+     * @throws Exception Sur WP_Error ou si le code reste en erreur après épuisement des retries.
+     */
+    private function execute_with_retry( string $label, callable $do_request, int $max_retries = 3 ): array {
+        $response = $do_request();
+        if ( is_wp_error( $response ) ) {
+            throw new Exception( "Erreur HTTP ({$label}) : " . $response->get_error_message() );
+        }
+
+        $code = wp_remote_retrieve_response_code( $response );
+        $body = wp_remote_retrieve_body( $response );
+        $this->logger->log( "{$label}: code {$code} – réponse : " . $body );
+
+        $attempt = 0;
+        while ( in_array( $code, array( 429, 500, 502, 503, 504 ), true ) && $attempt < $max_retries ) {
+            $attempt++;
+            $wait   = $attempt * 2;
+            $reason = ( 429 === $code ) ? 'rate limit' : 'erreur serveur';
+            $this->logger->log( "{$label}: {$reason} ({$code}), pause {$wait}s (tentative {$attempt}/{$max_retries})" );
+            sleep( $wait );
+
+            $response = $do_request();
+            if ( is_wp_error( $response ) ) {
+                throw new Exception( "Erreur HTTP ({$label}) après retry : " . $response->get_error_message() );
+            }
+            $code = wp_remote_retrieve_response_code( $response );
+            $body = wp_remote_retrieve_body( $response );
+            $this->logger->log( "{$label}: code {$code} (après retry) – réponse : " . $body );
+        }
+
+        return array( $code, $body );
+    }
+
+    /**
      * Récupère un token valide, sinon en demande un nouveau.
      * L'API Bihr renvoie un JSON avec une clé "access_token".
      */
@@ -148,58 +188,24 @@ class BihrWI_API_Client {
         $url = $this->base_url . '/Catalog/ZIP/CSV/' . ltrim( $catalog_path, '/' ) . '/Full';
         $this->logger->log( 'Catalog: démarrage génération -> ' . $url );
 
-        $response = $this->post_with_retry(
-            $url,
-            array(
-                'timeout' => 30,
-                'headers' => array(
-                    'Accept'        => 'application/json',
-                    // IMPORTANT : Bihr attend "Authorization: Bearer <token>"
-                    'Authorization' => 'Bearer ' . $token,
-                    'Content-Type'  => 'text/json',
-                ),
-                'body'    => null, // équivalent d'un body vide (Content-Length: 0)
-            )
+        [ $code, $body ] = $this->execute_with_retry(
+            'Catalog start',
+            function() use ( $url, $token ) {
+                return $this->post_with_retry(
+                    $url,
+                    array(
+                        'timeout' => 30,
+                        'headers' => array(
+                            'Accept'        => 'application/json',
+                            'Authorization' => 'Bearer ' . $token,
+                            'Content-Type'  => 'text/json',
+                        ),
+                        'body'    => null,
+                    )
+                );
+            },
+            $max_retries
         );
-
-        if ( is_wp_error( $response ) ) {
-            $this->logger->log( 'Catalog start: erreur HTTP : ' . $response->get_error_message() );
-            throw new Exception( 'Erreur HTTP lors du démarrage du catalog.' );
-        }
-
-        $code = wp_remote_retrieve_response_code( $response );
-        $body = wp_remote_retrieve_body( $response );
-
-        $this->logger->log( 'Catalog start: code ' . $code . ' – réponse : ' . $body );
-
-        // Rate limit (429) ou erreur serveur (5xx) : attendre et réessayer
-        $attempt = 0;
-        while ( in_array( $code, array( 429, 500, 502, 503, 504 ), true ) && $attempt < $max_retries ) {
-            $attempt++;
-            $wait = $attempt * 2;
-            $reason = ( $code === 429 ) ? 'rate limit' : 'erreur serveur';
-            $this->logger->log( "Catalog start: {$reason} ({$code}), pause {$wait}s (tentative {$attempt}/{$max_retries})" );
-            sleep( $wait );
-            $response = $this->post_with_retry(
-                $url,
-                array(
-                    'timeout' => 30,
-                    'headers' => array(
-                        'Accept'        => 'application/json',
-                        'Authorization' => 'Bearer ' . $token,
-                        'Content-Type'  => 'text/json',
-                    ),
-                    'body'    => null,
-                )
-            );
-            if ( is_wp_error( $response ) ) {
-                $this->logger->log( 'Catalog start: erreur HTTP après retry : ' . $response->get_error_message() );
-                throw new Exception( 'Erreur HTTP lors du démarrage du catalog.' );
-            }
-            $code = wp_remote_retrieve_response_code( $response );
-            $body = wp_remote_retrieve_body( $response );
-            $this->logger->log( 'Catalog start: code ' . $code . ' (après retry) – réponse : ' . $body );
-        }
 
         if ( $code < 200 || $code >= 300 ) {
             $error_message = 'Erreur API Bihr';
@@ -232,53 +238,22 @@ class BihrWI_API_Client {
         $url = $this->base_url . '/Catalog/GenerationStatus?ticketId=' . urlencode( $ticket_id );
         $this->logger->log( 'Catalog status: GET ' . $url );
 
-        $response = wp_remote_get(
-            $url,
-            array(
-                'timeout' => 30,
-                'headers' => array(
-                    'Accept'        => 'application/json',
-                    'Authorization' => 'Bearer ' . $token,
-                ),
-            )
+        [ $code, $body ] = $this->execute_with_retry(
+            'Catalog status',
+            function() use ( $url, $token ) {
+                return wp_remote_get(
+                    $url,
+                    array(
+                        'timeout' => 30,
+                        'headers' => array(
+                            'Accept'        => 'application/json',
+                            'Authorization' => 'Bearer ' . $token,
+                        ),
+                    )
+                );
+            },
+            $max_retries
         );
-
-        if ( is_wp_error( $response ) ) {
-            $this->logger->log( 'Catalog status: erreur HTTP : ' . $response->get_error_message() );
-            throw new Exception( 'Erreur HTTP lors de la récupération du status.' );
-        }
-
-        $code = wp_remote_retrieve_response_code( $response );
-        $body = wp_remote_retrieve_body( $response );
-
-        $this->logger->log( 'Catalog status: code ' . $code . ' – réponse : ' . $body );
-
-        // Rate limit (429) ou erreur serveur (5xx) : attendre et réessayer avec backoff
-        $attempt = 0;
-        while ( in_array( $code, array( 429, 500, 502, 503, 504 ), true ) && $attempt < $max_retries ) {
-            $attempt++;
-            $wait = $attempt * 2; // 2s, 4s, 6s
-            $reason = ( $code === 429 ) ? 'rate limit' : 'erreur serveur';
-            $this->logger->log( "Catalog status: {$reason} ({$code}), pause {$wait}s (tentative {$attempt}/{$max_retries})" );
-            sleep( $wait );
-            $response = wp_remote_get(
-                $url,
-                array(
-                    'timeout' => 30,
-                    'headers' => array(
-                        'Accept'        => 'application/json',
-                        'Authorization' => 'Bearer ' . $token,
-                    ),
-                )
-            );
-            if ( is_wp_error( $response ) ) {
-                $this->logger->log( 'Catalog status: erreur HTTP après retry : ' . $response->get_error_message() );
-                throw new Exception( 'Erreur HTTP lors de la récupération du status.' );
-            }
-            $code = wp_remote_retrieve_response_code( $response );
-            $body = wp_remote_retrieve_body( $response );
-            $this->logger->log( 'Catalog status: code ' . $code . ' (après retry) – réponse : ' . $body );
-        }
 
         if ( $code < 200 || $code >= 300 ) {
             $error_message = 'Erreur API Bihr';
