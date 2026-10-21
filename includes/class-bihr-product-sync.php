@@ -2648,9 +2648,6 @@ class BihrWI_Product_Sync {
         $chunk_size = 200;
         $chunk      = array();
 
-        // Vider la table puis réinsérer en masse (100x plus rapide que row-by-row)
-        $wpdb->query( "TRUNCATE TABLE `{$this->table_name}`" );
-
         foreach ( $merged as $code => $data ) {
             if ( empty( $code ) ) {
                 continue;
@@ -2738,7 +2735,14 @@ class BihrWI_Product_Sync {
         }
 
         $col_list = '`' . implode( '`, `', $columns ) . '`';
-        $sql = "INSERT INTO `{$this->table_name}` ({$col_list}) VALUES " . implode( ', ', $value_strings );
+        // ON DUPLICATE KEY UPDATE : met à jour les champs catalogue (prix, stock, images…)
+        // sans toucher product_id ni image_processed — les liens WooCommerce sont préservés.
+        $update_parts = array_map(
+            function( $col ) { return "`{$col}` = VALUES(`{$col}`)"; },
+            array_diff( $columns, array( 'product_code' ) )
+        );
+        $sql = "INSERT INTO `{$this->table_name}` ({$col_list}) VALUES " . implode( ', ', $value_strings )
+             . ' ON DUPLICATE KEY UPDATE ' . implode( ', ', $update_parts );
         $wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared — esc_sql/intval/floatval utilisés ligne par ligne, table_name = $wpdb->prefix + constante
     }
 

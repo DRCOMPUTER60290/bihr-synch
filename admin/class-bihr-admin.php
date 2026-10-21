@@ -135,14 +135,13 @@ class BihrWI_Admin {
 			true
 		);
 
-        $pending_images = (int) count( get_posts( array(
-            'post_type'      => 'product',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'meta_query'     => array(
-                array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
-            ),
-        ) ) );
+        global $wpdb;
+        $pending_images = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = %s",
+                '_bihr_pending_image_url'
+            )
+        );
 
 		wp_localize_script(
 			'bihr-progress-js',

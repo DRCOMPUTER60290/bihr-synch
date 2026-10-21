@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BihrWI_Schema {
 
     const OPTION_KEY = 'bihrwi_db_version';
-    const DB_VERSION = '2.0.0';
+    const DB_VERSION = '2.1.0';
 
     public static function init() {
         $current_version = get_option( self::OPTION_KEY, '0' );
@@ -19,6 +19,9 @@ class BihrWI_Schema {
     private static function run_migrations( string $from_version ) {
         if ( version_compare( $from_version, '2.0.0', '<' ) ) {
             self::migrate_200();
+        }
+        if ( version_compare( $from_version, '2.1.0', '<' ) ) {
+            self::migrate_210();
         }
     }
 
@@ -89,6 +92,28 @@ class BihrWI_Schema {
         // Table véhicules
         $vc = new BihrWI_Vehicle_Compatibility( new BihrWI_Logger() );
         $vc->create_tables();
+    }
+
+    private static function migrate_210() {
+        global $wpdb;
+        $table_products = $wpdb->prefix . 'bihr_products';
+        $queue_table    = $wpdb->prefix . 'bihr_import_queue';
+
+        $queue_indexes   = $wpdb->get_col( "SHOW INDEX FROM `{$queue_table}`", 2 );
+        $product_indexes = $wpdb->get_col( "SHOW INDEX FROM `{$table_products}`", 2 );
+
+        if ( ! in_array( 'idx_status_id', $queue_indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$queue_table}` ADD KEY idx_status_id (status, id)" );
+        }
+        if ( ! in_array( 'idx_dealer_price', $product_indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$table_products}` ADD KEY idx_dealer_price (dealer_price_ht)" );
+        }
+        if ( ! in_array( 'idx_stock_level', $product_indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$table_products}` ADD KEY idx_stock_level (stock_level)" );
+        }
+        if ( ! in_array( 'idx_cat_l1_l2', $product_indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$table_products}` ADD KEY idx_cat_l1_l2 (cat_l1, cat_l2)" );
+        }
     }
 
     public static function get_table_name( string $name ): string {
