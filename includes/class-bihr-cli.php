@@ -266,6 +266,185 @@ class BihrWI_CLI_Commands {
         ) );
     }
 
+    /**
+     * Traite la file d'import remplie via « Préparer la file (WP-CLI) » dans l'admin.
+     *
+     * Workflow recommandé pour importer des produits filtrés sans bloquer le site :
+     *   1. Admin WordPress → BIHR Import → appliquer vos filtres
+     *   2. Cliquer « Préparer la file (WP-CLI) » → remplit wp_bihr_import_queue avec vos IDs filtrés
+     *   3. SSH : wp bihr process-queue --chunk=500
+     *
+     * ## OPTIONS
+     *
+     * [--chunk=<n>]
+     * : Produits par itération (défaut: 500).
+     *
+     * [--with-images]
+     * : Télécharge les images après chaque chunk (curl_multi, 40 concurrent).
+     *
+     * [--img-concurrent=<n>]
+     * : Connexions cURL simultanées pour les images (défaut: 40, avec --with-images).
+     *
+     * ## EXAMPLES
+     *
+     *   wp bihr process-queue
+     *   wp bihr process-queue --chunk=500 --with-images
+     *
+     * @subcommand process-queue
+     */
+    public function process_queue( $args, $assoc_args ) {
+        global $wpdb;
+
+        $chunk_size     = isset( $assoc_args['chunk'] )          ? max( 1, (int) $assoc_args['chunk'] )          : 500;
+        $with_images    = isset( $assoc_args['with-images'] );
+        $img_concurrent = isset( $assoc_args['img-concurrent'] ) ? max( 1, (int) $assoc_args['img-concurrent'] ) : 40;
+
+        $logger = new BihrWI_Logger();
+        $sync   = new BihrWI_Product_Sync( $logger );
+
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+
+        $total_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
+
+        if ( 0 === $total_pending ) {
+            WP_CLI::error( 'La file est vide. Utilisez « Préparer la file (WP-CLI) » dans l\'admin WordPress.' );
+            return;
+        }
+
+        $stats_opt = get_option( 'bihrwi_mass_import_stats', array() );
+        $total     = isset( $stats_opt['total'] ) ? (int) $stats_opt['total'] : $total_pending;
+
+        WP_CLI::log( sprintf( '%d produits en file (%d déjà traités).', $total_pending, $total - $total_pending ) );
+        WP_CLI::log( sprintf( 'Chunk: %d | Images: %s', $chunk_size, $with_images ? 'inline' : 'différées' ) );
+
+        $success = (int) ( $stats_opt['success'] ?? 0 );
+        $errors  = (int) ( $stats_opt['errors']  ?? 0 );
+
+        $chunk_num = 0;
+
+        while ( true ) {
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT id, bihr_id FROM `{$queue_table}` WHERE status = 'pending' ORDER BY id ASC LIMIT %d",
+                $chunk_size
+            ) );
+
+            if ( empty( $rows ) ) {
+                break;
+            }
+
+            $chunk_num++;
+            $chunk_start = microtime( true );
+            $bihr_ids    = array_map( fn( $r ) => (int) $r->bihr_id, $rows );
+
+            WP_CLI::log( sprintf(
+                '--- Chunk %d (%d produits | %d/%d traités) ---',
+                $chunk_num,
+                count( $rows ),
+                $success + $errors,
+                $total
+            ) );
+
+            $sync->preload_product_rows( $bihr_ids );
+            $sync->preload_product_lookup( $bihr_ids );
+            $logger->enable_buffer();
+
+            wp_defer_term_counting( true );
+            if ( function_exists( 'wc_defer_product_counting' ) ) {
+                wc_defer_product_counting( true );
+            }
+
+            $done_ids   = array();
+            $error_ids  = array();
+            $link_pairs = array();
+            $i          = 0;
+
+            foreach ( $rows as $row ) {
+                $i++;
+                try {
+                    $wc_id = $sync->import_to_woocommerce( (int) $row->bihr_id, true, true );
+                    if ( $wc_id ) {
+                        $success++;
+                        $done_ids[]                        = (int) $row->id;
+                        $link_pairs[ (int) $row->bihr_id ] = $wc_id;
+                    } else {
+                        $errors++;
+                        $error_ids[] = (int) $row->id;
+                        WP_CLI::warning( "Échec bihr_id={$row->bihr_id}" );
+                    }
+                } catch ( Throwable $e ) {
+                    $errors++;
+                    $error_ids[] = (int) $row->id;
+                    WP_CLI::warning( "Erreur bihr_id={$row->bihr_id} : " . $e->getMessage() );
+                }
+
+                if ( 0 === $i % 200 ) {
+                    wp_cache_flush();
+                    if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
+                        $wpdb->queries = array();
+                    }
+                }
+            }
+
+            $sync->batch_update_product_links( $link_pairs );
+            $logger->flush_buffer();
+            $logger->disable_buffer();
+
+            wp_defer_term_counting( false );
+            if ( function_exists( 'wc_defer_product_counting' ) ) {
+                wc_defer_product_counting( false );
+            }
+
+            if ( ! empty( $done_ids ) ) {
+                $ph = implode( ',', array_fill( 0, count( $done_ids ), '%d' ) );
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='done' WHERE id IN ({$ph})", $done_ids ) );
+            }
+            if ( ! empty( $error_ids ) ) {
+                $ph = implode( ',', array_fill( 0, count( $error_ids ), '%d' ) );
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='error' WHERE id IN ({$ph})", $error_ids ) );
+            }
+
+            update_option( 'bihrwi_mass_import_stats', array(
+                'total'      => $total,
+                'started_at' => $stats_opt['started_at'] ?? time(),
+                'success'    => $success,
+                'errors'     => $errors,
+            ) );
+
+            $wpdb->flush();
+            $elapsed = microtime( true ) - $chunk_start;
+
+            WP_CLI::log( sprintf(
+                '    → %.1fs (%.2fs/produit) | succès=%d erreurs=%d',
+                $elapsed,
+                count( $rows ) > 0 ? $elapsed / count( $rows ) : 0,
+                $success,
+                $errors
+            ) );
+
+            if ( $with_images && ! empty( $link_pairs ) ) {
+                $img_pending = (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = %s",
+                    '_bihr_pending_image_url'
+                ) );
+                if ( $img_pending > 0 ) {
+                    WP_CLI::log( sprintf( '    [images] %d en attente → téléchargement (%d concurrent)…', $img_pending, $img_concurrent ) );
+                    $img_start = microtime( true );
+                    $remaining = $sync->download_pending_images_parallel( count( $rows ), $img_concurrent );
+                    WP_CLI::log( sprintf( '    [images] → %.1fs | %d restantes', microtime( true ) - $img_start, $remaining ) );
+                }
+            }
+        }
+
+        WP_CLI::success( sprintf(
+            'File traitée. Succès: %d | Erreurs: %d | Total: %d',
+            $success,
+            $errors,
+            $total
+        ) );
+    }
+
     public function download_images( $args, $assoc_args ) {
         global $wpdb;
 

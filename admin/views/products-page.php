@@ -1618,7 +1618,28 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 <span class="dashicons dashicons-performance" style="vertical-align:middle;"></span>
                 Import rapide (navigateur) — sans délai cron
             </button>
+            <button type="button" id="bihr-prepare-queue-btn" class="button button-secondary"
+                    data-nonce="<?php echo esc_attr( wp_create_nonce( 'bihrwi_browser_import_nonce' ) ); ?>"
+                    data-search="<?php echo esc_attr( $filter_search ); ?>"
+                    data-stock="<?php echo esc_attr( $filter_stock ); ?>"
+                    data-price-min="<?php echo esc_attr( $filter_price_min ); ?>"
+                    data-price-max="<?php echo esc_attr( $filter_price_max ); ?>"
+                    data-category="<?php echo esc_attr( $filter_category ); ?>"
+                    data-cat-l1="<?php echo esc_attr( $filter_cat_l1 ); ?>"
+                    data-cat-l2="<?php echo esc_attr( $filter_cat_l2 ); ?>"
+                    data-cat-l3="<?php echo esc_attr( $filter_cat_l3 ); ?>"
+                    data-cat-l2-not="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>"
+                    style="border-color:#2271b1; color:#2271b1;"
+                    title="Remplit la file avec les produits filtrés, puis lancez wp bihr process-queue depuis SSH">
+                <span class="dashicons dashicons-list-view" style="vertical-align:middle;"></span>
+                Préparer la file (WP-CLI)
+            </button>
             <span style="color:#666; font-size:12px;">Gardez cet onglet ouvert. Les images sont téléchargées séparément.</span>
+        </div>
+        <!-- Message file prête pour WP-CLI -->
+        <div id="bihr-queue-ready" style="display:none; margin-top:8px; padding:10px 14px; background:#f0f6ff; border:1px solid #72aee6; border-radius:4px; font-size:13px;">
+            <strong id="bihr-queue-ready-msg"></strong><br>
+            Lancez depuis SSH : <code id="bihr-queue-ready-cmd" style="background:#e8edf3; padding:2px 6px; border-radius:3px; font-size:12px; user-select:all;"></code>
         </div>
 
         <!-- Barre de progression import rapide navigateur -->
@@ -1687,6 +1708,39 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             $('#bihr-bi-stop').on('click', function() {
                 bihrBIStop = true;
                 $('#bihr-bi-label').text('Arrêt en cours… (le batch actuel se termine)');
+            });
+
+            $('#bihr-prepare-queue-btn').on('click', function() {
+                var btn   = $(this);
+                var nonce = btn.data('nonce');
+                var filters = {
+                    search:          btn.data('search')     || '',
+                    stock_filter:    btn.data('stock')      || '',
+                    price_min:       btn.data('price-min')  || '',
+                    price_max:       btn.data('price-max')  || '',
+                    category_filter: btn.data('category')   || '',
+                    cat_l1:          btn.data('cat-l1')     || '',
+                    cat_l2:          btn.data('cat-l2')     || '',
+                    cat_l3:          btn.data('cat-l3')     || '',
+                    cat_l2_not:      btn.data('cat-l2-not') || ''
+                };
+                btn.prop('disabled', true).text('Préparation…');
+                $('#bihr-queue-ready').hide();
+                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce}, filters))
+                    .done(function(resp) {
+                        btn.prop('disabled', false).html('<span class="dashicons dashicons-list-view" style="vertical-align:middle;"></span> Préparer la file (WP-CLI)');
+                        if (!resp.success) {
+                            alert('Erreur : ' + (resp.data || 'impossible de préparer la file'));
+                            return;
+                        }
+                        $('#bihr-queue-ready-msg').text(resp.data.total.toLocaleString('fr-FR') + ' produits en file d\'attente.');
+                        $('#bihr-queue-ready-cmd').text('wp bihr process-queue --chunk=500');
+                        $('#bihr-queue-ready').show();
+                    })
+                    .fail(function() {
+                        btn.prop('disabled', false).html('<span class="dashicons dashicons-list-view" style="vertical-align:middle;"></span> Préparer la file (WP-CLI)');
+                        alert('Erreur réseau lors de la préparation.');
+                    });
             });
 
             function runNextChunk(nonce) {
