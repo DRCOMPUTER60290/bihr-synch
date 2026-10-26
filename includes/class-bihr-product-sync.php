@@ -650,7 +650,13 @@ class BihrWI_Product_Sync {
      * @param string $cat_l3_filter
      * @return array Tableau d'IDs (int[])
      */
-    public function get_all_filtered_product_ids( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '', $cat_l2_not = '' ) {
+    /**
+     * @param bool $only_unimported Si true, exclut les produits déjà importés (product_id IS NULL).
+     *                              Passer true depuis les actions d'import/file pour ne pas re-traiter
+     *                              des produits déjà dans WooCommerce.
+     *                              Laisser false (défaut) pour le frontend et les comptages.
+     */
+    public function get_all_filtered_product_ids( $search = '', $stock_filter = '', $price_min = '', $price_max = '', $category_filter = '', $cat_l1_filter = '', $cat_l2_filter = '', $cat_l3_filter = '', $cat_l2_not = '', $only_unimported = false ) {
         global $wpdb;
 
         $search          = sanitize_text_field( (string) $search );
@@ -668,11 +674,13 @@ class BihrWI_Product_Sync {
         $where_sql = $filter['where'];
         $args      = $filter['args'];
 
+        if ( $only_unimported ) {
+            // Exclure les produits déjà importés : profite de l'index idx_cat_filter_import
+            // (cat_l1, cat_l2, product_id) ajouté en migrate_230.
+            $where_sql .= ' AND product_id IS NULL';
+        }
+
         $table_name = esc_sql( $this->table_name );
-        // Exclure les produits déjà importés (product_id NOT NULL) : évite de ré-enqueuer
-        // des produits déjà dans WooCommerce et profite de l'index idx_cat_filter_import
-        // (cat_l1, cat_l2, product_id) ajouté en migrate_230.
-        $where_sql .= ' AND product_id IS NULL';
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
         $sql        = "SELECT id FROM `{$table_name}` WHERE {$where_sql} ORDER BY id ASC";
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above

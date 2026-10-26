@@ -293,10 +293,20 @@ class BihrWI_CLI_Commands {
      *   2. Cliquer « Préparer la file (WP-CLI) » → remplit wp_bihr_import_queue avec vos IDs filtrés
      *   3. SSH : wp bihr process-queue --chunk=500
      *
+     * Pour le traitement en parallèle sur o2switch (64 cœurs), utiliser --worker-id / --workers,
+     * ou générer automatiquement les commandes via « wp bihr parallel-queue --workers=4 ».
+     *
      * ## OPTIONS
      *
      * [--chunk=<n>]
      * : Produits par itération (défaut: 500).
+     *
+     * [--workers=<n>]
+     * : Nombre total de workers parallèles (défaut: 1 = mode single-thread).
+     *   Chaque worker traite les entrées dont id % workers = worker-id.
+     *
+     * [--worker-id=<n>]
+     * : Index de ce worker, de 0 à (workers - 1) (défaut: 0).
      *
      * [--with-images]
      * : Télécharge les images après chaque chunk (curl_multi, 40 concurrent).
@@ -308,6 +318,7 @@ class BihrWI_CLI_Commands {
      *
      *   wp bihr process-queue
      *   wp bihr process-queue --chunk=500 --with-images
+     *   wp bihr process-queue --workers=4 --worker-id=0 --chunk=500
      *
      * @subcommand process-queue
      */
@@ -315,15 +326,28 @@ class BihrWI_CLI_Commands {
         global $wpdb;
 
         $chunk_size     = isset( $assoc_args['chunk'] )          ? max( 1, (int) $assoc_args['chunk'] )          : 500;
+        $total_workers  = isset( $assoc_args['workers'] )        ? max( 1, (int) $assoc_args['workers'] )        : 1;
+        $worker_id      = isset( $assoc_args['worker-id'] )      ? max( 0, (int) $assoc_args['worker-id'] )      : 0;
         $with_images    = isset( $assoc_args['with-images'] );
         $img_concurrent = isset( $assoc_args['img-concurrent'] ) ? max( 1, (int) $assoc_args['img-concurrent'] ) : 40;
+
+        if ( $worker_id >= $total_workers ) {
+            WP_CLI::error( sprintf( '--worker-id (%d) doit être inférieur à --workers (%d).', $worker_id, $total_workers ) );
+            return;
+        }
 
         $logger = new BihrWI_Logger();
         $sync   = new BihrWI_Product_Sync( $logger );
 
         $queue_table = $wpdb->prefix . 'bihr_import_queue';
 
-        $total_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
+        // Filtre worker : chaque process traite les lignes dont id % total_workers = worker_id
+        $worker_clause = $total_workers > 1
+            ? $wpdb->prepare( " AND (id %% %d) = %d", $total_workers, $worker_id )
+            : '';
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $total_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" . $worker_clause );
 
         if ( 0 === $total_pending ) {
             WP_CLI::error( 'La file est vide. Utilisez « Préparer la file (WP-CLI) » dans l\'admin WordPress.' );
@@ -333,7 +357,8 @@ class BihrWI_CLI_Commands {
         $stats_opt = get_option( 'bihrwi_mass_import_stats', array() );
         $total     = isset( $stats_opt['total'] ) ? (int) $stats_opt['total'] : $total_pending;
 
-        WP_CLI::log( sprintf( '%d produits en file (%d déjà traités).', $total_pending, $total - $total_pending ) );
+        $worker_info = $total_workers > 1 ? sprintf( ' [worker %d/%d]', $worker_id, $total_workers - 1 ) : '';
+        WP_CLI::log( sprintf( '%d produits en file (%d déjà traités)%s.', $total_pending, max( 0, $total - $total_pending ), $worker_info ) );
         WP_CLI::log( sprintf( 'Chunk: %d | Images: %s', $chunk_size, $with_images ? 'inline' : 'différées' ) );
 
         $success = (int) ( $stats_opt['success'] ?? 0 );
@@ -342,8 +367,9 @@ class BihrWI_CLI_Commands {
         $chunk_num = 0;
 
         while ( true ) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
             $rows = $wpdb->get_results( $wpdb->prepare(
-                "SELECT id, bihr_id FROM `{$queue_table}` WHERE status = 'pending' ORDER BY id ASC LIMIT %d",
+                "SELECT id, bihr_id FROM `{$queue_table}` WHERE status = 'pending'{$worker_clause} ORDER BY id ASC LIMIT %d",
                 $chunk_size
             ) );
 
@@ -473,6 +499,62 @@ class BihrWI_CLI_Commands {
             $errors,
             $total
         ) );
+    }
+
+    /**
+     * Affiche les commandes WP-CLI à lancer en parallèle pour vider la file d'import.
+     *
+     * Pratique sur o2switch (64 cœurs) : lance N terminaux SSH avec les commandes affichées.
+     * Chaque worker traite sa tranche (id % workers = worker_id), sans conflit de lignes.
+     *
+     * ## OPTIONS
+     *
+     * [--workers=<n>]
+     * : Nombre de processus parallèles à générer (défaut: 4).
+     *
+     * [--chunk=<n>]
+     * : Taille de chunk à injecter dans chaque commande générée (défaut: 500).
+     *
+     * [--with-images]
+     * : Ajoute --with-images à chaque commande générée.
+     *
+     * ## EXAMPLES
+     *
+     *   wp bihr parallel-queue --workers=4
+     *   wp bihr parallel-queue --workers=8 --chunk=300
+     *
+     * @subcommand parallel-queue
+     */
+    public function parallel_queue( $args, $assoc_args ) {
+        global $wpdb;
+
+        $total_workers = isset( $assoc_args['workers'] ) ? max( 2, (int) $assoc_args['workers'] ) : 4;
+        $chunk         = isset( $assoc_args['chunk'] )   ? max( 1, (int) $assoc_args['chunk'] )   : 500;
+        $with_images   = isset( $assoc_args['with-images'] ) ? ' --with-images' : '';
+
+        $queue_table   = $wpdb->prefix . 'bihr_import_queue';
+        $total_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'" );
+
+        if ( 0 === $total_pending ) {
+            WP_CLI::error( 'La file est vide. Utilisez « Préparer la file (WP-CLI) » dans l\'admin WordPress.' );
+            return;
+        }
+
+        WP_CLI::log( sprintf( '%d produits en attente — %d workers :', $total_pending, $total_workers ) );
+        WP_CLI::log( '' );
+
+        for ( $i = 0; $i < $total_workers; $i++ ) {
+            WP_CLI::log( sprintf(
+                'wp bihr process-queue --workers=%d --worker-id=%d --chunk=%d%s',
+                $total_workers,
+                $i,
+                $chunk,
+                $with_images
+            ) );
+        }
+
+        WP_CLI::log( '' );
+        WP_CLI::log( 'Lancez chaque commande dans un terminal SSH séparé pour le traitement parallèle.' );
     }
 
     public function download_images( $args, $assoc_args ) {
