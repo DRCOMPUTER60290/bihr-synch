@@ -179,13 +179,11 @@ class BihrWI_CLI_Commands {
             $logger->flush_buffer();
             $logger->disable_buffer();
 
-            // Réactiver les recomptages, lever la suspension cache, vider wpdb
+            // Lever la suspension cache, vider wpdb.
+            // Les recomptages de termes sont différés jusqu'à la fin de l'import
+            // (voir après la boucle foreach) pour éviter N COUNT() sur tables croissantes.
             wp_suspend_cache_invalidation( false );
             wp_cache_flush();
-            wp_defer_term_counting( false );
-            if ( function_exists( 'wc_defer_product_counting' ) ) {
-                wc_defer_product_counting( false );
-            }
             $wpdb->flush();
 
             $elapsed = microtime( true ) - $chunk_start;
@@ -220,6 +218,13 @@ class BihrWI_CLI_Commands {
                     ) );
                 }
             }
+        }
+
+        // Recomptage des catégories une seule fois en fin d'import.
+        WP_CLI::log( 'Recomptage des catégories produits...' );
+        wp_defer_term_counting( false );
+        if ( function_exists( 'wc_defer_product_counting' ) ) {
+            wc_defer_product_counting( false );
         }
 
         WP_CLI::success( sprintf( 'Import terminé. Succès: %d | Erreurs: %d | Total: %d', $success, $errors, $total ) );
@@ -409,10 +414,8 @@ class BihrWI_CLI_Commands {
 
             wp_suspend_cache_invalidation( false );
             wp_cache_flush();
-            wp_defer_term_counting( false );
-            if ( function_exists( 'wc_defer_product_counting' ) ) {
-                wc_defer_product_counting( false );
-            }
+            // Ne pas recompter les termes à chaque chunk : coût O(n produits) × O(catégories).
+            // Le recomptage se fait une seule fois après la boucle complète (voir ci-dessous).
 
             if ( ! empty( $done_ids ) ) {
                 $ph = implode( ',', array_fill( 0, count( $done_ids ), '%d' ) );
@@ -455,6 +458,13 @@ class BihrWI_CLI_Commands {
                     WP_CLI::log( sprintf( '    [images] → %.1fs | %d restantes', microtime( true ) - $img_start, $remaining ) );
                 }
             }
+        }
+
+        // Recomptage des catégories une seule fois en fin d'import.
+        WP_CLI::log( 'Recomptage des catégories produits...' );
+        wp_defer_term_counting( false );
+        if ( function_exists( 'wc_defer_product_counting' ) ) {
+            wc_defer_product_counting( false );
         }
 
         WP_CLI::success( sprintf(

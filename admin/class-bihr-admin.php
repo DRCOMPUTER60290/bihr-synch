@@ -2342,10 +2342,11 @@ class BihrWI_Admin {
                 $wpdb->queries = array();
             }
 
-            if ( function_exists( 'wc_defer_product_counting' ) ) {
-                wc_defer_product_counting( false );
-            }
-            wp_defer_term_counting( false );
+            // NE PAS appeler wp_defer_term_counting(false) ici.
+            // Cela déclencherait un COUNT(*) sur wp_term_relationships pour chaque
+            // catégorie touchée dans ce batch — coût O(n produits importés) × O(catégories).
+            // À 1500 produits, 50 COUNT queries sur 1500+ lignes à chaque chunk.
+            // Le recomptage complet est fait une seule fois à la fin (done=true).
 
             $this->logger->flush_buffer();
             $this->logger->disable_buffer();
@@ -2360,6 +2361,15 @@ class BihrWI_Admin {
             "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = %s",
             'pending'
         ) );
+
+        // Recomptage complet des catégories uniquement quand l'import est terminé.
+        // Fait une seule fois au lieu de N fois (une par chunk).
+        if ( 0 === $new_pending ) {
+            wp_defer_term_counting( false );
+            if ( function_exists( 'wc_defer_product_counting' ) ) {
+                wc_defer_product_counting( false );
+            }
+        }
 
         $done_count = $total > 0 ? ( $total - $new_pending ) : count( $rows );
         $percent    = $total > 0 ? round( $done_count / $total * 100, 1 ) : 0.0;
