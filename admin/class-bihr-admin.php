@@ -2277,30 +2277,40 @@ class BihrWI_Admin {
             $proc_bihr_ids = array_map( function( $r ) { return (int) $r->bihr_id; }, $rows_to_process );
             $this->product_sync->preload_product_rows( $proc_bihr_ids );
             $this->product_sync->preload_product_lookup( $proc_bihr_ids );
+            // Précharger toutes les catégories WooCommerce en 1 requête.
+            // Sans ça, chaque chunk AJAX repart d'un cache vide et fait jusqu'à
+            // 3 get_terms() par produit pour les mêmes catégories (N×3 requêtes).
+            if ( class_exists( 'BihrWI_Category_Path' ) ) {
+                BihrWI_Category_Path::preload_cache();
+            }
 
             if ( function_exists( 'wc_defer_product_counting' ) ) {
                 wc_defer_product_counting( true );
             }
-            if ( function_exists( 'wc_defer_transaction_requests' ) ) {
-                wc_defer_transaction_requests( true );
-            }
             wp_defer_term_counting( true );
+            // Suspendre clean_post_cache() par-produit pendant le batch.
+            // WooCommerce/WordPress invalide le cache objet sur chaque save() ;
+            // on suspend ce churn et on vide une fois en fin de batch.
+            wp_suspend_cache_invalidation( true );
 
             $this->logger->set_min_level( BihrWI_Logger::LEVEL_WARN );
             $this->logger->enable_buffer();
             $this->product_sync->reset_margin_cache();
 
-            $done_ids  = array();
-            $error_ids = array();
-            $i = 0;
+            $done_ids   = array();
+            $error_ids  = array();
+            $link_pairs = array(); // bihr_id => wc_id, pour batch UPDATE en fin de chunk
             foreach ( $rows_to_process as $row ) {
                 $queue_id   = (int) $row->id;
                 $product_id = (int) $row->bihr_id;
                 try {
-                    $wc_id = $this->product_sync->import_to_woocommerce( $product_id, true );
+                    // skip_link_update=true : regroupe les UPDATE product_id en 1 requête
+                    // en fin de chunk (même pattern que le CLI — évite N UPDATE individuels)
+                    $wc_id = $this->product_sync->import_to_woocommerce( $product_id, true, true );
                     if ( $wc_id ) {
                         $success++;
-                        $done_ids[] = $queue_id;
+                        $done_ids[]                = $queue_id;
+                        $link_pairs[ $product_id ] = $wc_id;
                     } else {
                         $errors++;
                         $error_ids[] = $queue_id;
@@ -2309,14 +2319,10 @@ class BihrWI_Admin {
                     $errors++;
                     $error_ids[] = $queue_id;
                 }
-                $i++;
-                if ( 0 === $i % 50 ) {
-                    wp_cache_flush();
-                    if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
-                        $wpdb->queries = array();
-                    }
-                }
             }
+
+            // 1 seul INSERT…ON DUPLICATE KEY UPDATE pour tout le batch
+            $this->product_sync->batch_update_product_links( $link_pairs );
 
             if ( ! empty( $done_ids ) ) {
                 $ph = implode( ',', array_fill( 0, count( $done_ids ), '%d' ) );
@@ -2330,6 +2336,11 @@ class BihrWI_Admin {
             }
 
             $wpdb->flush();
+            wp_suspend_cache_invalidation( false );
+            wp_cache_flush();
+            if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
+                $wpdb->queries = array();
+            }
 
             if ( function_exists( 'wc_defer_product_counting' ) ) {
                 wc_defer_product_counting( false );

@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BihrWI_Schema {
 
     const OPTION_KEY = 'bihrwi_db_version';
-    const DB_VERSION = '2.1.0';
+    const DB_VERSION = '2.2.0';
 
     public static function init() {
         $current_version = get_option( self::OPTION_KEY, '0' );
@@ -22,6 +22,9 @@ class BihrWI_Schema {
         }
         if ( version_compare( $from_version, '2.1.0', '<' ) ) {
             self::migrate_210();
+        }
+        if ( version_compare( $from_version, '2.2.0', '<' ) ) {
+            self::migrate_220();
         }
     }
 
@@ -113,6 +116,16 @@ class BihrWI_Schema {
         }
         if ( ! in_array( 'idx_cat_l1_l2', $product_indexes, true ) ) {
             $wpdb->query( "ALTER TABLE `{$table_products}` ADD KEY idx_cat_l1_l2 (cat_l1, cat_l2)" );
+        }
+    }
+
+    private static function migrate_220() {
+        global $wpdb;
+        $indexes = $wpdb->get_col( "SHOW INDEX FROM `{$wpdb->postmeta}`", 2 );
+        // Index composite pour find_existing_attachment_by_url() : évite le scan complet
+        // sur meta_value quand la médiathèque dépasse 50 000 images.
+        if ( ! in_array( 'bihr_image_source', $indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$wpdb->postmeta}` ADD INDEX bihr_image_source (meta_key(20), meta_value(100))" );
         }
     }
 
