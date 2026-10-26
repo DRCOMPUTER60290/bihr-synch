@@ -121,6 +121,14 @@ class BihrWI_CLI_Commands {
             // Précharger le cache SKU pour ce chunk (élimine N+1 sur wc_product_meta_lookup)
             $sync->preload_product_lookup( $chunk_ids );
 
+            // Précharger toutes les catégories WooCommerce en 1 requête.
+            // Le cache PHP statique survit pendant tout le run CLI (1 processus),
+            // mais ce preload force le remplissage dès le 1er chunk — sans attendre
+            // que ensure_term() le construise produit par produit.
+            if ( class_exists( 'BihrWI_Category_Path' ) ) {
+                BihrWI_Category_Path::preload_cache();
+            }
+
             // Buffériser les logs : 1 fwrite groupé par chunk au lieu de N syscalls fichier
             $logger->enable_buffer();
 
@@ -129,6 +137,9 @@ class BihrWI_CLI_Commands {
             if ( function_exists( 'wc_defer_product_counting' ) ) {
                 wc_defer_product_counting( true );
             }
+            // Suspendre clean_post_cache() par-produit : évite le churn de cache
+            // objet WP/WC sur chaque $product->save(). On vide une fois en fin de chunk.
+            wp_suspend_cache_invalidation( true );
 
             $i           = 0;
             $link_pairs  = array(); // bihr_id => wc_id, pour batch_update_product_links()
@@ -150,8 +161,9 @@ class BihrWI_CLI_Commands {
                     WP_CLI::warning( "Erreur bihr_id={$product_id} : " . $e->getMessage() );
                 }
 
-                // Vider le cache objet toutes les 200 itérations
-                // (24 GB buffer pool InnoDB : cache WP beaucoup moins critique qu'en mutu classique)
+                // Vider le cache objet toutes les 200 itérations pour éviter
+                // l'accumulation mémoire (les objets sont toujours mis en cache à la
+                // lecture même avec wp_suspend_cache_invalidation actif).
                 if ( 0 === $i % 200 ) {
                     wp_cache_flush();
                     if ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) {
@@ -167,7 +179,9 @@ class BihrWI_CLI_Commands {
             $logger->flush_buffer();
             $logger->disable_buffer();
 
-            // Réactiver les recomptages et vider wpdb après chaque chunk
+            // Réactiver les recomptages, lever la suspension cache, vider wpdb
+            wp_suspend_cache_invalidation( false );
+            wp_cache_flush();
             wp_defer_term_counting( false );
             if ( function_exists( 'wc_defer_product_counting' ) ) {
                 wc_defer_product_counting( false );
@@ -346,12 +360,16 @@ class BihrWI_CLI_Commands {
 
             $sync->preload_product_rows( $bihr_ids );
             $sync->preload_product_lookup( $bihr_ids );
+            if ( class_exists( 'BihrWI_Category_Path' ) ) {
+                BihrWI_Category_Path::preload_cache();
+            }
             $logger->enable_buffer();
 
             wp_defer_term_counting( true );
             if ( function_exists( 'wc_defer_product_counting' ) ) {
                 wc_defer_product_counting( true );
             }
+            wp_suspend_cache_invalidation( true );
 
             $done_ids   = array();
             $error_ids  = array();
@@ -389,6 +407,8 @@ class BihrWI_CLI_Commands {
             $logger->flush_buffer();
             $logger->disable_buffer();
 
+            wp_suspend_cache_invalidation( false );
+            wp_cache_flush();
             wp_defer_term_counting( false );
             if ( function_exists( 'wc_defer_product_counting' ) ) {
                 wc_defer_product_counting( false );
