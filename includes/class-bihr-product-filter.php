@@ -212,20 +212,18 @@ class BihrWI_Product_Filter {
             ) );
         }
 
-        // Récupérer les produits WooCommerce correspondants via les meta _bihr_product_code
+        // Récupérer les product_code depuis wp_bihr_products (1 requête batch)
         global $wpdb;
-        $placeholders = implode( ',', array_fill( 0, count( $bihr_product_ids ), '%d' ) );
-        
-        // Récupérer les product_code depuis wp_bihr_products
-        $table_name = $wpdb->prefix . 'bihr_products';
-        $product_codes = $wpdb->get_col(
+        $placeholders  = implode( ',', array_fill( 0, count( $bihr_product_ids ), '%d' ) );
+        $table_name    = $wpdb->prefix . 'bihr_products';
+        $rows          = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT product_code FROM `{$table_name}` WHERE id IN ($placeholders)",
+                "SELECT id, product_code FROM `{$table_name}` WHERE id IN ({$placeholders})",
                 ...$bihr_product_ids
             )
         );
 
-        if ( empty( $product_codes ) ) {
+        if ( empty( $rows ) ) {
             wp_send_json_success( array(
                 'count'    => 0,
                 'products' => array(),
@@ -233,34 +231,70 @@ class BihrWI_Product_Filter {
             ) );
         }
 
-        // Trouver les produits WooCommerce par _bihr_product_code
-        $products = array();
-        foreach ( $product_codes as $product_code ) {
-            $product_id = wc_get_product_id_by_sku( $product_code );
-            
-            // Si pas trouvé par SKU, chercher par meta
-            if ( ! $product_id ) {
-                $product_id = $wpdb->get_var(
-                    $wpdb->prepare(
-                        "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_product_code' AND meta_value = %s LIMIT 1",
-                        $product_code
-                    )
-                );
-            }
+        $product_codes = array_column( $rows, 'product_code' );
 
-            if ( $product_id ) {
-                $product = wc_get_product( $product_id );
-                
-                if ( $product && $product->is_visible() ) {
-                    $products[] = array(
-                        'id'    => $product_id,
-                        'title' => $product->get_name(),
-                        'price' => $product->get_price_html(),
-                        'url'   => get_permalink( $product_id ),
-                        'image' => wp_get_attachment_image_url( $product->get_image_id(), 'woocommerce_thumbnail' ) ?: wc_placeholder_img_src(),
-                        'sku'   => $product->get_sku(),
-                    );
-                }
+        // Batch lookup via wc_product_meta_lookup (indexé sur sku) — 1 requête
+        $code_placeholders = implode( ',', array_fill( 0, count( $product_codes ), '%s' ) );
+        $lookup_table      = $wpdb->prefix . 'wc_product_meta_lookup';
+        $sku_rows          = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT product_id, sku FROM `{$lookup_table}` WHERE sku IN ({$code_placeholders})",
+                ...$product_codes
+            )
+        );
+        $code_to_id = array();
+        foreach ( $sku_rows as $row ) {
+            $code_to_id[ $row->sku ] = (int) $row->product_id;
+        }
+
+        // Fallback batch : codes non trouvés dans lookup → 1 requête postmeta
+        $missing_codes = array_diff( $product_codes, array_keys( $code_to_id ) );
+        if ( ! empty( $missing_codes ) ) {
+            $meta_placeholders = implode( ',', array_fill( 0, count( $missing_codes ), '%s' ) );
+            $meta_rows         = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_bihr_product_code' AND meta_value IN ({$meta_placeholders})",
+                    ...$missing_codes
+                )
+            );
+            foreach ( $meta_rows as $row ) {
+                $code_to_id[ $row->meta_value ] = (int) $row->post_id;
+            }
+        }
+
+        $wc_ids = array_values( array_filter( array_unique( array_map(
+            static function ( $code ) use ( $code_to_id ) {
+                return $code_to_id[ $code ] ?? 0;
+            },
+            $product_codes
+        ) ) ) );
+
+        if ( empty( $wc_ids ) ) {
+            wp_send_json_success( array(
+                'count'    => 0,
+                'products' => array(),
+                'message'  => 'Aucun produit WooCommerce trouvé.',
+            ) );
+        }
+
+        // Charger tous les produits WC en 1 appel batch
+        $wc_products = wc_get_products( array(
+            'include' => $wc_ids,
+            'status'  => 'publish',
+            'limit'   => -1,
+        ) );
+
+        $products = array();
+        foreach ( $wc_products as $product ) {
+            if ( $product->is_visible() ) {
+                $products[] = array(
+                    'id'    => $product->get_id(),
+                    'title' => $product->get_name(),
+                    'price' => $product->get_price_html(),
+                    'url'   => get_permalink( $product->get_id() ),
+                    'image' => wp_get_attachment_image_url( $product->get_image_id(), 'woocommerce_thumbnail' ) ?: wc_placeholder_img_src(),
+                    'sku'   => $product->get_sku(),
+                );
             }
         }
 

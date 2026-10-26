@@ -2070,7 +2070,7 @@ class BihrWI_Admin {
         $filter_cat_l3    = isset( $_POST['cat_l3'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
         $filter_cat_l2_not = isset( $_POST['cat_l2_not'] ) ? sanitize_text_field( wp_unslash( $_POST['cat_l2_not'] ) ) : '';
 
-        // Récupérer tous les IDs correspondant à ces filtres
+        // Récupérer tous les IDs non encore importés correspondant à ces filtres
         $ids = $this->product_sync->get_all_filtered_product_ids(
             $filter_search,
             $filter_stock,
@@ -2080,7 +2080,8 @@ class BihrWI_Admin {
             $filter_cat_l1,
             $filter_cat_l2,
             $filter_cat_l3,
-            $filter_cat_l2_not
+            $filter_cat_l2_not,
+            true
         );
 
         if ( empty( $ids ) ) {
@@ -2165,7 +2166,8 @@ class BihrWI_Admin {
 
         $ids = $this->product_sync->get_all_filtered_product_ids(
             $filter_search, $filter_stock, $filter_price_min, $filter_price_max,
-            $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3, $filter_cat_l2_not
+            $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3, $filter_cat_l2_not,
+            true
         );
 
         if ( empty( $ids ) ) {
