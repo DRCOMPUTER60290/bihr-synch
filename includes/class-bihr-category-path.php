@@ -10,6 +10,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BihrWI_Category_Path {
 
     /**
+     * Cache partagé entre tous les appels de ensure_term() dans le même processus PHP.
+     * Promu en propriété de classe pour pouvoir être alimenté par preload_cache().
+     *
+     * @var array<string,int>  clé : "$parent_id|$name" → term_id
+     */
+    protected static $term_cache = array();
+
+    /**
      * Valeurs de catégories à ignorer (placeholders).
      *
      * @var string[]
@@ -170,12 +178,36 @@ class BihrWI_Category_Path {
      * @param int    $parent_id
      * @return int term_id ou 0.
      */
-    protected static function ensure_term( $name, $parent_id = 0 ) {
-        // Cache statique : évite les requêtes DB répétées pour les mêmes termes.
-        // Sans ce cache, chaque produit déclenche jusqu'à 3 get_terms() identiques
-        // (l1, l2, l3), soit 450 requêtes pour 150 produits.
-        static $cache = array();
+    /**
+     * Précharge TOUTES les catégories product_cat existantes dans $term_cache en 1 seule requête.
+     *
+     * À appeler une fois par chunk (CLI et AJAX) avant d'importer les produits.
+     * Sans ce préchargement, chaque chunk repart d'un cache vide (nouvelle requête PHP)
+     * et déclenche jusqu'à 3 get_terms() par produit pour les mêmes catégories.
+     */
+    public static function preload_cache(): void {
+        if ( ! taxonomy_exists( 'product_cat' ) ) {
+            return;
+        }
 
+        $terms = get_terms( array(
+            'taxonomy'   => 'product_cat',
+            'hide_empty' => false,
+            'fields'     => 'all',
+            'number'     => 0,
+        ) );
+
+        if ( is_wp_error( $terms ) || empty( $terms ) ) {
+            return;
+        }
+
+        foreach ( $terms as $term ) {
+            $key = absint( $term->parent ) . '|' . $term->name;
+            self::$term_cache[ $key ] = (int) $term->term_id;
+        }
+    }
+
+    protected static function ensure_term( $name, $parent_id = 0 ) {
         $name      = trim( wp_strip_all_tags( (string) $name ) );
         $parent_id = absint( $parent_id );
 
@@ -184,8 +216,8 @@ class BihrWI_Category_Path {
         }
 
         $cache_key = $parent_id . '|' . $name;
-        if ( isset( $cache[ $cache_key ] ) ) {
-            return $cache[ $cache_key ];
+        if ( isset( self::$term_cache[ $cache_key ] ) ) {
+            return self::$term_cache[ $cache_key ];
         }
 
         // Chercher un term avec ce nom et parent donné.
@@ -201,8 +233,8 @@ class BihrWI_Category_Path {
         );
 
         if ( ! is_wp_error( $existing ) && ! empty( $existing ) ) {
-            $cache[ $cache_key ] = (int) $existing[0];
-            return $cache[ $cache_key ];
+            self::$term_cache[ $cache_key ] = (int) $existing[0];
+            return self::$term_cache[ $cache_key ];
         }
 
         $args = array();
@@ -214,15 +246,15 @@ class BihrWI_Category_Path {
 
         if ( is_wp_error( $term ) ) {
             if ( isset( $term->error_data['term_exists'] ) ) {
-                $cache[ $cache_key ] = (int) $term->error_data['term_exists'];
-                return $cache[ $cache_key ];
+                self::$term_cache[ $cache_key ] = (int) $term->error_data['term_exists'];
+                return self::$term_cache[ $cache_key ];
             }
 
             return 0;
         }
 
-        $cache[ $cache_key ] = (int) $term['term_id'];
-        return $cache[ $cache_key ];
+        self::$term_cache[ $cache_key ] = (int) $term['term_id'];
+        return self::$term_cache[ $cache_key ];
     }
 
     /**
