@@ -185,7 +185,18 @@ class BihrWI_Category_Path {
      * Sans ce préchargement, chaque chunk repart d'un cache vide (nouvelle requête PHP)
      * et déclenche jusqu'à 3 get_terms() par produit pour les mêmes catégories.
      */
+    /** @var bool  true après le premier preload_cache() réussi dans ce processus PHP. */
+    protected static $cache_preloaded = false;
+
     public static function preload_cache(): void {
+        // Évite de re-déclencher get_terms() à chaque chunk : le cache statique
+        // $term_cache survit pendant tout le run CLI (1 processus), donc un seul
+        // preload suffit ; les termes créés en cours d'import sont ajoutés au cache
+        // dans ensure_term() au moment de leur création.
+        if ( self::$cache_preloaded ) {
+            return;
+        }
+
         if ( ! taxonomy_exists( 'product_cat' ) ) {
             return;
         }
@@ -205,6 +216,8 @@ class BihrWI_Category_Path {
             $key = absint( $term->parent ) . '|' . $term->name;
             self::$term_cache[ $key ] = (int) $term->term_id;
         }
+
+        self::$cache_preloaded = true;
     }
 
     protected static function ensure_term( $name, $parent_id = 0 ) {

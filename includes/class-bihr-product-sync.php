@@ -12,6 +12,7 @@ class BihrWI_Product_Sync {
     protected $ai_enrichment        = null;
     protected static $margin_settings_cache = null;
     protected $csv_parser;
+    protected $validator            = null; // instance partagée — évite new BihrWI_Product_Validator() par produit
 
     public function __construct( BihrWI_Logger $logger ) {
         global $wpdb;
@@ -20,6 +21,9 @@ class BihrWI_Product_Sync {
         // Instancié une seule fois pour éviter un get_option() par produit importé.
         $this->ai_enrichment = new BihrWI_AI_Enrichment( $logger );
         $this->csv_parser    = new BihrWI_CSV_Parser( $logger );
+        if ( class_exists( 'BihrWI_Product_Validator' ) ) {
+            $this->validator = new BihrWI_Product_Validator();
+        }
     }
 
     /**
@@ -318,12 +322,14 @@ class BihrWI_Product_Sync {
                 continue;
             }
             $values = array_filter( array_map( 'trim', explode( '||', $val ) ) );
+            // Pas de TRIM() dans la WHERE : les valeurs sont pré-trimées à l'insertion
+            // (migrate_230 + insert_products_chunk), donc les index idx_cat_* sont utilisables.
             if ( count( $values ) > 1 ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values ), '%s' ) );
-                $where_sql   .= " AND TRIM({$col}) IN ({$placeholders})";
+                $where_sql   .= " AND `{$col}` IN ({$placeholders})";
                 $args         = array_merge( $args, $values );
             } else {
-                $where_sql .= " AND TRIM({$col}) = %s";
+                $where_sql .= " AND `{$col}` = %s";
                 $args[]     = reset( $values );
             }
         }
@@ -332,7 +338,7 @@ class BihrWI_Product_Sync {
             $values_not = array_filter( array_map( 'trim', explode( '||', $cat_l2_not ) ) );
             if ( ! empty( $values_not ) ) {
                 $placeholders = implode( ',', array_fill( 0, count( $values_not ), '%s' ) );
-                $where_sql   .= " AND TRIM(cat_l2) NOT IN ({$placeholders})";
+                $where_sql   .= " AND cat_l2 NOT IN ({$placeholders})";
                 $args         = array_merge( $args, $values_not );
             }
         }
@@ -663,6 +669,10 @@ class BihrWI_Product_Sync {
         $args      = $filter['args'];
 
         $table_name = esc_sql( $this->table_name );
+        // Exclure les produits déjà importés (product_id NOT NULL) : évite de ré-enqueuer
+        // des produits déjà dans WooCommerce et profite de l'index idx_cat_filter_import
+        // (cat_l1, cat_l2, product_id) ajouté en migrate_230.
+        $where_sql .= ' AND product_id IS NULL';
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
         $sql        = "SELECT id FROM `{$table_name}` WHERE {$where_sql} ORDER BY id ASC";
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
@@ -705,9 +715,10 @@ class BihrWI_Product_Sync {
         }
 
         // Validation des champs obligatoires avant tout traitement WooCommerce.
-        if ( class_exists( 'BihrWI_Product_Validator' ) ) {
-            $validator  = new BihrWI_Product_Validator();
-            $val_errors = $validator->validate( (array) $row );
+        // Utilise l'instance partagée ($this->validator) instanciée une seule fois dans __construct()
+        // au lieu de créer un nouvel objet par produit.
+        if ( $this->validator ) {
+            $val_errors = $this->validator->validate( (array) $row );
             if ( ! empty( $val_errors ) ) {
                 $this->logger->log(
                     "Validation produit {$row->product_code} : " . implode( ' | ', $val_errors )
@@ -2209,6 +2220,10 @@ class BihrWI_Product_Sync {
             'cat_l1', 'cat_l2', 'cat_l3',
         );
 
+        // Colonnes catégorie : toujours pré-trimées avant INSERT pour que les index idx_cat_*
+        // fonctionnent sans TRIM() dans les WHERE (évite les full-scans sur 126 000 lignes).
+        $trim_cols = array( 'cat_l1', 'cat_l2', 'cat_l3', 'category' );
+
         $value_strings = array();
 
         foreach ( $rows as $row ) {
@@ -2222,7 +2237,11 @@ class BihrWI_Product_Sync {
                 } elseif ( $col === 'dealer_price_ht' ) {
                     $row_parts[] = floatval( $val );
                 } else {
-                    $row_parts[] = "'" . esc_sql( (string) $val ) . "'";
+                    $str = (string) $val;
+                    if ( in_array( $col, $trim_cols, true ) ) {
+                        $str = trim( $str );
+                    }
+                    $row_parts[] = "'" . esc_sql( $str ) . "'";
                 }
             }
             $value_strings[] = '(' . implode( ', ', $row_parts ) . ')';

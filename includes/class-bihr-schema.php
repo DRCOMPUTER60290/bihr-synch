@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BihrWI_Schema {
 
     const OPTION_KEY = 'bihrwi_db_version';
-    const DB_VERSION = '2.2.0';
+    const DB_VERSION = '2.3.0';
 
     public static function init() {
         $current_version = get_option( self::OPTION_KEY, '0' );
@@ -25,6 +25,9 @@ class BihrWI_Schema {
         }
         if ( version_compare( $from_version, '2.2.0', '<' ) ) {
             self::migrate_220();
+        }
+        if ( version_compare( $from_version, '2.3.0', '<' ) ) {
+            self::migrate_230();
         }
     }
 
@@ -126,6 +129,36 @@ class BihrWI_Schema {
         // sur meta_value quand la médiathèque dépasse 50 000 images.
         if ( ! in_array( 'bihr_image_source', $indexes, true ) ) {
             $wpdb->query( "ALTER TABLE `{$wpdb->postmeta}` ADD INDEX bihr_image_source (meta_key(20), meta_value(100))" );
+        }
+    }
+
+    private static function migrate_230() {
+        global $wpdb;
+        $table_products = $wpdb->prefix . 'bihr_products';
+        $queue_table    = $wpdb->prefix . 'bihr_import_queue';
+
+        // 1. Nettoyer les espaces dans les colonnes catégorie : supprime le besoin de TRIM()
+        //    dans les WHERE ce qui empêchait l'utilisation des index existants.
+        $wpdb->query( "UPDATE `{$table_products}` SET cat_l1 = TRIM(cat_l1) WHERE cat_l1 IS NOT NULL AND cat_l1 != TRIM(cat_l1)" );
+        $wpdb->query( "UPDATE `{$table_products}` SET cat_l2 = TRIM(cat_l2) WHERE cat_l2 IS NOT NULL AND cat_l2 != TRIM(cat_l2)" );
+        $wpdb->query( "UPDATE `{$table_products}` SET cat_l3 = TRIM(cat_l3) WHERE cat_l3 IS NOT NULL AND cat_l3 != TRIM(cat_l3)" );
+
+        // 2. Index composite couvrant le cas filtré + non-importé :
+        //    SELECT id WHERE cat_l1=X AND cat_l2=Y AND product_id IS NULL ORDER BY id
+        //    MySQL peut utiliser (cat_l1, cat_l2, product_id) pour satisfaire toute la WHERE.
+        $product_indexes = $wpdb->get_col( "SHOW INDEX FROM `{$table_products}`", 2 );
+        if ( ! in_array( 'idx_cat_filter_import', $product_indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$table_products}` ADD KEY idx_cat_filter_import (cat_l1, cat_l2, product_id)" );
+        }
+        // Index couvrant pour l'import global non filtré : WHERE product_id IS NULL ORDER BY id
+        if ( ! in_array( 'idx_product_id_id', $product_indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$table_products}` ADD KEY idx_product_id_id (product_id, id)" );
+        }
+
+        // 3. Index sur bihr_id dans la file d'import : accélère les preload/lookups par bihr_id.
+        $queue_indexes = $wpdb->get_col( "SHOW INDEX FROM `{$queue_table}`", 2 );
+        if ( ! in_array( 'idx_bihr_id', $queue_indexes, true ) ) {
+            $wpdb->query( "ALTER TABLE `{$queue_table}` ADD KEY idx_bihr_id (bihr_id)" );
         }
     }
 
