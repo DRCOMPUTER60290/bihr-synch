@@ -1602,6 +1602,22 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             </button>
         </form>
 
+        <!-- Bannière import interrompu (affichée dynamiquement si file pending) -->
+        <div id="bihr-resume-wrap" style="display:none; margin-top:10px; padding:12px 14px; background:#fff8e5; border:1px solid #f0b849; border-radius:4px; font-size:13px;">
+            <strong>⚡ Import interrompu détecté</strong> —
+            <span id="bihr-resume-pending"></span> produits restants dans la file.<br>
+            <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" id="bihr-resume-btn" class="button button-primary">
+                    <span class="dashicons dashicons-controls-play" style="vertical-align:middle;"></span>
+                    Reprendre l'import
+                </button>
+                <button type="button" id="bihr-resume-cancel-btn" class="button" style="color:#d63638; border-color:#d63638;">
+                    <span class="dashicons dashicons-trash" style="vertical-align:middle;"></span>
+                    Annuler et vider la file
+                </button>
+            </div>
+        </div>
+
         <!-- Import rapide navigateur — sans délai cron, JS drive le loop -->
         <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <button type="button" id="bihr-browser-import-btn" class="button button-primary"
@@ -1662,6 +1678,47 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         (function($) {
             var bihrBIRunning = false, bihrBIStop = false;
 
+            // Vérifier au chargement si un import est interrompu
+            (function checkPendingQueue() {
+                var nonce = $('#bihr-browser-import-btn').data('nonce');
+                $.post(ajaxurl, {action: 'bihrwi_browser_queue_status', _wpnonce: nonce})
+                    .done(function(resp) {
+                        if (resp.success && resp.data.has_queue) {
+                            $('#bihr-resume-pending').text(resp.data.pending.toLocaleString('fr-FR'));
+                            $('#bihr-resume-wrap').show();
+                        }
+                    });
+            })();
+
+            $('#bihr-resume-btn').on('click', function() {
+                if (bihrBIRunning) return;
+                var nonce = $('#bihr-browser-import-btn').data('nonce');
+                bihrBIRunning = true;
+                bihrBIStop    = false;
+                $(this).prop('disabled', true);
+                $('#bihr-resume-wrap').hide();
+                $('#bihr-bi-wrap').show();
+                $('#bihr-bi-label').text('Reprise de l\'import…');
+                $('#bihr-bi-bar').css('width', '0%');
+                $('#bihr-bi-pct').text('');
+                $('#bihr-bi-stats').text('');
+                $('#bihr-browser-import-btn').prop('disabled', true);
+                runNextChunk(nonce);
+            });
+
+            $('#bihr-resume-cancel-btn').on('click', function() {
+                if (!confirm('Vider la file d\'attente et annuler l\'import interrompu ?')) return;
+                var nonce = $('#bihr-browser-import-btn').data('nonce');
+                $(this).prop('disabled', true);
+                $.post(ajaxurl, {action: 'bihrwi_browser_clear_queue', _wpnonce: nonce})
+                    .done(function() {
+                        $('#bihr-resume-wrap').hide();
+                    })
+                    .always(function() {
+                        $('#bihr-resume-cancel-btn').prop('disabled', false);
+                    });
+            });
+
             $('#bihr-browser-import-btn').on('click', function() {
                 if (bihrBIRunning) return;
                 var btn   = $(this);
@@ -1681,6 +1738,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 bihrBIRunning = true;
                 bihrBIStop    = false;
                 btn.prop('disabled', true);
+                $('#bihr-resume-wrap').hide();
                 $('#bihr-bi-wrap').show();
                 $('#bihr-bi-label').text('Initialisation de la file d\'attente…');
                 $('#bihr-bi-bar').css('width', '0%');

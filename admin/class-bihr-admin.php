@@ -85,6 +85,8 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_manual_stock_sync', array( $this, 'ajax_manual_stock_sync' ) );
         add_action( 'wp_ajax_bihrwi_browser_start_import', array( $this, 'ajax_browser_start_import' ) );
         add_action( 'wp_ajax_bihrwi_browser_import_chunk', array( $this, 'ajax_browser_import_chunk' ) );
+        add_action( 'wp_ajax_bihrwi_browser_queue_status', array( $this, 'ajax_browser_queue_status' ) );
+        add_action( 'wp_ajax_bihrwi_browser_clear_queue', array( $this, 'ajax_browser_clear_queue' ) );
         
         // WP-Cron hooks pour synchronisation automatique
         add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
@@ -2203,6 +2205,43 @@ class BihrWI_Admin {
             'total'   => count( $ids ),
             'message' => sprintf( '%d produits ajoutés à la file d\'attente.', count( $ids ) ),
         ) );
+    }
+
+    /**
+     * AJAX : retourne l'état courant de la file d'import (pending, total).
+     * Utilisé au chargement de la page pour détecter un import interrompu.
+     */
+    public function ajax_browser_queue_status() {
+        check_ajax_referer( 'bihrwi_browser_import_nonce', '_wpnonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Accès refusé', 403 );
+        }
+        global $wpdb;
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+        $pending     = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = %s", 'pending' ) );
+        $total       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$queue_table}`" );
+        $stats       = get_option( 'bihrwi_mass_import_stats', array() );
+        wp_send_json_success( array(
+            'pending'   => $pending,
+            'total'     => $total,
+            'stats'     => $stats,
+            'has_queue' => $pending > 0,
+        ) );
+    }
+
+    /**
+     * AJAX : vide la file d'import (annulation d'un import interrompu).
+     */
+    public function ajax_browser_clear_queue() {
+        check_ajax_referer( 'bihrwi_browser_import_nonce', '_wpnonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Accès refusé', 403 );
+        }
+        global $wpdb;
+        $queue_table = $wpdb->prefix . 'bihr_import_queue';
+        $wpdb->query( "TRUNCATE TABLE `{$queue_table}`" );
+        delete_option( 'bihrwi_mass_import_stats' );
+        wp_send_json_success( array( 'message' => 'File d\'import vidée.' ) );
     }
 
     /**
