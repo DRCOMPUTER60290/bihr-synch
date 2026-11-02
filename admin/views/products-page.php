@@ -1651,6 +1651,10 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 Préparer la file (WP-CLI)
             </button>
             <span style="color:#666; font-size:12px;">Gardez cet onglet ouvert. Les images sont téléchargées séparément.</span>
+            <label style="font-size:13px; color:#444; display:flex; align-items:center; gap:5px; cursor:pointer; margin-left:4px; white-space:nowrap;" title="Importe sans appel OpenAI — 4 workers parallèles — beaucoup plus rapide. Descriptions à enrichir séparément.">
+                <input type="checkbox" id="bihr-skip-ai" checked>
+                <strong>Sans IA</strong> <small style="color:#888;">(×4 rapide)</small>
+            </label>
         </div>
         <!-- Message file prête pour WP-CLI -->
         <div id="bihr-queue-ready" style="display:none; margin-top:8px; padding:10px 14px; background:#f0f6ff; border:1px solid #72aee6; border-radius:4px; font-size:13px;">
@@ -1676,7 +1680,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
         <script>
         (function($) {
-            var bihrBIRunning = false, bihrBIStop = false;
+            var bihrBIRunning = false, bihrBIStop = false, bihrBIActiveWorkers = 0;
 
             // Vérifier au chargement si un import est interrompu
             (function checkPendingQueue() {
@@ -1703,7 +1707,9 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 $('#bihr-bi-pct').text('');
                 $('#bihr-bi-stats').text('');
                 $('#bihr-browser-import-btn').prop('disabled', true);
-                runNextChunk(nonce);
+                var skipAiResume = $('#bihr-skip-ai').is(':checked') ? '1' : '0';
+                bihrBIActiveWorkers = 4;
+                for (var i = 0; i < 4; i++) { runNextChunk(nonce, skipAiResume); }
             });
 
             $('#bihr-resume-cancel-btn').on('click', function() {
@@ -1754,7 +1760,9 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                             return;
                         }
                         $('#bihr-bi-label').text(resp.data.message + ' — démarrage…');
-                        runNextChunk(nonce);
+                        var skipAi = $('#bihr-skip-ai').is(':checked') ? '1' : '0';
+                        bihrBIActiveWorkers = 4;
+                        for (var j = 0; j < 4; j++) { runNextChunk(nonce, skipAi); }
                     })
                     .fail(function() {
                         $('#bihr-bi-label').text('Erreur réseau lors de l\'initialisation.');
@@ -1801,20 +1809,27 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     });
             });
 
-            function runNextChunk(nonce) {
+            function runNextChunk(nonce, skipAi) {
                 if (bihrBIStop) {
-                    $('#bihr-bi-label').text('Import arrêté. Cliquez sur « Import rapide » pour reprendre.');
-                    bihrBIRunning = false;
-                    $('#bihr-browser-import-btn').prop('disabled', false);
+                    bihrBIActiveWorkers--;
+                    if (bihrBIActiveWorkers <= 0) {
+                        bihrBIActiveWorkers = 0;
+                        $('#bihr-bi-label').text('Import arrêté. Cliquez sur « Import rapide » pour reprendre.');
+                        bihrBIRunning = false;
+                        $('#bihr-browser-import-btn').prop('disabled', false);
+                    }
                     return;
                 }
 
-                $.post(ajaxurl, {action: 'bihrwi_browser_import_chunk', _wpnonce: nonce})
-                    .done(function(resp) {
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    timeout: 120000,
+                    data: {action: 'bihrwi_browser_import_chunk', _wpnonce: nonce, skip_ai: skipAi || '0'},
+                    success: function(resp) {
                         if (!resp.success) {
-                            $('#bihr-bi-label').text('Erreur serveur. Cliquez sur « Import rapide » pour reprendre.');
-                            bihrBIRunning = false;
-                            $('#bihr-browser-import-btn').prop('disabled', false);
+                            $('#bihr-bi-label').text('Erreur serveur. Reprise dans 10s…');
+                            setTimeout(function() { runNextChunk(nonce, skipAi); }, 10000);
                             return;
                         }
                         var d = resp.data;
@@ -1824,24 +1839,33 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                         $('#bihr-bi-count').show().text(
                             processed.toLocaleString('fr-FR') + ' / ' + d.total.toLocaleString('fr-FR') + ' produits traités'
                         );
-                        $('#bihr-bi-stats').text('✓ Succès : ' + d.success.toLocaleString('fr-FR') + '   ✗ Erreurs : ' + d.errors + '   Restants : ' + d.pending.toLocaleString('fr-FR'));
+                        var aiLabel = skipAi === '1' ? ' sans IA' : '';
+                        $('#bihr-bi-stats').text('✓ Succès : ' + d.success.toLocaleString('fr-FR') + '   ✗ Erreurs : ' + d.errors + '   Restants : ' + d.pending.toLocaleString('fr-FR') + aiLabel);
 
                         if (d.done) {
-                            $('#bihr-bi-label').text('✓ Import terminé !');
-                            $('#bihr-bi-count').text(d.success.toLocaleString('fr-FR') + ' / ' + d.total.toLocaleString('fr-FR') + ' produits importés.');
-                            bihrBIRunning = false;
-                            $('#bihr-browser-import-btn').prop('disabled', false);
+                            bihrBIActiveWorkers--;
+                            if (bihrBIActiveWorkers <= 0) {
+                                bihrBIActiveWorkers = 0;
+                                $('#bihr-bi-label').text('✓ Import terminé !');
+                                $('#bihr-bi-count').text(d.success.toLocaleString('fr-FR') + ' / ' + d.total.toLocaleString('fr-FR') + ' produits importés.');
+                                bihrBIRunning = false;
+                                $('#bihr-browser-import-btn').prop('disabled', false);
+                            }
                             return;
                         }
 
-                        var etaMin = d.pending > 0 ? Math.round(d.pending / 50 * 12 / 60) : 0;
+                        // ETA : 4 workers × capacité par chunk
+                        var ppc    = skipAi === '1' ? 100 : 10;
+                        var spc    = skipAi === '1' ? 1.5 : 3;
+                        var etaMin = d.pending > 0 ? Math.round(d.pending / (4 * ppc) * spc / 60) : 0;
                         var etaStr = etaMin > 0 ? ' (~' + etaMin + ' min restantes)' : '';
-                        $('#bihr-bi-label').text('Import en cours…' + etaStr);
-                        setTimeout(function() { runNextChunk(nonce); }, 200);
-                    })
-                    .fail(function() {
-                        setTimeout(function() { runNextChunk(nonce); }, 10000);
-                    });
+                        $('#bihr-bi-label').text('Import en cours' + aiLabel + '…' + etaStr);
+                        setTimeout(function() { runNextChunk(nonce, skipAi); }, 200);
+                    },
+                    error: function() {
+                        setTimeout(function() { runNextChunk(nonce, skipAi); }, 10000);
+                    }
+                });
             }
         })(jQuery);
         </script>

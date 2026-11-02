@@ -1796,6 +1796,7 @@ class BihrWI_Admin {
         }
 
         $skip_images = ! empty( $_POST['skip_images'] ) && '1' === $_POST['skip_images'];
+        $skip_ai     = ! empty( $_POST['skip_ai'] ) && '1' === $_POST['skip_ai'];
 
         // Bufferiser les logs en mémoire pour ce batch
         $this->logger->enable_buffer();
@@ -1833,7 +1834,7 @@ class BihrWI_Admin {
 
         foreach ( $product_ids as $product_id ) {
             try {
-                $wc_id = $this->product_sync->import_to_woocommerce( $product_id, $skip_images );
+                $wc_id = $this->product_sync->import_to_woocommerce( $product_id, $skip_images, false, $skip_ai );
 
                 if ( $wc_id ) {
                     $results[] = array(
@@ -2257,12 +2258,15 @@ class BihrWI_Admin {
         @set_time_limit( 360 );
         global $wpdb;
         $queue_table = $wpdb->prefix . 'bihr_import_queue';
-        $batch_size  = 50; // o2switch: ~0,25s/produit → 50×0,25s = ~12s, sous tout timeout Apache
 
-        $pending = (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = %s",
-            'pending'
-        ) );
+        // skip_ai=true → pas d'appel OpenAI → import ~10x plus rapide
+        $skip_ai    = ! empty( $_POST['skip_ai'] ) && '1' === $_POST['skip_ai'];
+        // Sans IA : 100 produits × ~0,25s = ~25s. Avec IA : 10 × ~2s = ~20s (safer).
+        $batch_size = $skip_ai ? 100 : 10;
+
+        $pending = (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM `{$queue_table}` WHERE status = 'pending'"
+        );
 
         if ( 0 === $pending ) {
             $stats = get_option( 'bihrwi_mass_import_stats', array() );
@@ -2278,10 +2282,26 @@ class BihrWI_Admin {
             return;
         }
 
-        $rows = $wpdb->get_results( $wpdb->prepare(
-            "SELECT id, bihr_id FROM `{$queue_table}` WHERE status = 'pending' ORDER BY id ASC LIMIT %d",
-            $batch_size
-        ) );
+        // Claim atomique : chaque worker AJAX reçoit un token unique.
+        // L'UPDATE atomique garantit qu'aucun autre worker ne prend les mêmes lignes.
+        $claim_token = wp_generate_uuid4();
+        $has_claimed_by = $wpdb->get_var( "SHOW COLUMNS FROM `{$queue_table}` LIKE 'claimed_by'" );
+        if ( $has_claimed_by ) {
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE `{$queue_table}` SET status='processing', claimed_by=%s WHERE status='pending' ORDER BY id ASC LIMIT %d",
+                $claim_token,
+                $batch_size
+            ) );
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT id, bihr_id FROM `{$queue_table}` WHERE status='processing' AND claimed_by=%s",
+                $claim_token
+            ) );
+        } else {
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT id, bihr_id FROM `{$queue_table}` WHERE status = 'pending' ORDER BY id ASC LIMIT %d",
+                $batch_size
+            ) );
+        }
 
         if ( empty( $rows ) ) {
             wp_send_json_success( array( 'done' => true, 'pending' => 0, 'percent' => 100.0 ) );
@@ -2347,7 +2367,7 @@ class BihrWI_Admin {
                 try {
                     // skip_link_update=true : regroupe les UPDATE product_id en 1 requête
                     // en fin de chunk (même pattern que le CLI — évite N UPDATE individuels)
-                    $wc_id = $this->product_sync->import_to_woocommerce( $product_id, true, true );
+                    $wc_id = $this->product_sync->import_to_woocommerce( $product_id, true, true, $skip_ai );
                     if ( $wc_id ) {
                         $success++;
                         $done_ids[]                = $queue_id;

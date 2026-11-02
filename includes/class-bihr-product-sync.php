@@ -702,7 +702,7 @@ class BihrWI_Product_Sync {
      * @param bool $skip_link_update Si true, ne fait pas l'UPDATE product_id dans wp_bihr_products.
      *                               Utiliser avec batch_update_product_links() pour regrouper en 1 requête/chunk.
      */
-    public function import_to_woocommerce( $product_id, $skip_images = false, $skip_link_update = false ) {
+    public function import_to_woocommerce( $product_id, $skip_images = false, $skip_link_update = false, $skip_ai = false ) {
         global $wpdb;
 
         // Utiliser le cache préchargé par preload_product_rows() si disponible (évite 1 SELECT/produit).
@@ -786,7 +786,7 @@ class BihrWI_Product_Sync {
 
         // Enrichissement IA si disponible (instance partagée, pas de get_option() par produit)
         $ai_enrichment = $this->ai_enrichment;
-        if ( $ai_enrichment->is_enabled() ) {
+        if ( ! $skip_ai && $ai_enrichment->is_enabled() ) {
             $this->logger->debug( 'Import WooCommerce: enrichissement IA activé pour ' . $row->product_code );
             
             // Construire l'URL complète de l'image si disponible
