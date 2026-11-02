@@ -1655,6 +1655,10 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 <input type="checkbox" id="bihr-skip-ai" checked>
                 <strong>Sans IA</strong> <small style="color:#888;">(×4 rapide)</small>
             </label>
+            <label style="font-size:13px; color:#444; display:flex; align-items:center; gap:5px; cursor:pointer; margin-left:4px; white-space:nowrap;" title="Exclut les produits déjà présents dans WooCommerce (product_id IS NOT NULL). Utile pour n'importer que les nouveautés.">
+                <input type="checkbox" id="bihr-skip-existing" checked>
+                <strong>Nouveaux seulement</strong> <small style="color:#888;">(ignore les déjà importés)</small>
+            </label>
         </div>
         <!-- Message file prête pour WP-CLI -->
         <div id="bihr-queue-ready" style="display:none; margin-top:8px; padding:10px 14px; background:#f0f6ff; border:1px solid #72aee6; border-radius:4px; font-size:13px;">
@@ -1751,7 +1755,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 $('#bihr-bi-pct').text('0%');
                 $('#bihr-bi-stats').text('');
 
-                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce}, filters))
+                var skipExisting = $('#bihr-skip-existing').is(':checked') ? '1' : '0';
+                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce, skip_existing: skipExisting}, filters))
                     .done(function(resp) {
                         if (!resp.success) {
                             $('#bihr-bi-label').text('Erreur : ' + (resp.data || 'impossible de démarrer'));
@@ -1792,7 +1797,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 };
                 btn.prop('disabled', true).text('Préparation…');
                 $('#bihr-queue-ready').hide();
-                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce}, filters))
+                var skipExistingQueue = $('#bihr-skip-existing').is(':checked') ? '1' : '0';
+                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce, skip_existing: skipExistingQueue}, filters))
                     .done(function(resp) {
                         btn.prop('disabled', false).html('<span class="dashicons dashicons-list-view" style="vertical-align:middle;"></span> Préparer la file (WP-CLI)');
                         if (!resp.success) {

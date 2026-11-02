@@ -2167,10 +2167,12 @@ class BihrWI_Admin {
         $filter_cat_l3     = isset( $_POST['cat_l3'] )          ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
         $filter_cat_l2_not = isset( $_POST['cat_l2_not'] )      ? sanitize_text_field( wp_unslash( $_POST['cat_l2_not'] ) ) : '';
 
+        $skip_existing = ! empty( $_POST['skip_existing'] ) && '1' === $_POST['skip_existing'];
+
         $ids = $this->product_sync->get_all_filtered_product_ids(
             $filter_search, $filter_stock, $filter_price_min, $filter_price_max,
             $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3, $filter_cat_l2_not,
-            true
+            $skip_existing
         );
 
         if ( empty( $ids ) ) {
