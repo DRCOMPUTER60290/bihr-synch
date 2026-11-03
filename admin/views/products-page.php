@@ -1467,6 +1467,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     </label>
                     <select name="sort_by" id="sort_by">
                         <option value="">Par défaut (ID)</option>
+                        <option value="sku_asc" <?php selected( $sort_by, 'sku_asc' ); ?>>SKU (A → Z)</option>
+                        <option value="sku_desc" <?php selected( $sort_by, 'sku_desc' ); ?>>SKU (Z → A)</option>
                         <option value="name_asc" <?php selected( $sort_by, 'name_asc' ); ?>>Nom (A → Z)</option>
                         <option value="name_desc" <?php selected( $sort_by, 'name_desc' ); ?>>Nom (Z → A)</option>
                         <option value="price_asc" <?php selected( $sort_by, 'price_asc' ); ?>>Prix croissant</option>
@@ -1860,7 +1862,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     <input type="checkbox" id="bihr-select-all-checkbox" title="Tout sélectionner" />
                 </th>
                 <th style="width:60px;">ID</th>
-                <th style="width:120px;">Code produit</th>
+                <th style="width:120px;">SKU</th>
                 <th>Nom</th>
                 <th>Catégorie (Bihr)</th>
                 <th>Niveau 1</th>
