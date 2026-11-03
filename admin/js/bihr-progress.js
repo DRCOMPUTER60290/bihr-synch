@@ -240,7 +240,12 @@ jQuery(document).ready(function($) {
                         for (var j = 0; j < response.data.results.length; j++) {
                             var res = response.data.results[j];
                             var lineId = '#bihr-import-' + res.product_id;
-                            if (res.success) {
+                            if (res.skipped) {
+                                $(lineId).html(
+                                    '<span class="dashicons dashicons-yes" style="color: #888;"></span> ' +
+                                    '<strong>Produit ID ' + res.product_id + '</strong> - Déjà importé dans WooCommerce'
+                                );
+                            } else if (res.success) {
                                 $(lineId).html(
                                     '<span id="bihr-success-' + res.product_id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
                                     '<strong>Produit ID ' + res.product_id + '</strong> - Importé (WC ID: ' + res.wc_id + ')'
@@ -367,6 +372,7 @@ jQuery(document).ready(function($) {
                     // Importer les produits par batch pour accélérer l'import
                     var currentIndex = 0;
                     var successCount = 0;
+                    var skippedCount = 0;
                     var errorCount = 0;
                     var batchSize = 10; // Taille de batch réduite pour éviter les timeouts serveur
 
@@ -374,7 +380,10 @@ jQuery(document).ready(function($) {
                         if (currentIndex >= allProducts.length) {
                             // Terminé
                             $progressBar.css('width', '100%').text('100%');
-                            var finalMsg = 'Import terminé : ' + successCount + ' succès';
+                            var finalMsg = 'Import terminé : ' + successCount + ' importé(s)';
+                            if (skippedCount > 0) {
+                                finalMsg += ', ' + skippedCount + ' déjà dans WooCommerce';
+                            }
                             if (errorCount > 0) {
                                 finalMsg += ', ' + errorCount + ' erreur(s)';
                             }
@@ -458,7 +467,13 @@ jQuery(document).ready(function($) {
                                     for (var j = 0; j < response.data.results.length; j++) {
                                         var res = response.data.results[j];
                                         var lineId = '#bihr-import-' + res.product_id;
-                                        if (res.success) {
+                                        if (res.skipped) {
+                                            $(lineId).html(
+                                                '<span class="dashicons dashicons-yes" style="color: #888;"></span> ' +
+                                                '<strong>Produit ID ' + res.product_id + '</strong> - Déjà importé dans WooCommerce'
+                                            );
+                                            skippedCount++;
+                                        } else if (res.success) {
                                             $(lineId).html(
                                                 '<span id="bihr-success-' + res.product_id + '" class="dashicons dashicons-yes-alt" style="color: green;"></span> ' +
                                                 '<strong>Produit ID ' + res.product_id + '</strong> - Importé (WC ID: ' + res.wc_id + ')'

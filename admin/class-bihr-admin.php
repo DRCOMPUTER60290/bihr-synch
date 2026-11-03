@@ -1804,16 +1804,26 @@ class BihrWI_Admin {
         // Recharger les marges (cache static vidé = nouvelle lecture option)
         $this->product_sync->reset_margin_cache();
 
-        // Exclure les produits déjà importés (product_id IS NOT NULL)
-        $total_ids  = count( $product_ids );
-        $product_ids = $this->product_sync->filter_unimported_products( $product_ids );
-        $skipped     = $total_ids - count( $product_ids );
+        // Identifier les produits déjà importés pour les signaler dans les résultats (sans les re-importer).
+        $original_ids = $product_ids;
+        $product_ids  = $this->product_sync->filter_unimported_products( $product_ids );
+        $skipped_ids  = array_diff( $original_ids, $product_ids );
+
+        $results = array();
+        foreach ( $skipped_ids as $sid ) {
+            $results[] = array(
+                'product_id' => $sid,
+                'success'    => true,
+                'skipped'    => true,
+                'message'    => 'Déjà importé dans WooCommerce.',
+            );
+        }
 
         if ( empty( $product_ids ) ) {
-            $this->logger->log( 'Batch AJAX: tous les produits sont déjà importés (' . $skipped . ' ignorés).' );
+            $this->logger->log( 'Batch AJAX: tous les produits sont déjà importés (' . count( $skipped_ids ) . ' ignorés).' );
             $this->logger->flush_buffer();
             $this->logger->disable_buffer();
-            wp_send_json_success( array( 'results' => array(), 'skipped' => $skipped ) );
+            wp_send_json_success( array( 'results' => $results, 'skipped' => count( $skipped_ids ) ) );
         }
 
         // Désactiver les recomptages et notifications pendant le batch
@@ -1828,7 +1838,7 @@ class BihrWI_Admin {
         // Préchargement du cache WooCommerce pour éviter N+1 requêtes DB
         $this->product_sync->preload_product_lookup( $product_ids );
 
-        $results = array();
+        // $results already contains skipped products (déjà importés) from the block above.
         $batch_start = microtime( true );
         $total_bihr = count( $product_ids );
 
