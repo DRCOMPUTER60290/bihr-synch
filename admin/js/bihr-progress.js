@@ -134,6 +134,7 @@ jQuery(document).ready(function($) {
         stopImport = false;
         $progressContainer.show();
         $('#bihr-stop-import').show();
+        $('#bihr-kill-cli').show();
         $progressBar.css('width', '0%').text('0%');
         $progressText.text('0 / ' + selectedProducts.length + ' produits importés');
         $progressDetails.html('');
@@ -158,6 +159,7 @@ jQuery(document).ready(function($) {
                 }
                 $progressText.html('<strong style="color: green;">' + finalMsg + '</strong>');
                 $('#bihr-stop-import').hide();
+                $('#bihr-kill-cli').hide();
 
                 function reenableButtons() {
                     $('#bihr-import-selected, #bihr-select-all, #bihr-deselect-all').prop('disabled', false);
@@ -361,6 +363,7 @@ jQuery(document).ready(function($) {
                     stopImport = false;
                     $progressContainer.show();
                     $('#bihr-stop-import').show();
+                    $('#bihr-kill-cli').show();
                     $progressBar.css('width', '0%').text('0%');
                     $progressText.text('0 / ' + count + ' produits importés');
                     $progressDetails.html('');
@@ -389,6 +392,7 @@ jQuery(document).ready(function($) {
                             }
                             $progressText.html('<strong style="color: green;">' + finalMsg + '</strong>');
                             $('#bihr-stop-import').hide();
+                            $('#bihr-kill-cli').hide();
 
                             // Lancer le téléchargement des images si nécessaire
                             if (!$('#bihr-skip-images').is(':checked')) {
@@ -1044,6 +1048,32 @@ jQuery(document).ready(function($) {
                 // Réactiver le bouton
                 $button.prop('disabled', false);
                 $button.find('.dashicons').removeClass('spin');
+            }
+        });
+    });
+
+    $('#bihr-kill-cli').on('click', function(e) {
+        e.preventDefault();
+        if (!confirm('Forcer l\'arrêt du processus WP-CLI ? Cette action est irréversible.')) return;
+        var $btn = $(this);
+        $btn.prop('disabled', true).html('<span class="dashicons dashicons-update spin" style="vertical-align:middle;"></span> Arrêt en cours...');
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'bihrwi_kill_cli_import', nonce: bihrProgressData.nonce },
+            success: function(response) {
+                if (response.success) {
+                    var msg = response.data.message || 'Processus arrêté.';
+                    alert('✅ ' + msg);
+                    $btn.hide();
+                } else {
+                    alert('⚠ Erreur : ' + (response.data ? response.data.message : 'inconnue'));
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-warning" style="vertical-align:middle;"></span> ⚠ Tuer process CLI');
+                }
+            },
+            error: function() {
+                alert('Erreur de connexion.');
+                $btn.prop('disabled', false).html('<span class="dashicons dashicons-warning" style="vertical-align:middle;"></span> ⚠ Tuer process CLI');
             }
         });
     });
