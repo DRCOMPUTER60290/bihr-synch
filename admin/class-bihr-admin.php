@@ -87,6 +87,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_browser_import_chunk', array( $this, 'ajax_browser_import_chunk' ) );
         add_action( 'wp_ajax_bihrwi_browser_queue_status', array( $this, 'ajax_browser_queue_status' ) );
         add_action( 'wp_ajax_bihrwi_browser_clear_queue', array( $this, 'ajax_browser_clear_queue' ) );
+        add_action( 'wp_ajax_bihrwi_deduplicate_products', array( $this, 'ajax_deduplicate_products' ) );
         
         // WP-Cron hooks pour synchronisation automatique
         add_action( 'bihrwi_auto_stock_sync', array( $this, 'run_auto_stock_sync' ) );
@@ -2253,6 +2254,51 @@ class BihrWI_Admin {
         $wpdb->query( "TRUNCATE TABLE `{$queue_table}`" );
         delete_option( 'bihrwi_mass_import_stats' );
         wp_send_json_success( array( 'message' => 'File d\'import vidée.' ) );
+    }
+
+    /**
+     * AJAX : supprime les doublons de wp_bihr_products, conserve MAX(id) par product_code.
+     */
+    public function ajax_deduplicate_products() {
+        check_ajax_referer( 'bihrwi_deduplicate_nonce', '_wpnonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Accès refusé', 403 );
+        }
+
+        global $wpdb;
+        $table = esc_sql( $wpdb->prefix . 'bihr_products' );
+
+        // Compter les doublons avant suppression
+        $total_before = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
+        $unique_skus  = (int) $wpdb->get_var( "SELECT COUNT(DISTINCT product_code) FROM `{$table}`" );
+        $duplicates   = $total_before - $unique_skus;
+
+        if ( $duplicates <= 0 ) {
+            wp_send_json_success( array(
+                'deleted'  => 0,
+                'total'    => $total_before,
+                'message'  => 'Aucun doublon trouvé.',
+            ) );
+        }
+
+        // Supprime toutes les lignes sauf MAX(id) par product_code
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table name is esc_sql'd, no user input
+        $wpdb->query(
+            "DELETE FROM `{$table}`
+             WHERE id NOT IN (
+                 SELECT max_id FROM (
+                     SELECT MAX(id) AS max_id FROM `{$table}` GROUP BY product_code
+                 ) AS keep
+             )"
+        );
+
+        $deleted = $wpdb->rows_affected;
+
+        wp_send_json_success( array(
+            'deleted'  => $deleted,
+            'total'    => $total_before - $deleted,
+            'message'  => $deleted . ' doublon(s) supprimé(s). ' . ( $total_before - $deleted ) . ' produits uniques conservés.',
+        ) );
     }
 
     /**

@@ -1880,6 +1880,42 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     }
     ?>
 
+    <!-- Nettoyage des doublons -->
+    <div id="bihr-dedup-bar" style="display:flex; align-items:center; gap:10px; margin:10px 0 6px; padding:8px 12px; background:#fff8e1; border:1px solid #f9a825; border-radius:4px; font-size:13px;">
+        <span>⚠️ Le tableau peut contenir des doublons (même SKU, plusieurs lignes).</span>
+        <button type="button" id="bihr-dedup-btn" class="button button-secondary"
+                data-nonce="<?php echo esc_attr( wp_create_nonce( 'bihrwi_deduplicate_nonce' ) ); ?>">
+            🧹 Supprimer les doublons
+        </button>
+        <span id="bihr-dedup-result" style="color:#1a7f37; font-weight:600;"></span>
+    </div>
+    <script>
+    jQuery(document).ready(function($) {
+        $('#bihr-dedup-btn').on('click', function() {
+            var btn = $(this);
+            if (!confirm('Supprimer tous les doublons ? Un seul produit par SKU sera conservé (le plus récent).')) return;
+            btn.prop('disabled', true).text('⏳ Nettoyage…');
+            $.post(ajaxurl, {
+                action: 'bihrwi_deduplicate_products',
+                _wpnonce: btn.data('nonce')
+            }, function(resp) {
+                if (resp.success) {
+                    $('#bihr-dedup-result').text('✅ ' + resp.data.message);
+                    btn.closest('#bihr-dedup-bar').css('background', '#e8f5e9').css('border-color', '#2e7d32');
+                    btn.prop('disabled', true).text('✅ Fait');
+                    setTimeout(function() { location.reload(); }, 1500);
+                } else {
+                    $('#bihr-dedup-result').text('❌ Erreur').css('color', '#c62828');
+                    btn.prop('disabled', false).text('🧹 Supprimer les doublons');
+                }
+            }).fail(function() {
+                $('#bihr-dedup-result').text('❌ Erreur réseau').css('color', '#c62828');
+                btn.prop('disabled', false).text('🧹 Supprimer les doublons');
+            });
+        });
+    });
+    </script>
+
     <!-- Barre de recherche rapide -->
     <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="display:flex; align-items:center; gap:8px; margin:12px 0 8px; flex-wrap:wrap;">
         <input type="hidden" name="page" value="bihr-products" />

@@ -591,9 +591,14 @@ class BihrWI_Product_Sync {
         $per_page = absint( $per_page );
         $offset   = absint( $offset );
 
-        // Construire la requête SQL complète avec tous les placeholders dans la chaîne principale
+        // Construire la requête SQL dédoublonnée : un seul produit par product_code (MAX id)
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where_sql contains only placeholders and constant strings, all values are passed to prepare()
-        $sql = "SELECT * FROM `{$table_name}` WHERE {$where_sql} ORDER BY `{$order_column}` {$order_dir} LIMIT %d OFFSET %d";
+        $sql = "SELECT p.* FROM `{$table_name}` p
+            INNER JOIN (
+                SELECT MAX(id) AS best_id FROM `{$table_name}` WHERE {$where_sql} GROUP BY product_code
+            ) dedup ON p.id = dedup.best_id
+            ORDER BY p.`{$order_column}` {$order_dir}
+            LIMIT %d OFFSET %d";
 
         // Préparer la requête avec tous les arguments (toujours utiliser prepare même si args est vide)
         $all_args = array_merge( $args, array( $per_page, $offset ) );
@@ -635,8 +640,9 @@ class BihrWI_Product_Sync {
         $args      = $filter['args'];
 
         $table_name = esc_sql( $this->table_name );
+        // Compte les SKU distincts (product_code) pour éviter les doublons dans le total affiché
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where_sql contains only placeholders and constant strings, all values are passed to prepare()
-        $sql        = "SELECT COUNT(*) FROM `{$table_name}` WHERE {$where_sql}";
+        $sql        = "SELECT COUNT(DISTINCT product_code) FROM `{$table_name}` WHERE {$where_sql}";
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is prepared with all placeholders
         $prepared   = $wpdb->prepare( $sql, $args );
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Query is prepared above with all placeholders
