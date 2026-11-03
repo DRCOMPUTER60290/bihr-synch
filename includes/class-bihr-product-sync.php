@@ -554,8 +554,10 @@ class BihrWI_Product_Sync {
         $args      = $filter['args'];
 
         // Whitelist des colonnes autorisées pour ORDER BY
-        $allowed_columns = array( 'id', 'product_code', 'name', 'dealer_price_ht', 'stock_level', 'category' );
+        $allowed_columns = array( 'id', 'product_code', 'new_part_number', 'name', 'dealer_price_ht', 'stock_level', 'category' );
         $allowed_sorts = array(
+            'sku_asc'    => array( 'product_code', 'ASC' ),
+            'sku_desc'   => array( 'product_code', 'DESC' ),
             'price_asc'  => array( 'dealer_price_ht', 'ASC' ),
             'price_desc' => array( 'dealer_price_ht', 'DESC' ),
             'name_asc'   => array( 'name', 'ASC' ),
