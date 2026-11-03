@@ -643,4 +643,49 @@ class BihrWI_CLI_Commands {
 
         WP_CLI::success( sprintf( 'Téléchargement terminé. Total : %d image(s).', $total_processed ) );
     }
+
+    /**
+     * Arrête tous les processus WP-CLI d'import BIHR en cours.
+     *
+     * @subcommand kill-import
+     */
+    public function kill_import( $args, $assoc_args ) {
+        $patterns    = array( 'wp bihr import_products', 'wp bihr process_queue', 'wp bihr parallel_queue' );
+        $current_pid = getmypid();
+        $killed      = 0;
+
+        foreach ( $patterns as $pattern ) {
+            $raw = (string) shell_exec( 'pgrep -fa ' . escapeshellarg( $pattern ) . ' 2>/dev/null' );
+            if ( empty( $raw ) ) {
+                continue;
+            }
+            foreach ( explode( "\n", trim( $raw ) ) as $line ) {
+                if ( empty( $line ) ) {
+                    continue;
+                }
+                $parts = explode( ' ', $line, 2 );
+                $pid   = (int) $parts[0];
+                if ( $pid <= 0 || $pid === $current_pid ) {
+                    continue;
+                }
+                WP_CLI::log( sprintf( 'Arrêt PID %d : %s', $pid, isset( $parts[1] ) ? $parts[1] : '' ) );
+                if ( function_exists( 'posix_kill' ) ) {
+                    posix_kill( $pid, 15 );
+                    sleep( 2 );
+                    if ( posix_kill( $pid, 0 ) ) {
+                        posix_kill( $pid, 9 );
+                    }
+                } else {
+                    shell_exec( 'kill -9 ' . (int) $pid );
+                }
+                $killed++;
+            }
+        }
+
+        if ( $killed > 0 ) {
+            WP_CLI::success( sprintf( '%d processus arrêté(s).', $killed ) );
+        } else {
+            WP_CLI::success( "Aucun processus d'import en cours." );
+        }
+    }
 }

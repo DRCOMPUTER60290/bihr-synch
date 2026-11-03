@@ -51,6 +51,7 @@ class BihrWI_Admin {
         add_action( 'wp_ajax_bihrwi_download_pending_images', array( $this, 'ajax_download_pending_images' ) );
         add_action( 'wp_ajax_bihrwi_count_pending_images', array( $this, 'ajax_count_pending_images' ) );
         add_action( 'wp_ajax_bihrwi_stop_mass_import', array( $this, 'ajax_stop_mass_import' ) );
+        add_action( 'wp_ajax_bihrwi_kill_cli_import', array( $this, 'ajax_kill_cli_import' ) );
         add_action( 'wp_ajax_bihrwi_start_image_download_bg', array( $this, 'ajax_start_image_download_bg' ) );
         add_action( 'wp_ajax_bihrwi_stop_image_download_bg',  array( $this, 'ajax_stop_image_download_bg' ) );
         add_action( 'wp_ajax_bihrwi_image_download_status',   array( $this, 'ajax_image_download_status' ) );
@@ -2039,6 +2040,44 @@ class BihrWI_Admin {
         delete_option( 'bihrwi_mass_import_stats' );
 
         wp_send_json_success( array( 'message' => 'Import arrêté.' ) );
+    }
+
+    public function ajax_kill_cli_import() {
+        check_ajax_referer( 'bihrwi_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( array( 'message' => 'Permission refusée.' ) );
+        }
+        $patterns = array( 'wp bihr import_products', 'wp bihr process_queue', 'wp bihr parallel_queue' );
+        $current  = getmypid();
+        $killed   = 0;
+        $found    = array();
+        foreach ( $patterns as $pattern ) {
+            $raw = (string) shell_exec( 'pgrep -fa ' . escapeshellarg( $pattern ) . ' 2>/dev/null' );
+            if ( empty( $raw ) ) continue;
+            foreach ( explode( "\n", trim( $raw ) ) as $line ) {
+                if ( empty( $line ) ) continue;
+                $parts = explode( ' ', $line, 2 );
+                $pid   = (int) $parts[0];
+                if ( $pid <= 0 || $pid === $current ) continue;
+                $found[] = $pid;
+                if ( function_exists( 'posix_kill' ) ) {
+                    posix_kill( $pid, 15 );
+                    sleep( 2 );
+                    if ( posix_kill( $pid, 0 ) ) posix_kill( $pid, 9 );
+                } else {
+                    shell_exec( 'kill -9 ' . (int) $pid );
+                }
+                $killed++;
+            }
+        }
+        if ( $killed > 0 ) {
+            wp_send_json_success( array(
+                'message' => sprintf( '%d processus CLI arrêté(s). PIDs : %s', $killed, implode( ', ', $found ) ),
+                'killed'  => $killed,
+            ) );
+        } else {
+            wp_send_json_success( array( 'message' => 'Aucun processus CLI en cours.', 'killed' => 0 ) );
+        }
     }
 
     /**

@@ -1500,6 +1500,9 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
             <button id="bihr-stop-import" class="button" style="border-color: #d63638; color: #d63638; display: none;">
                 <span class="dashicons dashicons-dismiss" style="vertical-align: middle;"></span> Arrêter
             </button>
+            <button id="bihr-kill-cli" class="button" style="border-color: #9b59b6; color: #9b59b6; margin-left: 8px; display:none;" title="Force l'arrêt du processus WP-CLI sur le serveur">
+                <span class="dashicons dashicons-warning" style="vertical-align: middle;"></span> ⚠ Tuer process CLI
+            </button>
         </h3>
         <div style="background: #f0f0f1; height: 30px; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
             <div id="bihr-progress-bar" style="background: #2271b1; height: 100%; width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;"></div>
