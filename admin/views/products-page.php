@@ -1196,7 +1196,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <h2>3. Prévisualisation des produits Bihr (table wp_bihr_products)</h2>
 
     <p>
-        <strong>Total :</strong> <?php echo intval( $total ); ?> produits
+        <strong>Total :</strong> <?php echo number_format_i18n( $total ); ?> références BIHR
+        <span class="description">(plusieurs références BIHR peuvent correspondre au même produit WooCommerce)</span>
         <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) || $filter_price_min !== '' || $filter_price_max !== '' || ! empty( $filter_category ) || ! empty( $sort_by ) ) : ?>
             (filtrés)
         <?php endif; ?>

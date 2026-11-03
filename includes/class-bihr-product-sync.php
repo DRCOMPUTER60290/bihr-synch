@@ -179,8 +179,8 @@ class BihrWI_Product_Sync {
     }
 
     /**
-     * Filtre les IDs de produits BIHR : ne garde que ceux pas encore importés
-     * (product_id IS NULL dans wp_bihr_products).
+     * Filtre les IDs BIHR sans produit WooCommerce existant.
+     * Une ancienne liaison vers un produit supprimé est considérée comme non importée.
      *
      * @param int[] $ids IDs dans wp_bihr_products.
      * @return int[] IDs non encore importés.
@@ -197,7 +197,10 @@ class BihrWI_Product_Sync {
         $ph          = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
         $imported    = $wpdb->get_col(
             $wpdb->prepare(
-                "SELECT id FROM `{$table_name}` WHERE id IN ({$ph}) AND product_id IS NOT NULL",
+                "SELECT bihr.id
+                 FROM `{$table_name}` AS bihr
+                 INNER JOIN `{$wpdb->posts}` AS product ON product.ID = bihr.product_id
+                 WHERE bihr.id IN ({$ph})",
                 ...$ids
             )
         );
@@ -651,7 +654,7 @@ class BihrWI_Product_Sync {
      * @return array Tableau d'IDs (int[])
      */
     /**
-     * @param bool $only_unimported Si true, exclut les produits déjà importés (product_id IS NULL).
+     * @param bool $only_unimported Si true, exclut les produits déjà liés à un produit WooCommerce existant.
      *                              Passer true depuis les actions d'import/file pour ne pas re-traiter
      *                              des produits déjà dans WooCommerce.
      *                              Laisser false (défaut) pour le frontend et les comptages.
@@ -675,9 +678,12 @@ class BihrWI_Product_Sync {
         $args      = $filter['args'];
 
         if ( $only_unimported ) {
-            // Exclure les produits déjà importés : profite de l'index idx_cat_filter_import
-            // (cat_l1, cat_l2, product_id) ajouté en migrate_230.
-            $where_sql .= ' AND product_id IS NULL';
+            // Inclure les liens orphelins : le produit WooCommerce référencé a pu être supprimé.
+            // La sous-requête garde les lignes déjà liées exclues sans pagination.
+            $posts_table = esc_sql( $wpdb->posts );
+            $where_sql  .= " AND (product_id IS NULL OR NOT EXISTS (
+                SELECT 1 FROM `{$posts_table}` AS bihr_wc_product WHERE bihr_wc_product.ID = product_id
+            ))";
         }
 
         $table_name = esc_sql( $this->table_name );
