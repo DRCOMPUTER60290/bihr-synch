@@ -363,6 +363,7 @@ class BihrWI_CLI_Commands {
 
         $success = (int) ( $stats_opt['success'] ?? 0 );
         $errors  = (int) ( $stats_opt['errors']  ?? 0 );
+        $skipped = (int) ( $stats_opt['skipped'] ?? 0 );
 
         $chunk_num = 0;
 
@@ -381,11 +382,48 @@ class BihrWI_CLI_Commands {
             $chunk_start = microtime( true );
             $bihr_ids    = array_map( fn( $r ) => (int) $r->bihr_id, $rows );
 
+            // Une référence a pu être importée après la préparation de la file.
+            // La re-vérifier avant import évite de mettre à jour un produit déjà lié.
+            $unimported_ids = $sync->filter_unimported_products( $bihr_ids );
+            $unimported_set = array_flip( $unimported_ids );
+            $rows_to_skip   = array();
+            $rows_to_process = array();
+            foreach ( $rows as $row ) {
+                if ( isset( $unimported_set[ (int) $row->bihr_id ] ) ) {
+                    $rows_to_process[] = $row;
+                } else {
+                    $rows_to_skip[] = $row;
+                }
+            }
+
+            if ( ! empty( $rows_to_skip ) ) {
+                $skip_ids = array_map( function( $row ) { return (int) $row->id; }, $rows_to_skip );
+                $ph = implode( ',', array_fill( 0, count( $skip_ids ), '%d' ) );
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( $wpdb->prepare( "UPDATE `{$queue_table}` SET status='done' WHERE id IN ({$ph})", $skip_ids ) );
+                $skipped += count( $skip_ids );
+                WP_CLI::log( sprintf( '    → %d déjà importé(s), ignoré(s)', count( $skip_ids ) ) );
+            }
+
+            if ( empty( $rows_to_process ) ) {
+                update_option( 'bihrwi_mass_import_stats', array(
+                    'total'      => $total,
+                    'started_at' => $stats_opt['started_at'] ?? time(),
+                    'success'    => $success,
+                    'skipped'    => $skipped,
+                    'errors'     => $errors,
+                ) );
+                continue;
+            }
+
+            $rows     = $rows_to_process;
+            $bihr_ids = array_map( fn( $r ) => (int) $r->bihr_id, $rows );
+
             WP_CLI::log( sprintf(
                 '--- Chunk %d (%d produits | %d/%d traités) ---',
                 $chunk_num,
                 count( $rows ),
-                $success + $errors,
+                $success + $skipped + $errors,
                 $total
             ) );
 
@@ -458,6 +496,7 @@ class BihrWI_CLI_Commands {
                 'total'      => $total,
                 'started_at' => $stats_opt['started_at'] ?? time(),
                 'success'    => $success,
+                'skipped'    => $skipped,
                 'errors'     => $errors,
             ) );
 
@@ -494,8 +533,9 @@ class BihrWI_CLI_Commands {
         }
 
         WP_CLI::success( sprintf(
-            'File traitée. Succès: %d | Erreurs: %d | Total: %d',
+            'File traitée. Succès: %d | Déjà importés ignorés: %d | Erreurs: %d | Total: %d',
             $success,
+            $skipped,
             $errors,
             $total
         ) );

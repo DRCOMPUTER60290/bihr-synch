@@ -1501,6 +1501,242 @@ li {
     margin-right: 8px;
 }
 
+/* Import BIHR simplifié */
+.bihr-import-primary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+    margin: 18px 0 12px;
+    padding: 22px 24px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-left: 4px solid #2271b1;
+    border-radius: 6px;
+}
+
+.bihr-import-primary__copy {
+    max-width: 620px;
+}
+
+.bihr-import-eyebrow {
+    margin: 0 0 4px;
+    color: #646970;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.bihr-import-primary__copy h2 {
+    margin: 0 0 6px;
+    color: #1d2327;
+    font-size: 20px;
+    line-height: 1.3;
+}
+
+.bihr-import-primary__copy > p:last-child {
+    margin: 0;
+    color: #646970;
+}
+
+.bihr-import-primary__actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.bihr-import-ai-option,
+.bihr-import-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    color: #1d2327;
+    cursor: pointer;
+}
+
+.bihr-import-ai-option span,
+.bihr-import-option span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bihr-import-ai-option small,
+.bihr-import-option small {
+    color: #646970;
+    font-size: 11px;
+}
+
+.bihr-import-resume,
+.bihr-import-section,
+.bihr-pending-images-banner__idle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.bihr-import-resume {
+    margin: 12px 0;
+    padding: 12px 16px;
+    background: #fff8e5;
+    border: 1px solid #f0b849;
+    border-radius: 5px;
+}
+
+.bihr-import-resume__actions,
+.bihr-import-section__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bihr-import-progress {
+    margin: 12px 0;
+    padding: 14px 16px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 5px;
+}
+
+.bihr-import-progress__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.bihr-import-progress__head strong {
+    flex: 1;
+    min-width: 200px;
+}
+
+.bihr-import-progress__track {
+    height: 14px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    background: #f0f0f1;
+    border-radius: 7px;
+}
+
+.bihr-import-progress__track > div {
+    width: 0;
+    height: 100%;
+    background: #2271b1;
+    border-radius: inherit;
+    transition: width .3s ease;
+}
+
+#bihr-bi-count {
+    margin: 4px 0;
+    color: #1d2327;
+    font-weight: 600;
+}
+
+#bihr-bi-count:empty {
+    display: none;
+}
+
+#bihr-bi-stats,
+#bihr-img-dl-note {
+    color: #646970;
+    font-size: 12px;
+}
+
+.bihr-import-advanced {
+    margin: 12px 0 18px;
+    border: 1px solid #c3c4c7;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.bihr-import-advanced > summary {
+    padding: 12px 16px;
+    color: #2271b1;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.bihr-import-advanced[open] > summary {
+    border-bottom: 1px solid #dcdcde;
+}
+
+.bihr-import-advanced__body {
+    padding: 0 16px;
+}
+
+.bihr-import-section {
+    padding: 16px 0;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.bihr-import-section:last-of-type {
+    border-bottom: 0;
+}
+
+.bihr-import-section h3 {
+    margin: 0 0 4px;
+    font-size: 14px;
+}
+
+.bihr-import-section p {
+    margin: 0;
+    color: #646970;
+}
+
+.bihr-import-option {
+    min-width: 220px;
+}
+
+.bihr-pending-images-banner {
+    margin: 12px 0;
+    padding: 12px;
+    background: #fff8e5;
+    border-left: 3px solid #dba617;
+}
+
+.bihr-queue-ready {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+    padding: 10px 12px;
+    background: #f0f6ff;
+    border: 1px solid #72aee6;
+    border-radius: 4px;
+}
+
+.bihr-queue-ready code {
+    user-select: all;
+}
+
+@media screen and (max-width: 782px) {
+    .bihr-import-primary {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 16px;
+    }
+
+    .bihr-import-primary__actions {
+        width: 100%;
+    }
+
+    .bihr-import-primary__actions .button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .bihr-import-section {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
 .warning-list li:before {
     content: '⚠️ ';
     margin-right: 8px;

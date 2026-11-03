@@ -122,7 +122,7 @@ class BihrWI_Admin {
 			'bihr-admin-css',
 			BIHRWI_PLUGIN_URL . 'admin/css/bihr-admin.css',
 			array(),
-			BIHRWI_VERSION
+			filemtime( BIHRWI_PLUGIN_DIR . 'admin/css/bihr-admin.css' )
 		);
 
 		wp_enqueue_script(
@@ -2177,12 +2177,10 @@ class BihrWI_Admin {
         $filter_cat_l3     = isset( $_POST['cat_l3'] )          ? sanitize_text_field( wp_unslash( $_POST['cat_l3'] ) ) : '';
         $filter_cat_l2_not = isset( $_POST['cat_l2_not'] )      ? sanitize_text_field( wp_unslash( $_POST['cat_l2_not'] ) ) : '';
 
-        $skip_existing = ! empty( $_POST['skip_existing'] ) && '1' === $_POST['skip_existing'];
-
         $ids = $this->product_sync->get_all_filtered_product_ids(
             $filter_search, $filter_stock, $filter_price_min, $filter_price_max,
             $filter_category, $filter_cat_l1, $filter_cat_l2, $filter_cat_l3, $filter_cat_l2_not,
-            $skip_existing
+            true
         );
 
         if ( empty( $ids ) ) {
@@ -3839,7 +3837,8 @@ class BihrWI_Admin {
             $cat_l1,
             $cat_l2,
             $cat_l3,
-            $cat_l2_not
+            $cat_l2_not,
+            true
         );
 
         wp_send_json_success( array( 'ids' => $ids, 'count' => count( $ids ) ) );

@@ -1520,107 +1520,22 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
         <div id="bihr-image-progress-details" style="max-height: 120px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-size: 12px;"></div>
     </div>
 
-    <div style="margin-bottom: 15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-        <div>
-            <button id="bihr-select-all" class="button" style="margin-right: 5px;">Sélectionner tout (page)</button>
-            <button id="bihr-deselect-all" class="button" style="margin-right: 5px;">Désélectionner tout</button>
-            <button id="bihr-import-selected" class="button button-primary" disabled>
-                <span class="dashicons dashicons-upload" style="vertical-align: middle;"></span>
-                Importer les produits sélectionnés (<span id="bihr-selected-count">0</span>)
-            </button>
-            <button id="bihr-import-all-filtered" class="button button-secondary" style="margin-left: 10px;">
-                <span class="dashicons dashicons-database-import" style="vertical-align: middle;"></span>
-                Importer tous les produits filtrés
-            </button>
-            <label style="margin-left: 15px; font-weight: 600; cursor: pointer;" title="Importe les données produit sans télécharger les images — ×3 plus rapide. Téléchargez les images ensuite.">
-                <input type="checkbox" id="bihr-skip-images" style="margin-right: 4px;">
-                Sans images <span style="color:#2271b1;">(×3 plus rapide)</span>
-            </label>
+    <?php
+    global $wpdb;
+    $pending_img_count = (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = %s",
+        '_bihr_pending_image_url'
+    ) );
+    ?>
+
+    <section class="bihr-import-primary">
+        <div class="bihr-import-primary__copy">
+            <p class="bihr-import-eyebrow">Import BIHR</p>
+            <h2>Importer les nouveautés filtrées</h2>
+            <p>Les produits déjà importés sont ignorés automatiquement. Laissez cette page ouverte pendant l’import.</p>
         </div>
-
-        <?php
-        $pending_img_count = (int) count( get_posts( array(
-            'post_type'      => 'product',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'meta_query'     => array(
-                array( 'key' => '_bihr_pending_image_url', 'compare' => 'EXISTS' ),
-            ),
-        ) ) );
-        ?>
-        <?php if ( $pending_img_count > 0 ) : ?>
-        <div id="bihr-pending-images-banner" style="margin: 10px 0; padding: 12px 15px; background: #fff3cd; border-left: 4px solid #f0ad4e; border-radius: 2px;">
-
-            <!-- Vue initiale : bouton démarrer -->
-            <div id="bihr-img-dl-idle">
-                <span id="bihr-img-dl-count"><strong><?php echo intval( $pending_img_count ); ?></strong> produit(s) sans image en attente de téléchargement.</span>
-                <button id="bihr-download-pending-images" class="button button-primary" style="margin-left: 10px;">
-                    <span class="dashicons dashicons-download" style="vertical-align: middle;"></span>
-                    Télécharger les images manquantes
-                </button>
-            </div>
-
-            <!-- Vue en cours : barre de progression + stop -->
-            <div id="bihr-img-dl-progress" style="display:none;">
-                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <span id="bihr-img-dl-label" style="white-space:nowrap; font-weight:600;">Démarrage…</span>
-                    <div style="flex:1; min-width:200px; background:#e0e0e0; border-radius:4px; height:18px; overflow:hidden;">
-                        <div id="bihr-img-dl-bar" style="width:0%; height:100%; background:#2271b1; border-radius:4px; transition:width 0.4s ease; display:flex; align-items:center; justify-content:center;">
-                            <span id="bihr-img-dl-pct" style="color:#fff; font-size:11px; font-weight:bold; line-height:18px;"></span>
-                        </div>
-                    </div>
-                    <button id="bihr-stop-image-download" class="button button-secondary" style="white-space:nowrap; border-color:#d63638; color:#d63638;">
-                        <span class="dashicons dashicons-controls-pause" style="vertical-align:middle;"></span>
-                        Arrêter
-                    </button>
-                </div>
-                <div id="bihr-img-dl-note" style="margin-top:5px; font-size:12px; color:#666;">
-                    Le téléchargement continue en arrière-plan même si vous changez de page.
-                </div>
-            </div>
-
-        </div>
-        <?php endif; ?>
-
-        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-            <input type="hidden" name="action" value="bihrwi_start_mass_import" />
-            <?php wp_nonce_field( 'bihrwi_start_mass_import_action', 'bihrwi_start_mass_import_nonce' ); ?>
-            <!-- Repasser les filtres actuels au handler -->
-            <input type="hidden" name="search" value="<?php echo esc_attr( $filter_search ); ?>" />
-            <input type="hidden" name="stock_filter" value="<?php echo esc_attr( $filter_stock ); ?>" />
-            <input type="hidden" name="price_min" value="<?php echo esc_attr( $filter_price_min ); ?>" />
-            <input type="hidden" name="price_max" value="<?php echo esc_attr( $filter_price_max ); ?>" />
-            <input type="hidden" name="category_filter" value="<?php echo esc_attr( $filter_category ); ?>" />
-            <input type="hidden" name="cat_l1" value="<?php echo esc_attr( $filter_cat_l1 ); ?>" />
-            <input type="hidden" name="cat_l2" value="<?php echo esc_attr( $filter_cat_l2 ); ?>" />
-            <input type="hidden" name="cat_l3" value="<?php echo esc_attr( $filter_cat_l3 ); ?>" />
-            <input type="hidden" name="cat_l2_not" value="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>" />
-
-            <button type="submit" class="button button-secondary" style="border-color:#2271b1; color:#2271b1;">
-                <span class="dashicons dashicons-clock" style="vertical-align: middle;"></span>
-                Import massif en tâche de fond (tous les produits filtrés)
-            </button>
-        </form>
-
-        <!-- Bannière import interrompu (affichée dynamiquement si file pending) -->
-        <div id="bihr-resume-wrap" style="display:none; margin-top:10px; padding:12px 14px; background:#fff8e5; border:1px solid #f0b849; border-radius:4px; font-size:13px;">
-            <strong>⚡ Import interrompu détecté</strong> —
-            <span id="bihr-resume-pending"></span> produits restants dans la file.<br>
-            <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                <button type="button" id="bihr-resume-btn" class="button button-primary">
-                    <span class="dashicons dashicons-controls-play" style="vertical-align:middle;"></span>
-                    Reprendre l'import
-                </button>
-                <button type="button" id="bihr-resume-cancel-btn" class="button" style="color:#d63638; border-color:#d63638;">
-                    <span class="dashicons dashicons-trash" style="vertical-align:middle;"></span>
-                    Annuler et vider la file
-                </button>
-            </div>
-        </div>
-
-        <!-- Import rapide navigateur — sans délai cron, JS drive le loop -->
-        <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <button type="button" id="bihr-browser-import-btn" class="button button-primary"
+        <div class="bihr-import-primary__actions">
+            <button type="button" id="bihr-browser-import-btn" class="button button-primary button-hero"
                     data-nonce="<?php echo esc_attr( wp_create_nonce( 'bihrwi_browser_import_nonce' ) ); ?>"
                     data-search="<?php echo esc_attr( $filter_search ); ?>"
                     data-stock="<?php echo esc_attr( $filter_stock ); ?>"
@@ -1631,55 +1546,116 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     data-cat-l2="<?php echo esc_attr( $filter_cat_l2 ); ?>"
                     data-cat-l3="<?php echo esc_attr( $filter_cat_l3 ); ?>"
                     data-cat-l2-not="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>">
-                <span class="dashicons dashicons-performance" style="vertical-align:middle;"></span>
-                Import rapide (navigateur) — sans délai cron
+                <span class="dashicons dashicons-database-import" style="vertical-align:middle;"></span>
+                Démarrer l’import
             </button>
-            <button type="button" id="bihr-prepare-queue-btn" class="button button-secondary"
-                    data-nonce="<?php echo esc_attr( wp_create_nonce( 'bihrwi_browser_import_nonce' ) ); ?>"
-                    data-search="<?php echo esc_attr( $filter_search ); ?>"
-                    data-stock="<?php echo esc_attr( $filter_stock ); ?>"
-                    data-price-min="<?php echo esc_attr( $filter_price_min ); ?>"
-                    data-price-max="<?php echo esc_attr( $filter_price_max ); ?>"
-                    data-category="<?php echo esc_attr( $filter_category ); ?>"
-                    data-cat-l1="<?php echo esc_attr( $filter_cat_l1 ); ?>"
-                    data-cat-l2="<?php echo esc_attr( $filter_cat_l2 ); ?>"
-                    data-cat-l3="<?php echo esc_attr( $filter_cat_l3 ); ?>"
-                    data-cat-l2-not="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>"
-                    style="border-color:#2271b1; color:#2271b1;"
-                    title="Remplit la file avec les produits filtrés, puis lancez wp bihr process-queue depuis SSH">
-                <span class="dashicons dashicons-list-view" style="vertical-align:middle;"></span>
-                Préparer la file (WP-CLI)
-            </button>
-            <span style="color:#666; font-size:12px;">Gardez cet onglet ouvert. Les images sont téléchargées séparément.</span>
-            <label style="font-size:13px; color:#444; display:flex; align-items:center; gap:5px; cursor:pointer; margin-left:4px; white-space:nowrap;" title="Importe sans appel OpenAI — 4 workers parallèles — beaucoup plus rapide. Descriptions à enrichir séparément.">
+            <label class="bihr-import-ai-option" title="Sans appel OpenAI : conserve les descriptions BIHR et accélère l’import.">
                 <input type="checkbox" id="bihr-skip-ai" checked>
-                <strong>Sans IA</strong> <small style="color:#888;">(×4 rapide)</small>
-            </label>
-            <label style="font-size:13px; color:#444; display:flex; align-items:center; gap:5px; cursor:pointer; margin-left:4px; white-space:nowrap;" title="Exclut les produits déjà présents dans WooCommerce (product_id IS NOT NULL). Utile pour n'importer que les nouveautés.">
-                <input type="checkbox" id="bihr-skip-existing" checked>
-                <strong>Nouveaux seulement</strong> <small style="color:#888;">(ignore les déjà importés)</small>
+                <span><strong>Sans IA</strong><small>Plus rapide, descriptions BIHR conservées</small></span>
             </label>
         </div>
-        <!-- Message file prête pour WP-CLI -->
-        <div id="bihr-queue-ready" style="display:none; margin-top:8px; padding:10px 14px; background:#f0f6ff; border:1px solid #72aee6; border-radius:4px; font-size:13px;">
-            <strong id="bihr-queue-ready-msg"></strong><br>
-            Lancez depuis SSH : <code id="bihr-queue-ready-cmd" style="background:#e8edf3; padding:2px 6px; border-radius:3px; font-size:12px; user-select:all;"></code>
-        </div>
+    </section>
 
-        <!-- Barre de progression import rapide navigateur -->
-        <div id="bihr-bi-wrap" style="display:none; margin-top:12px; padding:14px 16px; background:#fff; border:1px solid #ccd0d4; border-radius:4px;">
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
-                <strong id="bihr-bi-label" style="min-width:220px;">Initialisation…</strong>
-                <div style="flex:1; min-width:160px; background:#e0e0e0; border-radius:3px; height:16px; overflow:hidden;">
-                    <div id="bihr-bi-bar" style="width:0%; height:100%; background:#0073aa; border-radius:3px; transition:width 0.4s;"></div>
+    <!-- Bannière import interrompu (affichée dynamiquement si file pending) -->
+    <div id="bihr-resume-wrap" class="bihr-import-resume" style="display:none;">
+        <div>
+            <strong>Un import a été interrompu.</strong>
+            <span id="bihr-resume-pending"></span> produit(s) restent à traiter.
+        </div>
+        <div class="bihr-import-resume__actions">
+            <button type="button" id="bihr-resume-btn" class="button button-primary">Reprendre l’import</button>
+            <button type="button" id="bihr-resume-cancel-btn" class="button">Vider la file</button>
+        </div>
+    </div>
+
+    <details class="bihr-import-advanced">
+        <summary>Autres options d’import et gestion des images</summary>
+        <div class="bihr-import-advanced__body">
+            <section class="bihr-import-section">
+                <div>
+                    <h3>Importer une sélection</h3>
+                    <p>Sélectionnez des lignes dans le tableau, puis lancez l’import.</p>
                 </div>
-                <span id="bihr-bi-pct" style="min-width:36px; font-weight:700; text-align:right;">0%</span>
-                <button type="button" id="bihr-bi-stop" class="button" style="border-color:#d63638; color:#d63638;">
-                    <span class="dashicons dashicons-controls-pause" style="vertical-align:middle;"></span> Arrêter
+                <div class="bihr-import-section__actions">
+                    <button id="bihr-select-all" class="button">Tout sélectionner sur cette page</button>
+                    <button id="bihr-deselect-all" class="button">Tout désélectionner</button>
+                    <button id="bihr-import-selected" class="button button-secondary" disabled>
+                        Importer la sélection (<span id="bihr-selected-count">0</span>)
+                    </button>
+                </div>
+                <label class="bihr-import-option" title="Les images seront téléchargées séparément après l’import.">
+                    <input type="checkbox" id="bihr-skip-images">
+                    <span><strong>Ne pas télécharger les images pendant l’import</strong><small>Les télécharger ensuite séparément</small></span>
+                </label>
+            </section>
+
+            <section class="bihr-import-section">
+                <div>
+                    <h3>Autres méthodes</h3>
+                    <p>À utiliser pour les gros imports ou si vous travaillez en SSH.</p>
+                </div>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="bihr-import-section__actions">
+                    <input type="hidden" name="action" value="bihrwi_start_mass_import" />
+                    <?php wp_nonce_field( 'bihrwi_start_mass_import_action', 'bihrwi_start_mass_import_nonce' ); ?>
+                    <input type="hidden" name="search" value="<?php echo esc_attr( $filter_search ); ?>" />
+                    <input type="hidden" name="stock_filter" value="<?php echo esc_attr( $filter_stock ); ?>" />
+                    <input type="hidden" name="price_min" value="<?php echo esc_attr( $filter_price_min ); ?>" />
+                    <input type="hidden" name="price_max" value="<?php echo esc_attr( $filter_price_max ); ?>" />
+                    <input type="hidden" name="category_filter" value="<?php echo esc_attr( $filter_category ); ?>" />
+                    <input type="hidden" name="cat_l1" value="<?php echo esc_attr( $filter_cat_l1 ); ?>" />
+                    <input type="hidden" name="cat_l2" value="<?php echo esc_attr( $filter_cat_l2 ); ?>" />
+                    <input type="hidden" name="cat_l3" value="<?php echo esc_attr( $filter_cat_l3 ); ?>" />
+                    <input type="hidden" name="cat_l2_not" value="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>" />
+                    <button type="submit" class="button">Lancer en tâche de fond</button>
+                </form>
+                <button type="button" id="bihr-prepare-queue-btn" class="button"
+                        data-nonce="<?php echo esc_attr( wp_create_nonce( 'bihrwi_browser_import_nonce' ) ); ?>"
+                        data-search="<?php echo esc_attr( $filter_search ); ?>"
+                        data-stock="<?php echo esc_attr( $filter_stock ); ?>"
+                        data-price-min="<?php echo esc_attr( $filter_price_min ); ?>"
+                        data-price-max="<?php echo esc_attr( $filter_price_max ); ?>"
+                        data-category="<?php echo esc_attr( $filter_category ); ?>"
+                        data-cat-l1="<?php echo esc_attr( $filter_cat_l1 ); ?>"
+                        data-cat-l2="<?php echo esc_attr( $filter_cat_l2 ); ?>"
+                        data-cat-l3="<?php echo esc_attr( $filter_cat_l3 ); ?>"
+                        data-cat-l2-not="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>">
+                    Préparer une file WP-CLI
                 </button>
+            </section>
+
+            <?php if ( $pending_img_count > 0 ) : ?>
+            <div id="bihr-pending-images-banner" class="bihr-pending-images-banner">
+                <div id="bihr-img-dl-idle" class="bihr-pending-images-banner__idle">
+                    <span id="bihr-img-dl-count"><strong><?php echo number_format_i18n( $pending_img_count ); ?></strong> produit(s) attendent leurs images.</span>
+                    <button id="bihr-download-pending-images" class="button">Télécharger les images manquantes</button>
+                </div>
+                <div id="bihr-img-dl-progress" style="display:none;">
+                    <div class="bihr-import-progress__head">
+                        <strong id="bihr-img-dl-label">Préparation du téléchargement…</strong>
+                        <span id="bihr-img-dl-pct"></span>
+                        <button id="bihr-stop-image-download" class="button">Arrêter</button>
+                    </div>
+                    <div class="bihr-import-progress__track"><div id="bihr-img-dl-bar"></div></div>
+                    <div id="bihr-img-dl-note">Le téléchargement continue même si vous quittez cette page.</div>
+                </div>
             </div>
-            <div id="bihr-bi-count" style="font-size:15px; font-weight:700; color:#23282d; margin-bottom:4px; display:none;"></div>
-            <div id="bihr-bi-stats" style="font-size:12px; color:#777;"></div>
+            <?php endif; ?>
+
+            <div id="bihr-queue-ready" class="bihr-queue-ready" style="display:none;">
+                <strong id="bihr-queue-ready-msg"></strong>
+                <span>Lancez depuis SSH : <code id="bihr-queue-ready-cmd"></code></span>
+            </div>
+        </div>
+    </details>
+        <div id="bihr-bi-wrap" class="bihr-import-progress" style="display:none;">
+            <div class="bihr-import-progress__head">
+                <strong id="bihr-bi-label">Préparation de l’import…</strong>
+                <span id="bihr-bi-pct"></span>
+                <button type="button" id="bihr-bi-stop" class="button">Arrêter</button>
+            </div>
+            <div class="bihr-import-progress__track"><div id="bihr-bi-bar"></div></div>
+            <div id="bihr-bi-count"></div>
+            <div id="bihr-bi-stats"></div>
         </div>
 
         <script>
@@ -1755,8 +1731,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 $('#bihr-bi-pct').text('0%');
                 $('#bihr-bi-stats').text('');
 
-                var skipExisting = $('#bihr-skip-existing').is(':checked') ? '1' : '0';
-                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce, skip_existing: skipExisting}, filters))
+                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce}, filters))
                     .done(function(resp) {
                         if (!resp.success) {
                             $('#bihr-bi-label').text('Erreur : ' + (resp.data || 'impossible de démarrer'));
@@ -1797,8 +1772,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                 };
                 btn.prop('disabled', true).text('Préparation…');
                 $('#bihr-queue-ready').hide();
-                var skipExistingQueue = $('#bihr-skip-existing').is(':checked') ? '1' : '0';
-                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce, skip_existing: skipExistingQueue}, filters))
+                $.post(ajaxurl, $.extend({action: 'bihrwi_browser_start_import', _wpnonce: nonce}, filters))
                     .done(function(resp) {
                         btn.prop('disabled', false).html('<span class="dashicons dashicons-list-view" style="vertical-align:middle;"></span> Préparer la file (WP-CLI)');
                         if (!resp.success) {
