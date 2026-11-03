@@ -1855,23 +1855,72 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
 
     </div>
 
+    <?php
+    // Paramètres de base pour les URLs de tri (préserve tous les filtres actifs)
+    $bihrwi_sort_base = array( 'page' => 'bihr-products' );
+    foreach ( array( 'search' => $filter_search, 'stock_filter' => $filter_stock, 'price_min' => $filter_price_min, 'price_max' => $filter_price_max, 'category_filter' => $filter_category, 'cat_l1' => $filter_cat_l1, 'cat_l2' => $filter_cat_l2, 'cat_l3' => $filter_cat_l3 ) as $k => $v ) {
+        if ( $v !== '' && $v !== null ) {
+            $bihrwi_sort_base[ $k ] = $v;
+        }
+    }
+
+    /**
+     * Génère l'URL de tri pour une colonne donnée.
+     * Si le tri actuel est $asc_key → bascule sur $desc_key, sinon → $asc_key.
+     */
+    function bihrwi_sort_url( $base, $asc_key, $desc_key, $current ) {
+        $next = ( $current === $asc_key ) ? $desc_key : $asc_key;
+        return admin_url( 'admin.php' ) . '?' . http_build_query( array_merge( $base, array( 'sort_by' => $next ) ), '', '&', PHP_QUERY_RFC3986 );
+    }
+
+    function bihrwi_sort_icon( $asc_key, $desc_key, $current ) {
+        if ( $current === $asc_key )  return ' ↑';
+        if ( $current === $desc_key ) return ' ↓';
+        return ' ↕';
+    }
+    ?>
+
+    <!-- Barre de recherche rapide -->
+    <form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="display:flex; align-items:center; gap:8px; margin:12px 0 8px; flex-wrap:wrap;">
+        <input type="hidden" name="page" value="bihr-products" />
+        <?php foreach ( array( 'stock_filter' => $filter_stock, 'price_min' => $filter_price_min, 'price_max' => $filter_price_max, 'category_filter' => $filter_category, 'cat_l1' => $filter_cat_l1, 'cat_l2' => $filter_cat_l2, 'cat_l3' => $filter_cat_l3, 'sort_by' => $sort_by ) as $k => $v ) :
+            if ( $v !== '' && $v !== null ) : ?>
+                <input type="hidden" name="<?php echo esc_attr( $k ); ?>" value="<?php echo esc_attr( $v ); ?>" />
+        <?php endif; endforeach; ?>
+        <input type="text" name="search" value="<?php echo esc_attr( $filter_search ); ?>"
+               placeholder="🔍 Rechercher SKU, nom, description…"
+               style="flex:1; min-width:200px; max-width:360px; height:32px; padding:0 8px; border:1px solid #8c8f94; border-radius:4px;" />
+        <select name="stock_filter" style="height:32px; border:1px solid #8c8f94; border-radius:4px; padding:0 6px;">
+            <option value="">Stock : tous</option>
+            <option value="in_stock"     <?php selected( $filter_stock, 'in_stock' ); ?>>En stock</option>
+            <option value="out_of_stock" <?php selected( $filter_stock, 'out_of_stock' ); ?>>Hors stock</option>
+        </select>
+        <button type="submit" class="button">Filtrer</button>
+        <?php if ( ! empty( $filter_search ) || ! empty( $filter_stock ) ) : ?>
+            <a href="<?php echo esc_url( admin_url( 'admin.php?page=bihr-products' ) ); ?>" class="button">✕</a>
+        <?php endif; ?>
+        <span style="color:#666; font-size:12px; margin-left:4px;">
+            <?php echo number_format_i18n( $total ); ?> résultat<?php echo $total > 1 ? 's' : ''; ?>
+        </span>
+    </form>
+
     <table class="widefat fixed striped">
         <thead>
             <tr>
                 <th style="width:40px;">
                     <input type="checkbox" id="bihr-select-all-checkbox" title="Tout sélectionner" />
                 </th>
-                <th style="width:60px;">ID</th>
-                <th style="width:120px;">SKU</th>
-                <th>Nom</th>
+                <th style="width:60px;"><a href="<?php echo esc_url( bihrwi_sort_url( $bihrwi_sort_base, 'id_asc', 'id_desc', $sort_by ) ); ?>" style="color:inherit; white-space:nowrap;">ID<?php echo bihrwi_sort_icon( 'id_asc', 'id_desc', $sort_by ); ?></a></th>
+                <th style="width:120px;"><a href="<?php echo esc_url( bihrwi_sort_url( $bihrwi_sort_base, 'sku_asc', 'sku_desc', $sort_by ) ); ?>" style="color:inherit; white-space:nowrap;">SKU<?php echo bihrwi_sort_icon( 'sku_asc', 'sku_desc', $sort_by ); ?></a></th>
+                <th><a href="<?php echo esc_url( bihrwi_sort_url( $bihrwi_sort_base, 'name_asc', 'name_desc', $sort_by ) ); ?>" style="color:inherit; white-space:nowrap;">Nom<?php echo bihrwi_sort_icon( 'name_asc', 'name_desc', $sort_by ); ?></a></th>
                 <th>Catégorie (Bihr)</th>
                 <th>Niveau 1</th>
                 <th>Niveau 2</th>
                 <th>Niveau 3</th>
                 <th>Description</th>
                 <th style="width:80px;">Image</th>
-                <th style="width:80px;">Stock</th>
-                <th style="width:120px;">Prix HT (dealer)</th>
+                <th style="width:80px;"><a href="<?php echo esc_url( bihrwi_sort_url( $bihrwi_sort_base, 'stock_asc', 'stock_desc', $sort_by ) ); ?>" style="color:inherit; white-space:nowrap;">Stock<?php echo bihrwi_sort_icon( 'stock_asc', 'stock_desc', $sort_by ); ?></a></th>
+                <th style="width:120px;"><a href="<?php echo esc_url( bihrwi_sort_url( $bihrwi_sort_base, 'price_asc', 'price_desc', $sort_by ) ); ?>" style="color:inherit; white-space:nowrap;">Prix HT (dealer)<?php echo bihrwi_sort_icon( 'price_asc', 'price_desc', $sort_by ); ?></a></th>
                 <th style="width:160px;">Action</th>
             </tr>
         </thead>
