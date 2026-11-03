@@ -197,7 +197,10 @@ class BihrWI_Product_Sync {
         $ph          = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
         $imported    = $wpdb->get_col(
             $wpdb->prepare(
-                "SELECT id FROM `{$table_name}` WHERE id IN ({$ph}) AND product_id IS NOT NULL",
+                "SELECT bp.id FROM `{$table_name}` bp
+                 WHERE bp.id IN ({$ph})
+                 AND bp.product_id IS NOT NULL
+                 AND EXISTS (SELECT 1 FROM {$wpdb->posts} p WHERE p.ID = bp.product_id AND p.post_type IN ('product','product_variation'))",
                 ...$ids
             )
         );

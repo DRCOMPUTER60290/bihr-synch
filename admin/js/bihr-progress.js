@@ -284,7 +284,9 @@ jQuery(document).ready(function($) {
                     currentIndex += batch.length;
                     var percent = Math.round((currentIndex / selectedProducts.length) * 100);
                     $progressBar.css('width', percent + '%').text(percent + '%');
-                    $progressText.text(currentIndex + ' / ' + selectedProducts.length + ' produits importés');
+                    var detail = successCount + ' créé(s)';
+                    if (errorCount > 0) detail += ', ' + errorCount + ' erreur(s)';
+                    $progressText.text(currentIndex + ' / ' + selectedProducts.length + ' traités — ' + detail);
                     importNextProductBatch();
                 }
             });
@@ -512,7 +514,10 @@ jQuery(document).ready(function($) {
                                 currentIndex += batch.length;
                                 var percent = Math.round((currentIndex / allProducts.length) * 100);
                                 $progressBar.css('width', percent + '%').text(percent + '%');
-                                $progressText.text(currentIndex + ' / ' + allProducts.length + ' produits importés');
+                                var detail = successCount + ' créé(s)';
+                                if (skippedCount > 0) detail += ', ' + skippedCount + ' ignoré(s)';
+                                if (errorCount > 0) detail += ', ' + errorCount + ' erreur(s)';
+                                $progressText.text(currentIndex + ' / ' + allProducts.length + ' traités — ' + detail);
                                 importNextFilteredProductBatch();
                             }
                         });
