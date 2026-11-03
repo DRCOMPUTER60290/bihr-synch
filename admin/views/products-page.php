@@ -1531,8 +1531,8 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
     <section class="bihr-import-primary">
         <div class="bihr-import-primary__copy">
             <p class="bihr-import-eyebrow">Import BIHR</p>
-            <h2>Importer les nouveautés filtrées</h2>
-            <p>Les produits déjà importés sont ignorés automatiquement. Laissez cette page ouverte pendant l’import.</p>
+            <h2>Importer les nouveautés filtrées (toutes les pages)</h2>
+            <p>Tous les produits correspondant aux filtres sont pris en compte, sur toutes les pages du tableau. Les produits déjà importés sont ignorés. Laissez cette page ouverte pendant l’import.</p>
         </div>
         <div class="bihr-import-primary__actions">
             <button type="button" id="bihr-browser-import-btn" class="button button-primary button-hero"
@@ -1547,7 +1547,7 @@ $prices_last_run  = get_option( 'bihrwi_prices_last_run', '' );
                     data-cat-l3="<?php echo esc_attr( $filter_cat_l3 ); ?>"
                     data-cat-l2-not="<?php echo esc_attr( isset( $filter_cat_l2_not ) ? $filter_cat_l2_not : '' ); ?>">
                 <span class="dashicons dashicons-database-import" style="vertical-align:middle;"></span>
-                Démarrer l’import
+                Importer tous les résultats
             </button>
             <label class="bihr-import-ai-option" title="Sans appel OpenAI : conserve les descriptions BIHR et accélère l’import.">
                 <input type="checkbox" id="bihr-skip-ai" checked>
