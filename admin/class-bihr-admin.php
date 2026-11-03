@@ -3839,7 +3839,8 @@ class BihrWI_Admin {
             $cat_l1,
             $cat_l2,
             $cat_l3,
-            $cat_l2_not
+            $cat_l2_not,
+            true // seulement les produits pas encore importés dans WooCommerce
         );
 
         wp_send_json_success( array( 'ids' => $ids, 'count' => count( $ids ) ) );
