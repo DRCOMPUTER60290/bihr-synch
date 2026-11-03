@@ -2481,12 +2481,12 @@ class BihrWI_Admin {
             }
         }
 
-        $done_count = $total > 0 ? ( $total - $new_pending ) : count( $rows );
+        $done_count = $success + $errors;
         $percent    = $total > 0 ? round( $done_count / $total * 100, 1 ) : 0.0;
 
         wp_send_json_success( array(
             'done'    => ( 0 === $new_pending ),
-            'pending' => $new_pending,
+            'pending' => $total > 0 ? max( 0, $total - $done_count ) : $new_pending,
             'total'   => $total,
             'success' => $success,
             'errors'  => $errors,
